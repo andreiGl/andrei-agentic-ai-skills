@@ -1,13 +1,16 @@
 # OS / tooling
 .DS_Store
 
-# Never publish live knowledge-base content — only the scaffold is tracked.
-# Uncomment if you point this repo at a real KB.
+# macOS custom folder icons. The real filename is "Icon" followed by a carriage
+# return, and a literal CR in this file gets eaten as the line ending — so match
+# it with "?" instead. `cp -R` drags these along from Finder-customized folders.
+Icon?
+
+# Live knowledge-base content must never be published — only the empty scaffold
+# is tracked here. These are inert while ~/.claude/knowledge holds the real KB
+# and only its conventions are symlinked in; uncomment if that ever changes.
 # knowledge/pages/**
 # knowledge/experiences/**
 # knowledge/raw/**
 !knowledge/**/.gitkeep
 !knowledge/raw/README.md
-
-# macOS custom folder icons
-Icon
