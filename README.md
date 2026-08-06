@@ -18,8 +18,11 @@ base and a set of coding behavioral guidelines — plus a custom status line.
 
 ## Installation
 
+Clone it wherever you keep repositories — `~/myProjects` below is a placeholder,
+substitute your own:
+
 ```bash
-git clone https://github.com/andreiGl/andrei-agentic-ai-skills.git
+git clone https://github.com/andreiGl/andrei-agentic-ai-skills.git ~/myProjects/andrei-agentic-ai-skills
 ```
 
 Then either copy the pieces into `~/.claude/`, or symlink them so this repo stays the
@@ -29,8 +32,9 @@ identically.
 ### Copy
 
 ```bash
-cp -R andrei-agentic-ai-skills/skills/* ~/.claude/skills/
-cp -R andrei-agentic-ai-skills/knowledge ~/.claude/knowledge
+REPO=~/myProjects/andrei-agentic-ai-skills
+cp -R "$REPO"/skills/* ~/.claude/skills/
+cp -R "$REPO"/knowledge ~/.claude/knowledge
 ```
 
 Simple, but edits made while working don't flow back — you have to remember to copy
@@ -39,7 +43,7 @@ them across, and in practice you won't.
 ### Symlink (what I run)
 
 ```bash
-REPO=~/IdeaProjects/andrei-agentic-ai-skills
+REPO=~/myProjects/andrei-agentic-ai-skills
 for s in "$REPO"/skills/*/; do ln -sfn "$s" ~/.claude/skills/"$(basename "$s")"; done
 ln -sfn "$REPO"/statusline-command.sh ~/.claude/statusline-command.sh
 ln -sfn "$REPO"/knowledge/CLAUDE.md ~/.claude/knowledge/CLAUDE.md
