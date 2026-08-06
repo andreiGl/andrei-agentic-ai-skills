@@ -1,0 +1,13 @@
+# OS / tooling
+.DS_Store
+
+# Never publish live knowledge-base content — only the scaffold is tracked.
+# Uncomment if you point this repo at a real KB.
+# knowledge/pages/**
+# knowledge/experiences/**
+# knowledge/raw/**
+!knowledge/**/.gitkeep
+!knowledge/raw/README.md
+
+# macOS custom folder icons
+Icon

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The LLM Knowledge Base System</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #0f1117; overflow: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #e2e8f0; }
+
+.deck { position: relative; width: 100%; height: 100%; }
+
+.slide {
+  position: absolute; inset: 0;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6vh 9vw;
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.slide.active { display: flex; opacity: 1; }
+
+.kicker {
+  font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  color: #63b3ed; margin-bottom: 18px;
+}
+h1 { font-size: 52px; font-weight: 800; color: #f7fafc; line-height: 1.15; margin-bottom: 20px; }
+h2 { font-size: 38px; font-weight: 800; color: #f7fafc; line-height: 1.2; margin-bottom: 28px; }
+.subtitle { font-size: 22px; color: #a0aec0; line-height: 1.5; max-width: 900px; }
+
+ul.points { list-style: none; margin-top: 8px; }
+ul.points li {
+  font-size: 22px; color: #cbd5e0; padding: 10px 0 10px 34px; position: relative; line-height: 1.4;
+  max-width: 950px;
+}
+ul.points li::before {
+  content: "→"; position: absolute; left: 0; color: #63b3ed; font-weight: 700;
+}
+ul.points li b { color: #f7fafc; }
+ul.points.tight li { padding: 7px 0 7px 34px; font-size: 19px; }
+
+.pain { color: #fc8181; }
+.win { color: #68d391; }
+
+/* Directory tree */
+.tree {
+  background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px;
+  padding: 26px 30px; margin-top: 24px; max-width: 680px;
+  font-family: 'SF Mono', monospace; font-size: 16px; line-height: 1.85; color: #cbd5e0;
+  white-space: pre;
+}
+.tree .dir { color: #68d391; font-weight: 700; }
+.tree .comment { color: #4a5568; }
+
+/* Pipeline diagram (reused pattern) */
+.pipeline { display: flex; align-items: center; gap: 0; margin: 30px 0 10px; flex-wrap: wrap; }
+.pipe-step {
+  background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px;
+  padding: 22px 22px; min-width: 190px; max-width: 230px;
+}
+.pipe-step .num {
+  display: inline-block; width: 26px; height: 26px; border-radius: 50%;
+  background: #2b6cb0; color: white; font-weight: 700; font-size: 13px;
+  text-align: center; line-height: 26px; margin-bottom: 10px;
+}
+.pipe-step .name { font-size: 16px; font-weight: 700; color: #f7fafc; margin-bottom: 6px; }
+.pipe-step .desc { font-size: 13px; color: #a0aec0; line-height: 1.4; }
+.pipe-arrow { font-size: 26px; color: #4a5568; padding: 0 10px; }
+
+/* Feature grid */
+.feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 10px; max-width: 1000px; }
+.feature-card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px; padding: 18px 20px; }
+.feature-card .title { font-size: 16px; font-weight: 700; color: #f7fafc; margin-bottom: 6px; }
+.feature-card .body { font-size: 14px; color: #a0aec0; line-height: 1.5; }
+
+/* Status badges */
+.badge-row { display: flex; gap: 14px; margin-top: 24px; }
+.badge {
+  border-radius: 10px; padding: 20px 26px; flex: 1; border: 1px solid #2d3748; background: #1a1f2e;
+}
+.badge .label { font-size: 15px; font-weight: 800; margin-bottom: 8px; }
+.badge .desc { font-size: 13px; color: #a0aec0; line-height: 1.5; }
+.badge.verified { border-color: #276749; }
+.badge.verified .label { color: #68d391; }
+.badge.inferred { border-color: #975a16; }
+.badge.inferred .label { color: #f6ad55; }
+.badge.stale { border-color: #822727; }
+.badge.stale .label { color: #fc8181; }
+
+/* Gate box */
+.gate-box {
+  background: #1a1f2e; border: 2px solid #2b6cb0; border-radius: 14px;
+  padding: 34px 40px; margin-top: 24px; max-width: 780px;
+}
+.gate-q { font-size: 22px; font-weight: 700; color: #f7fafc; margin-bottom: 18px; }
+.gate-ans { display: flex; gap: 20px; }
+.gate-col { flex: 1; padding: 16px 18px; border-radius: 8px; }
+.gate-col.yes { background: #17202e; border: 1px solid #2b4c7e; }
+.gate-col.no { background: #1e1a2e; border: 1px solid #553c9a; }
+.gate-col .verdict { font-weight: 800; font-size: 15px; margin-bottom: 6px; }
+.gate-col.yes .verdict { color: #90cdf4; }
+.gate-col.no .verdict { color: #d6bcfa; }
+.gate-col .action { font-size: 14px; color: #cbd5e0; }
+
+code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px; padding: 2px 6px; font-family: 'SF Mono', monospace; font-size: 0.9em; color: #90cdf4; }
+
+/* Story flow (discovered -> recorded -> prevented) */
+.story { display: flex; flex-direction: column; gap: 0; margin-top: 22px; max-width: 900px; }
+.story-step { display: flex; gap: 20px; align-items: flex-start; }
+.story-marker { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 34px; }
+.story-dot {
+  width: 34px; height: 34px; border-radius: 50%; background: #1a1f2e; border: 2px solid #2b6cb0;
+  display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; color: #90cdf4;
+}
+.story-line { width: 2px; flex: 1; background: #2d3748; min-height: 22px; }
+.story-body { padding-bottom: 22px; flex: 1; }
+.story-label { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #63b3ed; margin-bottom: 6px; }
+.story-quote {
+  font-size: 15px; color: #cbd5e0; line-height: 1.55; background: #1a1f2e; border: 1px solid #2d3748;
+  border-left: 3px solid #2b6cb0; border-radius: 6px; padding: 12px 16px; font-family: 'SF Mono', monospace;
+}
+.story-step.prevented .story-dot { border-color: #276749; color: #68d391; }
+.story-step.prevented .story-quote { border-left-color: #276749; }
+.story-meta { font-size: 15px; color: #a0aec0; margin-top: 10px; line-height: 1.5; font-style: italic; }
+
+/* Comparison table */
+.compare { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 1px; margin-top: 22px; max-width: 950px;
+  background: #2d3748; border-radius: 10px; overflow: hidden; }
+.compare > div { background: #1a1f2e; padding: 14px 18px; font-size: 14px; line-height: 1.4; }
+.compare .hd { background: #161b27; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #a0aec0; }
+.compare .wiki { color: #cbd5e0; }
+.compare .kb { color: #68d391; font-weight: 600; }
+
+/* Stat callout */
+.stat-row { display: flex; gap: 24px; margin-top: 26px; }
+.stat-box { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px; padding: 24px 30px; text-align: center; }
+.stat-box .num { font-size: 42px; font-weight: 800; color: #f7fafc; }
+.stat-box .cap { font-size: 13px; color: #a0aec0; margin-top: 6px; }
+.stat-arrow { font-size: 32px; color: #4a5568; align-self: center; }
+
+.bar { position: absolute; bottom: 0; left: 0; right: 0; height: 4px; background: #1a1f2e; }
+.bar-fill { height: 100%; background: #2b6cb0; transition: width .25s ease; }
+.pageno { position: absolute; bottom: 18px; right: 28px; font-size: 13px; color: #4a5568; font-family: monospace; }
+.hint { position: absolute; bottom: 18px; left: 28px; font-size: 12px; color: #4a5568; }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- 1: Title -->
+  <section class="slide active">
+    <div class="kicker">Team Presentation</div>
+    <h1>A Knowledge Base for Working with Claude</h1>
+    <p class="subtitle">A persistent, file-based memory system that survives context resets —
+      so the assistant doesn't relearn the same deployment quirk, silent failure mode, or
+      database surprise every single session.</p>
+  </section>
+
+  <!-- 2: The problem -->
+  <section class="slide">
+    <div class="kicker">The Problem</div>
+    <h2>Every session starts from zero</h2>
+    <ul class="points">
+      <li>Context windows <span class="pain">reset between sessions</span> — yesterday's hard-won discovery is gone tomorrow</li>
+      <li>Some facts <span class="pain">aren't in the code</span> — external behavior, silent failure modes, "why we chose X over Y"</li>
+      <li>Re-deriving them costs <span class="pain">real time</span> — re-reading the same logs, re-tracing the same silent failure</li>
+      <li>Tribal knowledge <span class="pain">lives in one person's head</span> until it bites someone else</li>
+    </ul>
+  </section>
+
+  <!-- 3: Not a static wiki -->
+  <section class="slide">
+    <div class="kicker">Not Just Stored Notes</div>
+    <h2>It behaves differently from a wiki page</h2>
+    <div class="compare">
+      <div class="hd">Behavior</div>
+      <div class="hd">Static wiki</div>
+      <div class="hd">This KB</div>
+
+      <div>When code changes</div>
+      <div class="wiki">Page silently goes stale — no signal</div>
+      <div class="kb">Page carries a trust label; contradictions get caught and corrected</div>
+
+      <div>When a fact is used</div>
+      <div class="wiki">Read passively, rarely re-checked</div>
+      <div class="kb">Verified with a live grep before being acted on, every time</div>
+
+      <div>When it grows</div>
+      <div class="wiki">Grows forever, nobody prunes it</div>
+      <div class="kb">Actively gated at write time and pruned in curation passes</div>
+
+      <div>Who writes to it</div>
+      <div class="wiki">Whoever remembers to edit it</div>
+      <div class="kb">Every session, automatically, right after doing the work</div>
+    </div>
+  </section>
+
+  <!-- 4: The layout -->
+  <section class="slide">
+    <div class="kicker">The Structure</div>
+    <h2>One directory, four kinds of content</h2>
+    <div class="tree">
+<span class="dir">knowledge/</span>
+├── CLAUDE.md           <span class="comment"># conventions &amp; processing rules</span>
+├── learnings.md        <span class="comment"># chronological log, read every session</span>
+├── <span class="dir">raw/</span>                <span class="comment"># original source dumps, verbatim</span>
+├── <span class="dir">knowledge/</span>           <span class="comment"># curated pages — the actual KB</span>
+│   ├── INDEX.md        <span class="comment"># tag-based navigation</span>
+│   ├── gotchas.md       <span class="comment"># one-line fast-scan facts</span>
+│   └── active-context.md <span class="comment"># open tickets, in-flux areas</span>
+└── <span class="dir">experiences/</span>         <span class="comment"># per-session decision logs</span>
+    </div>
+  </section>
+
+  <!-- 4: The gate -->
+  <section class="slide">
+    <div class="kicker">The Core Discipline</div>
+    <h2>Not everything deserves a page</h2>
+    <div class="gate-box">
+      <div class="gate-q">"Can this fact be derived from reading the code in under 3 tool calls?"</div>
+      <div class="gate-ans">
+        <div class="gate-col yes">
+          <div class="verdict">YES → skip it</div>
+          <div class="action">Module lists, class hierarchies, style rules — <code class="inline">grep</code>/<code class="inline">find</code> answers it faster than a stale page ever will.</div>
+        </div>
+        <div class="gate-col no">
+          <div class="verdict">NO → record it</div>
+          <div class="action">External behavior, silent failure modes, "why" decisions invisible in the diff — these are worth preserving.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5: What earns a page -->
+  <section class="slide">
+    <div class="kicker">What Actually Gets Written</div>
+    <h2>Category A facts only</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="title">Gotchas</div>
+        <div class="body">One-line, fast-scan facts that bite — e.g. "DS RI plugin silently disables itself if an index is missing." Lives in <code class="inline">gotchas.md</code>, read first every session.</div>
+      </div>
+      <div class="feature-card">
+        <div class="title">Knowledge pages</div>
+        <div class="body">Full pages for anything needing more than 3 sentences — class hierarchies with rationale, config differences between deployment profiles.</div>
+      </div>
+      <div class="feature-card">
+        <div class="title">Active context</div>
+        <div class="body">Open tickets, areas in flux, things to watch — updated at the end of sessions touching open work.</div>
+      </div>
+      <div class="feature-card">
+        <div class="title">Fragile areas</div>
+        <div class="body">Patterns that have caused repeated failures across multiple PRs — flagged so future work in that area gets extra scrutiny.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6: The loop in action -->
+  <section class="slide">
+    <div class="kicker">The Loop In Action — A Real Example</div>
+    <h2>Discovered once, never re-discovered</h2>
+    <div class="story">
+      <div class="story-step">
+        <div class="story-marker"><div class="story-dot">1</div><div class="story-line"></div></div>
+        <div class="story-body">
+          <div class="story-label">Discovered — 2026-06-15, PROJ-1234</div>
+          <div class="story-quote">The two deployment profiles route the same object types to
+            different storage backends. In the self-hosted profile, only
+            <code class="inline">users</code> and <code class="inline">groups</code> live in the shared
+            store — everything else sits in the service's own repository. In the cloud profile, all of
+            it lives in the shared store. That mismatch was the root cause of two earlier PRs scoping
+            their plugin to the wrong backend.</div>
+        </div>
+      </div>
+      <div class="story-step">
+        <div class="story-marker"><div class="story-dot">2</div><div class="story-line"></div></div>
+        <div class="story-body">
+          <div class="story-label">Recorded — same session, into gotchas.md + a full backend-routing page</div>
+          <div class="story-quote">"Before scoping any plugin to the shared store: check the repository
+            config for both profiles to confirm which backend each object type actually uses."</div>
+        </div>
+      </div>
+      <div class="story-step prevented">
+        <div class="story-marker"><div class="story-dot">✓</div></div>
+        <div class="story-body">
+          <div class="story-label">Prevented — 2026-07-09, three weeks later, same ticket</div>
+          <div class="story-quote">Re-reading the config against the recorded rule surfaced a scope gap
+            before it shipped: the existing integrity plugin is scoped to the service's own repository
+            only — it does <b>not</b> protect data in the shared store, even though both profiles load
+            side by side. Easy to assume coverage precisely because they load together. That gap became
+            the justification for a new PR, opened correctly the first time.</div>
+          <div class="story-meta">Two sessions, three weeks apart, same open ticket — the fact recorded on day one is what caught the mistake on day twenty-four.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7: Curation, not accumulation -->
+  <section class="slide">
+    <div class="kicker">It Prunes Itself, Too</div>
+    <h2>Growth is not the goal — signal is</h2>
+    <div class="stat-row">
+      <div class="stat-box"><div class="num">1,769</div><div class="cap">lines before curation</div></div>
+      <div class="stat-arrow">→</div>
+      <div class="stat-box"><div class="num">~700</div><div class="cap">lines after deleting 10 pages</div></div>
+    </div>
+    <ul class="points" style="margin-top:30px;">
+      <li>~60% of the initial KB turned out to be <b>Category B</b> — derivable from the code, written anyway because exploration naturally produces structural summaries</li>
+      <li>The gate is applied <b>at write time now</b>, not fixed up later in a big cleanup — the 2026-06-15 curation pass was the correction that taught this rule</li>
+      <li>Result: <code class="inline">gotchas.md</code> stays a true fast-scan — a wiki nobody prunes becomes a wiki nobody reads</li>
+    </ul>
+  </section>
+
+  <!-- 8: Freshness -->
+  <section class="slide">
+    <div class="kicker">Staying Honest</div>
+    <h2>Every page carries a trust level</h2>
+    <div class="badge-row">
+      <div class="badge verified">
+        <div class="label">✓ verified</div>
+        <div class="desc">Checked against the live codebase. Trust it.</div>
+      </div>
+      <div class="badge inferred">
+        <div class="label">≈ inferred</div>
+        <div class="desc">Written from exploration context, not direct verification. Confirm file paths and class names before acting.</div>
+      </div>
+      <div class="badge stale">
+        <div class="label">⚠ stale</div>
+        <div class="desc">Known to need updating. Read with skepticism; update after re-verifying.</div>
+      </div>
+    </div>
+    <ul class="points" style="margin-top:32px;">
+      <li>If a page contradicts observed reality, <b>the page loses</b> — update it and note the correction in <code class="inline">learnings.md</code></li>
+      <li>Named entities (classes, files, flags) are treated as claims about the past — grep before recommending</li>
+    </ul>
+    <div class="story-quote" style="margin-top:22px; max-width:900px;">
+      Real self-correction, one session apart: the gotcha said RF7 block 0 "has 1 string."
+      The next session hit a report file with an <b>empty</b> block 0 (<code class="inline">[]</code>) — the parser
+      silently over-counted and shifted every string index. The fix (<code class="inline">break</code> on <code class="inline">]</code>)
+      landed in the code AND the gotcha was rewritten same-day to say "size varies, never hardcode." The KB doesn't just store facts — it gets caught being wrong and corrects itself.
+    </div>
+  </section>
+
+  <!-- 7: Lifecycle -->
+  <section class="slide">
+    <div class="kicker">How It Grows</div>
+    <h2>A four-step loop, every session</h2>
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="num">1</div>
+        <div class="name">Save the source</div>
+        <div class="desc">Raw material lands in <code class="inline">raw/</code> verbatim, dated</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="num">2</div>
+        <div class="name">Extract &amp; gate</div>
+        <div class="desc">Apply the Category A test; write a page only if it survives</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="num">3</div>
+        <div class="name">Cross-link</div>
+        <div class="desc">Bidirectional <code class="inline">[[links]]</code> between related pages</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="num">4</div>
+        <div class="name">Log the session</div>
+        <div class="desc">Append to <code class="inline">learnings.md</code>; note decisions in <code class="inline">experiences/</code></div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top:28px; font-size:17px;">When <code class="inline">learnings.md</code> exceeds ~20 entries, a synthesis pass distills recurring themes into permanent pages and archives the rest.</p>
+  </section>
+
+  <!-- 8: Why it's worth it -->
+  <section class="slide">
+    <div class="kicker">The Payoff</div>
+    <h2>Small file, compounding return</h2>
+    <ul class="points">
+      <li><b>No re-deriving</b> — the DS RI plugin silent-disable gotcha gets caught before it burns another CI cycle</li>
+      <li><b>Faster onboarding</b> — anyone (human or LLM) picking up this project reads <code class="inline">gotchas.md</code> and <code class="inline">active-context.md</code> first, not the whole git history</li>
+      <li><b>Self-correcting</b> — freshness rules mean it degrades gracefully instead of silently rotting</li>
+      <li><b>Cheap to maintain</b> — the gate keeps it small; it stays a fast scan, not a wiki nobody reads</li>
+    </ul>
+  </section>
+
+</div>
+
+<div class="bar"><div class="bar-fill" id="barFill"></div></div>
+<div class="pageno" id="pageno"></div>
+<div class="hint">← → to navigate · Esc for overview</div>
+
+<script>
+const slides = document.querySelectorAll('.slide');
+let idx = 0;
+
+function render() {
+  slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+  document.getElementById('pageno').textContent = (idx + 1) + ' / ' + slides.length;
+  document.getElementById('barFill').style.width = ((idx + 1) / slides.length * 100) + '%';
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+    idx = Math.min(idx + 1, slides.length - 1); render();
+  } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+    idx = Math.max(idx - 1, 0); render();
+  } else if (e.key === 'Home') {
+    idx = 0; render();
+  } else if (e.key === 'End') {
+    idx = slides.length - 1; render();
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('a')) return;
+  const x = e.clientX, w = window.innerWidth;
+  if (x > w / 2) { idx = Math.min(idx + 1, slides.length - 1); }
+  else { idx = Math.max(idx - 1, 0); }
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
