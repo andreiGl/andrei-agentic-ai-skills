@@ -5,17 +5,20 @@ starting work.
 
 ## When to use
 
-At the start of a substantial task in a project that has knowledge pages. Wired into
-the global `CLAUDE.md`, so it usually runs without being asked.
+At the start of any substantial task. Wired into the global `CLAUDE.md`, so it usually
+runs without being asked.
 
-## What it loads
+Don't check whether the project has pages before running it — that check is the skill's
+first step, and the empty case costs one line.
 
-**Always:** `learnings.md`, `INDEX.md`, `gotchas.md`, `active-context.md`, and
-`pages/shared/patterns.md` if it exists.
+## What it does
 
-**Then by match:** any page whose **Project** is the current repo or `shared`, and
-whose **Tags** overlap the task or whose **Covers** globs match files the task will
-touch.
+Reads a fixed set of always-load files, then any page whose **Project** matches the
+current repo (or `shared`) and whose **Tags** overlap the task or whose **Covers**
+globs match files in play.
+
+The exact always-load list lives in [`SKILL.md`](SKILL.md) and only there — it used to
+be repeated in `INDEX.md`, and the two drifted.
 
 ## Status field
 

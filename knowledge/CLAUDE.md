@@ -19,12 +19,18 @@ knowledge/
 ├── gotchas.md          — one-line sharp facts, fast to scan
 ├── active-context.md   — open work and areas in flux
 ├── pages/<project>/    — curated knowledge pages, one directory per repo
+├── pages/shared/       — facts that apply everywhere, incl. patterns.md
 ├── experiences/        — per-session notes: decisions made, surprises found
+│   └── archive/        — entries already distilled into pages
 └── raw/                — original source material before extraction
 ```
 
 One directory per repo under `pages/`, named after the repo. Facts that apply
 everywhere go in `pages/shared/`.
+
+Distilled experience entries move into `experiences/archive/` rather than staying put.
+That's deliberate: `synthesize-knowledge` triggers on how many *undistilled* entries
+have accumulated, so leaving them in place would keep the trigger permanently true.
 
 ---
 
@@ -74,7 +80,13 @@ scanning: `db-`, `build-`, `auth-`.
 
 `Tags` drives loading — `load-knowledge` matches them against task keywords.
 `Covers` drives staleness — `check-knowledge` matches recently changed files against
-these globs. A page with neither is a page nothing will ever surface.
+these globs.
+
+Write `Covers: —` when the page describes no particular paths, as the cross-cutting
+pages (`gotchas`, `active-context`, `learnings`, `patterns`) all do. That's a real
+value, not a blank to be filled in later: it tells `check-knowledge` to skip the page
+rather than invent globs for it. **Tags**, by contrast, are never optional — a page
+without them will never be loaded by anything.
 
 **Status:**
 - `verified` — checked against the live codebase; trust it
@@ -142,4 +154,6 @@ Include **Prevented** only when a `gotchas.md` bullet visibly caught something d
 the session. Bullets that never appear in a Prevented entry across many sessions are
 candidates for deletion — that's the signal they aren't earning their place.
 
-Distill into pages when this file passes 20 entries. `synthesize-knowledge` owns that.
+`synthesize-knowledge` owns distillation, and its own "When to run" section is the only
+place the thresholds are stated. Don't restate them here or in the other skills — that
+is how three slightly different versions of one rule end up in three files.

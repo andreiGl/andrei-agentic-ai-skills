@@ -1,6 +1,6 @@
 ---
 name: synthesize-knowledge
-description: Find recurring patterns across past sessions in the personal knowledge base and distill them into pattern-level knowledge, then trim the raw logs. Use when experience entries have accumulated, or when the same module, bug class, or failure mode keeps reappearing in learnings.
+description: Find recurring patterns across past sessions in the personal knowledge base and distill them into pattern-level knowledge, then archive the raw logs. Use when undistilled experience entries have accumulated, or when the same module, bug class, or failure mode keeps reappearing in learnings.
 ---
 
 # Synthesize Knowledge — Pattern Extraction
@@ -11,17 +11,32 @@ sessions deliberately.
 
 ## When to run
 
-- `~/.claude/knowledge/experiences/` has 5 or more entries, **or**
-- `learnings.md` shows the same area, bug class, or failure mode in 3+ entries, **or**
+This section is the single source for these thresholds. The other skills and
+`knowledge/CLAUDE.md` point here rather than restating them.
+
+Run when any of these holds:
+
+- `~/.claude/knowledge/experiences/` has **5 or more entries** — counting files
+  directly in that directory, not the ones already moved to `experiences/archive/`
+- `learnings.md` shows the same area, bug class, or failure mode in **3+ entries**
+- `learnings.md` has grown past **20 entries**, whether or not a pattern is visible —
+  at that length it stops being scannable, which is its only job
 - You realize mid-session that you've solved this exact problem before
+
+The archive directory is what makes the first trigger resettable: distilling moves
+entries out of the count, so a run actually clears the condition it fired on.
 
 ---
 
 ## 1. Read the source material
 
-- Everything in `~/.claude/knowledge/experiences/`
+- Every entry directly in `~/.claude/knowledge/experiences/` (skip `archive/` unless
+  you're checking whether a pattern was already named)
 - `~/.claude/knowledge/learnings.md`
 - `~/.claude/knowledge/active-context.md`
+- `~/.claude/knowledge/pages/shared/patterns.md`, if it exists — a recurrence may
+  belong to a pattern that's already named, in which case bump its **Frequency**
+  rather than adding a near-duplicate
 
 ## 2. Look for repetition
 
@@ -54,24 +69,28 @@ observation, and observations don't change what happens next time.
 
 ## 4. Write `pages/shared/patterns.md`
 
-Use the standard page header from `~/.claude/knowledge/CLAUDE.md`, with
-`Project: shared` and `Tags: patterns, recurring, systemic`. One entry per pattern.
+Create `pages/shared/` if it doesn't exist yet. Use the standard page header from
+`~/.claude/knowledge/CLAUDE.md`, with `Project: shared`, `Tags: patterns, recurring,
+systemic`, and `Covers: —`. One entry per pattern.
 
-`load-knowledge` already loads this file whenever it exists — no wiring needed.
+`load-knowledge` reads this file whenever it exists — no wiring needed.
 
-## 5. Add a row to `INDEX.md`
+## 5. Update `INDEX.md`
 
-Once the page exists, if it isn't listed already.
+- Add a row for `patterns.md` if it isn't listed
+- Set **Last synthesized** to today's date
 
-## 6. Trim the source material
+The date is what this skill's first trigger reads. Skip it and the next session can't
+tell whether synthesis has ever run.
 
-- Move distilled experience entries into
-  `experiences/YYYY-MM-DD-distillation.md`, headed
+## 6. Archive what you distilled
+
+- Move distilled experience entries into `experiences/archive/`, creating it if needed
+- Trim `learnings.md` to its 10 most recent entries, appending the rest to
+  `experiences/archive/YYYY-MM-DD-distillation.md` under
   `# Distilled YYYY-MM-DD — promoted to patterns.md`
-- Trim `learnings.md` to its 10 most recent entries, archiving the rest to the same
-  distillation file
 
-Archive, don't delete. A pattern that turns out to be wrong needs its evidence.
+Archive, don't delete. A pattern that later turns out to be wrong needs its evidence.
 
 ## 7. Append to `learnings.md`
 

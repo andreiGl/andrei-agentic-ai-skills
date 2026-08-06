@@ -20,6 +20,9 @@ everything gathered; writes what survives into `pages/<project>/`; then populate
 **For an existing KB:** reads `learnings.md` and `INDEX.md` first, saves raw material
 in `raw/`, applies the gate, and adds a `gotchas.md` line or a full page.
 
+Tags are never optional — a page without them is never loaded. Covers may be `—` when
+the page describes no particular paths, which tells `check-knowledge` to skip it.
+
 ## The gate does most of the work
 
 > "Can this fact be derived from reading the code in under 3 tool calls?"

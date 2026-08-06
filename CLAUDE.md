@@ -12,10 +12,10 @@
 
 ## Knowledge base
 
-A cross-project knowledge base lives at ~/.claude/knowledge/, with conventions in ~/.claude/knowledge/CLAUDE.md. It applies to any project that has pages under ~/.claude/knowledge/pages/.
+A cross-project knowledge base lives at ~/.claude/knowledge/, with conventions in ~/.claude/knowledge/CLAUDE.md. Each skill below states its own trigger conditions — follow those rather than a copy kept here.
 
-- Before starting a substantial task in a project that has knowledge pages, run the load-knowledge skill.
-- After finishing a task that produced a surprise, a correction, or a rule worth keeping, run update-knowledge.
-- Before a large task, or when more than 2 weeks have passed since pages were last verified, run check-knowledge.
-- When ~/.claude/knowledge/experiences/ has 5+ entries, or ~/.claude/knowledge/learnings.md shows the same theme repeating, run synthesize-knowledge.
+- Run load-knowledge at the start of any substantial task. Don't check first whether the project has pages; that check is the skill's own first step, and it costs one line when there's nothing.
+- Run update-knowledge after finishing a substantial task.
+- Run check-knowledge before a large task, or when INDEX.md shows pages haven't been verified in over two weeks.
+- Run synthesize-knowledge when its "When to run" thresholds are met.
 - Use build-knowledge only when asked to create or extend a knowledge base. Don't bootstrap one mid-task as a detour.

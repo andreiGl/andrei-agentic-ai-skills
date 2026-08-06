@@ -1,6 +1,6 @@
 ---
 name: load-knowledge
-description: Load the personal knowledge base at ~/.claude/knowledge/ to prime context before starting work. Use at the start of a substantial task in a project that has knowledge pages, when past sessions have recorded gotchas, conventions, or open context worth carrying forward.
+description: Load the personal knowledge base at ~/.claude/knowledge/ to prime context before starting work. Use at the start of any substantial task, so gotchas, conventions, and open context recorded by past sessions are in hand before the first tool call.
 ---
 
 # Load the Knowledge Base
@@ -8,7 +8,13 @@ description: Load the personal knowledge base at ~/.claude/knowledge/ to prime c
 Read the knowledge base before working, so context from past sessions is in hand
 before the first tool call. Conventions live in `~/.claude/knowledge/CLAUDE.md`.
 
+Run this at the start of substantial work without checking first whether the project
+has pages — finding that out *is* step 1, and the empty case costs one line (see the
+end of this file).
+
 ## 1. Always load
+
+This list is authoritative; no other file restates it.
 
 1. `~/.claude/knowledge/learnings.md` — rules and surprises from past sessions
 2. `~/.claude/knowledge/INDEX.md` — every page, with tags and covered paths
@@ -21,10 +27,18 @@ on — that part of the KB just hasn't been built yet.
 
 ## 2. Then load by tag match
 
-Identify the current project from the repo name, then read `INDEX.md` and load any
-page where:
+Identify the current project:
 
-- **Project** is the current repo or `shared`, **and**
+```bash
+basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+```
+
+Outside a repository that falls back to the directory name, which is usually right. If
+it clearly isn't the project name, match on `shared` pages only rather than guessing.
+
+Then read `INDEX.md` and load any page where:
+
+- **Project** is the current project or `shared`, **and**
 - **Tags** overlap the task description, **or** **Covers** matches a file the task
   will touch
 

@@ -28,7 +28,8 @@ stale silently and nobody notices.
 
 2. **Create the directories:**
    ```bash
-   mkdir -p ~/.claude/knowledge/pages/<project> ~/.claude/knowledge/experiences ~/.claude/knowledge/raw
+   mkdir -p ~/.claude/knowledge/pages/<project> ~/.claude/knowledge/pages/shared \
+            ~/.claude/knowledge/experiences/archive ~/.claude/knowledge/raw
    ```
 
 3. **Apply the gate to everything gathered.** Sort into: page-worthy, one-line gotcha,
@@ -41,9 +42,10 @@ stale silently and nobody notices.
 
 5. **Populate `gotchas.md`** from the Gotchas section of every page written.
 
-6. **Add rows to `INDEX.md`** — Page, Project, Tags, Covers, Status. A page with no
-   Tags and no Covers will never be surfaced by `load-knowledge` or checked by
-   `check-knowledge`.
+6. **Add rows to `INDEX.md`** — Page, Project, Tags, Covers, Status. Tags are never
+   optional: a page without them will never be surfaced by `load-knowledge`. Covers
+   may be `—` when the page describes no particular paths, which tells
+   `check-knowledge` to skip it rather than invent globs.
 
 7. **Update `active-context.md`** with open work and areas currently in flux.
 
@@ -73,5 +75,6 @@ stale silently and nobody notices.
 - Every header has Project, Tags, Covers, Status, Last updated, Related
 - Code blocks are annotated with a language
 - `[[links]]` resolve, in both directions
-- `INDEX.md` has a row per page, with Tags and Covers filled in
+- `INDEX.md` has a row per page, every column filled — `—` where Covers doesn't apply,
+  never an empty cell
 - No module lists, class hierarchies, or restated style rules

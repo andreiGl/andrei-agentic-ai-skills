@@ -10,14 +10,27 @@ the pages that claim to describe it, and verifies those claims still hold.
 
 ## 1. Find what changed
 
-Run in the current repository — do not assume a path:
+Confirm you're in a repository first — this skill has nothing to work from otherwise:
 
 ```bash
-git log --since=2.weeks --name-only --pretty=format: | sort -u | grep -v '^$'
+git rev-parse --show-toplevel 2>/dev/null || echo "not a git repo"
 ```
 
-Widen the window if it returns almost nothing, or narrow it if the repo is busy
-enough that everything matches.
+If that fails, stop and say so. Verifying pages by hand against a non-repo directory
+isn't this skill's job.
+
+Then list what moved:
+
+```bash
+git log --since=2.weeks --no-merges --name-only --pretty=format: | sort -u | grep -v '^$'
+```
+
+`--no-merges` avoids double-counting: a merge commit's files already appear via the
+commits it brought in. The exception is a merge of work older than the window, whose
+commits `--since` filters out — widen the window if a known-busy area shows nothing.
+
+Widen or narrow the window generally: too little returned means it's too short, and
+everything matching means it's too long to be useful.
 
 ## 2. Map changed files to pages
 
@@ -25,8 +38,12 @@ Read `~/.claude/knowledge/INDEX.md`. For each page whose **Project** is the curr
 repo or `shared`, match its **Covers** globs against the changed files. A page whose
 covered paths changed is a candidate for staleness.
 
-If a page has no **Covers** value, it can't be checked this way. Fill it in — that's
-part of this pass, not a separate chore.
+**`Covers: —` means skip the page.** The cross-cutting pages — `gotchas`,
+`active-context`, `learnings`, `patterns` — describe no particular paths, so they
+have no staleness signal to read. Don't invent globs for them.
+
+A page with an *empty* Covers cell is different: that's an omission. Fill it in from
+what the page actually discusses, or set it to `—` if it genuinely covers no paths.
 
 Note any changed area that no page covers. That's a coverage gap, not a staleness
 problem, and it belongs in the report rather than being fixed here.
@@ -54,7 +71,13 @@ Check specific, falsifiable claims. "The module handles retries" can't be verifi
 `stale` without a note is useless to the next session — always say what changed and
 what needs confirming.
 
-## 5. Report
+## 5. Update `INDEX.md`
+
+Set **Last verified** to today's date. That field is what this skill's own
+"more than two weeks" trigger reads; without it there's nothing to compare against,
+and the trigger can never fire.
+
+## 6. Report
 
 - Pages verified
 - Pages marked stale, and why
@@ -68,5 +91,5 @@ writing the page here.
 ## When to run
 
 - Before a large task — a new feature or a significant refactor
-- When more than two weeks have passed since any page was marked `verified`
+- When **Last verified** in `INDEX.md` is more than two weeks old, or `never`
 - Mid-task, scoped to one page, the moment you catch a KB claim being wrong

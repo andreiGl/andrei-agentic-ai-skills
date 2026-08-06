@@ -6,27 +6,30 @@ describe them, then verifying their claims against live code.
 ## When to use
 
 - Before a large task (new feature, significant refactor)
-- When more than two weeks have passed since pages were last verified
+- When **Last verified** in `INDEX.md` is more than two weeks old, or `never`
 - Mid-task, scoped to a single page, when you catch a KB claim being wrong
-
-Wired into the global `CLAUDE.md` for the first two cases.
 
 ## What it does
 
-1. Lists files changed in the last two weeks in the **current** repo — no hardcoded paths
-2. Matches those files against each page's **Covers** globs in `INDEX.md`
-3. Spot-checks two or three specific, falsifiable claims per candidate page
-4. Updates status:
-   - Claim holds → bump `Last updated`, set `Status: verified`
-   - Claim is wrong → fix it, set `Status: verified`, add to `gotchas.md` if surprising
-   - Can't verify → set `Status: stale` **with a note on what's in doubt**
-5. Reports verified pages, stale pages, and changed areas no page covers
+1. Confirms it's in a git repository, and stops with a clear message if not
+2. Lists files changed in the last two weeks in the **current** repo — no hardcoded paths
+3. Matches those files against each page's **Covers** globs in `INDEX.md`
+4. Spot-checks two or three specific, falsifiable claims per candidate page
+5. Updates each page's `Status` and **Last updated**
+6. Stamps **Last verified** in `INDEX.md`
+7. Reports verified pages, stale pages, and changed areas no page covers
 
-## Why `Covers` matters
+## `Covers: —` means skip
 
-The file-to-page mapping is data, held in each page's header, not a table inside this
-skill. A page with no `Covers` value can never be checked — filling it in is part of
-this pass.
+The cross-cutting pages — `gotchas`, `active-context`, `learnings`, `patterns` —
+describe no particular paths and have no staleness signal to read. `—` is a real value
+telling this skill to leave them alone, not a blank to be filled in. An *empty* cell is
+different: that's an omission worth fixing during the pass.
+
+## Why it stamps a date
+
+The "more than two weeks" trigger has to read that date from somewhere. Without the
+stamp there's nothing to compare against and the trigger can never fire.
 
 ## Related
 

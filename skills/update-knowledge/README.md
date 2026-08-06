@@ -3,26 +3,33 @@
 Persists learnings from the current task into `~/.claude/knowledge/`. Wired into the
 global `CLAUDE.md`, so it usually runs without being asked.
 
-## What it does
+## What's conditional and what isn't
 
-1. Decides whether anything is worth recording at all — routine tasks are skipped
-2. Applies the Category A gate: facts derivable from the code in under 3 tool calls
-   don't become pages
-3. Routes what survives — a line in `gotchas.md`, an edit to an existing page, or a
-   new page in `pages/<project>/` with an `INDEX.md` row and bidirectional `[[links]]`
-4. Appends to `learnings.md`
-5. Writes an experience entry in `experiences/YYYY-MM-DD-<topic>.md`
-6. Updates `active-context.md` if open work changed state
+| Output | When |
+| :--- | :--- |
+| A page, or a `gotchas.md` line | Only when the Category A gate passes |
+| A `learnings.md` entry | Only when there was a rule or surprise |
+| An experience entry | Always |
+
+A routine task produces only the experience entry. That's the normal outcome — a page
+per task is how a knowledge base fills with noise and stops being read.
 
 ## Why the experience entry is unconditional
 
-`synthesize-knowledge` reads `experiences/` to find recurring patterns. If entries are
-only written on eventful sessions, the pattern signal disappears — the interesting
-part is often that the same area keeps coming up in otherwise unremarkable work.
+`synthesize-knowledge` reads `experiences/` to find recurring patterns. The useful
+signal is often that an unremarkable area keeps coming up; skip entries on quiet
+sessions and that signal disappears. Quiet sessions get three lines, not a full write-up.
+
+## Also
+
+Source material handed to you during the session — a pasted doc, an exported guide —
+gets saved verbatim to `raw/` before extraction. The extract is a summary; the source
+is the evidence.
+
+Distillation and trimming belong to [`synthesize-knowledge`](../synthesize-knowledge),
+which is the only place those thresholds are stated.
 
 ## Related
 
-- [`load-knowledge`](../load-knowledge) — loads the KB at the start of a task
-- [`build-knowledge`](../build-knowledge) — builds pages for a new project
-- [`check-knowledge`](../check-knowledge) — verifies existing pages are still accurate
-- [`synthesize-knowledge`](../synthesize-knowledge) — distills recurring patterns
+- [`load-knowledge`](../load-knowledge) · [`build-knowledge`](../build-knowledge) ·
+  [`check-knowledge`](../check-knowledge) · [`synthesize-knowledge`](../synthesize-knowledge)
