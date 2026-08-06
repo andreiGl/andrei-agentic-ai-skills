@@ -18,26 +18,53 @@ base and a set of coding behavioral guidelines — plus a custom status line.
 
 ## Installation
 
-Clone, then copy the pieces you want into `~/.claude/`:
-
 ```bash
 git clone https://github.com/andreiGl/andrei-agentic-ai-skills.git
 ```
 
-Skills — copy all of them, or just the directories you want:
+Then either copy the pieces into `~/.claude/`, or symlink them so this repo stays the
+source of truth. Claude Code follows symlinks, and skills registered through one behave
+identically.
+
+### Copy
 
 ```bash
 cp -R andrei-agentic-ai-skills/skills/* ~/.claude/skills/
+cp -R andrei-agentic-ai-skills/knowledge ~/.claude/knowledge
 ```
+
+Simple, but edits made while working don't flow back — you have to remember to copy
+them across, and in practice you won't.
+
+### Symlink (what I run)
+
+```bash
+REPO=~/IdeaProjects/andrei-agentic-ai-skills
+for s in "$REPO"/skills/*/; do ln -sfn "$s" ~/.claude/skills/"$(basename "$s")"; done
+ln -sfn "$REPO"/statusline-command.sh ~/.claude/statusline-command.sh
+ln -sfn "$REPO"/knowledge/CLAUDE.md ~/.claude/knowledge/CLAUDE.md
+ln -sfn "$REPO"/knowledge/raw/README.md ~/.claude/knowledge/raw/README.md
+ln -sfn "$REPO"/knowledge/presentation ~/.claude/knowledge/presentation
+```
+
+Editing a skill now edits the repo, and `git status` shows the change.
 
 Claude Code discovers skills at `~/.claude/skills/<name>/SKILL.md`, one level deep.
 Nesting them in subdirectories stops them being registered.
 
-The knowledge base scaffold — empty files with the right structure and conventions:
+### What deliberately stays out of the symlinks
 
-```bash
-cp -R andrei-agentic-ai-skills/knowledge ~/.claude/knowledge
-```
+`INDEX.md`, `learnings.md`, `gotchas.md`, `active-context.md`, and the contents of
+`pages/`, `experiences/`, and `raw/` stay as real files in `~/.claude/knowledge/`.
+
+Those accumulate real notes about real work. Symlinking them would put every recorded
+learning straight into this repo's working tree, one `git add -A` away from being
+published. The copies here are empty templates for a fresh install — they're meant to
+diverge from a live knowledge base, which is why they aren't linked.
+
+The same reasoning applies to [`CLAUDE.md`](CLAUDE.md) at the repo root: it's an example
+of the wiring, not a symlink target, because global instructions tend to accumulate
+project-specific and private rules over time.
 
 The knowledge skills do nothing until the global `CLAUDE.md` tells Claude when to run
 them. See [`CLAUDE.md`](CLAUDE.md) in this repo for the wiring I use — copy the
