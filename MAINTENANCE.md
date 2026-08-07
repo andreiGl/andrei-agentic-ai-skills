@@ -171,7 +171,36 @@ done
 nothing else. The one-way check prints nothing — hub pages are exempt by design and are
 skipped above.
 
-## Rule 10 — stop condition
+## Rule 10 — repository integrity
+
+```bash
+git fsck --no-progress
+find .git -name 'Icon?' | wc -l
+```
+
+**Expected:** no output from the first; `0` from the second.
+
+macOS Finder creates a file named `Icon` followed by a carriage return in every
+directory of a folder carrying a custom icon — including inside `.git`. Git treats every
+file under `refs/` as a ref, so `refs/Icon\r` becomes a ref pointing at the null SHA and
+**`git fetch` fails outright** with `bad object refs/Icon?`. The same files under
+`objects/` make `fsck` report `bad sha1 file` for each one.
+
+The `Icon?` line in `.gitignore` cannot help here: `.gitignore` governs what gets
+committed, not what exists inside `.git`. This is a class of breakage no content sweep
+reaches, which is why it gets its own rule.
+
+Clean up with:
+
+```bash
+find . -name 'Icon?' -type f -delete
+```
+
+It recurs while the directory carries the `com.apple.FinderInfo` attribute. Check with
+`xattr <dir>`; clear it with `xattr -d com.apple.FinderInfo <dir>`, which also removes
+the folder's custom icon.
+
+## Rule 11 — stop condition
 
 Stop when every command above matches its documented output and rules 5 and 6 find
 nothing. Reopen on the next skill edit — that's when the asymmetry gets created.
