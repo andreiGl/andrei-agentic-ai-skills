@@ -4,15 +4,22 @@ The skills form a system: one writes what another reads. Most defects found so f
 not in any single file but in the seams between them, and none of them threw an error —
 they degraded silently and looked correct in review.
 
-This is the procedure that catches them. It exists in the repo rather than in a note
-somewhere because it is the maintenance procedure for the thing it is stored next to.
+This file is the procedure that catches them. It lives in the repo because it is the
+maintenance procedure for the thing it sits next to.
+
+**Every rule below carries its command and that command's expected output.** A rule
+written as prose is not a check — it passes review, reads as coverage, and never runs.
+Where a rule genuinely can't be a command it says so explicitly, so it's visibly a manual
+step rather than something a sweep is assumed to cover.
+
+Run everything from the repo root.
 
 ---
 
-## The two failure shapes
+## The three failure shapes
 
 **One fact, several files.** A rule written in two places drifts, because nothing forces
-copies to agree. Every fact has exactly one owner; other files point at it.
+copies to agree. Every fact has one owner; other files point at it.
 
 | Fact | Owner |
 | :--- | :--- |
@@ -21,80 +28,134 @@ copies to agree. Every fact has exactly one owner; other files point at it.
 | Distillation and trimming thresholds | `skills/synthesize-knowledge/SKILL.md` |
 | Page routing data (Tags, Covers) | The page headers; `INDEX.md` is a derived cache |
 
-**A reader with no writer.** For every path or field a skill reads, some skill must
-write it. A reader whose writer was never updated fails silently — the symptom is
-indistinguishable from "there was nothing to find."
+**A reader with no writer.** For every path or field a skill reads, some skill must write
+it. Two sub-forms, and only the first is greppable:
 
-This has two sub-forms, and only the first is greppable:
+1. The writer never mentions it.
+2. The writer mentions it *after* the reader runs. Both halves correct; sequence wrong.
 
-1. The writer never mentions the field at all.
-2. The writer mentions it, but *after* the reader runs. Both halves present and
-   correct; the sequence is wrong.
-
----
-
-## The rules
-
-1. **Edit the reader and the writer in the same change.** This is the one that actually
-   prevents the problem. When a field is added to both in one pass it holds; when the
-   writer is left for later, later doesn't come. If you can't do both, leave the
-   half-done state visibly broken rather than silently degraded.
-2. **Path targets are written in absolute form** — `~/.claude/knowledge/...` — so one
-   sweep finds them all. Bare directory names used as prose referents ("files directly
-   in `experiences/`") are fine; they aren't targets.
-3. **Sweeps for duplicated definitions anchor on the syntax of defining**, not on the
-   term. A skill that says "set `Status: stale`" is a consumer doing its job, not a
-   restated definition.
-4. **Test every new sweep against known-good data** and confirm it stays silent. A sweep
-   that always fires gets ignored, which is worse than not having it — it reads as
-   confirmation.
-5. **After reordering steps, inserting one, or moving a file, read the step sequence
-   straight through** and ask what each step assumes already exists. No sweep finds an
-   unknown ordering bug; that needs the semantics of the steps.
-6. **Stop when 1-4 are silent and 5 finds nothing.** Reopen on the next skill edit —
-   that's when the asymmetry gets created.
+**A check that exists only as prose.** "Confirm that X" in a document is not a check.
+Every rule here has a command for this reason.
 
 ---
 
-## Sweeps
-
-Run from the repo root.
+## Rule 1 — every path a skill reads, some skill writes
 
 ```bash
-# Every path a skill reads must exist or be created by some skill.
-# patterns.md is expected: created on first synthesis, and its reader guards for it.
 grep -rhoE '~/\.claude/knowledge/[A-Za-z0-9_./<>-]+' skills/*/SKILL.md \
   | sed 's#/$##' | sort -u | while read p; do
     case "$p" in *'<'*|*YYYY*) continue;; esac
     [ -e "${p/#\~/$HOME}" ] || echo "READ BUT ABSENT: $p"
   done
+```
 
-# Rule 2: relative path targets that the absolute sweep above cannot see.
-# Two hits are expected and correct — a prose referent in synthesize-knowledge's
-# trigger list, and a section heading naming its output file. Anything else is a bug.
+**Expected:** exactly one line, `~/.claude/knowledge/pages/shared/patterns.md`. It's
+created on first synthesis and its reader guards for absence. Anything else is a bug.
+
+## Rule 2 — path targets absolute, prose referents may stay relative
+
+Absolute form means one sweep finds them all. Bare directory names used as prose
+("files directly in `experiences/`") aren't targets and shouldn't be normalized.
+
+```bash
 grep -rnoE '`(raw|pages|experiences)/[A-Za-z0-9_./<>-]*`' skills/*/SKILL.md
+```
 
-# Thresholds outside their owner.
+**Expected:** exactly two lines — a prose referent in `synthesize-knowledge`'s trigger
+list, and a section heading naming its own output file. Anything else is a target that
+needs absolutising.
+
+## Rule 3 — sweeps for duplicated definitions anchor on defining syntax
+
+Not on the term. A skill that says "set `Status: stale`" is a consumer doing its job.
+
+```bash
+grep -rln "3 tool calls" skills/ knowledge/*.md      # Category A gate
+grep -rln '`stale` —' skills/ knowledge/             # Status values
 grep -rn "20 entries\|5 or more entries\|5+ entries" skills/ knowledge/*.md CLAUDE.md \
-  | grep -v "synthesize-knowledge/SKILL.md"
-
-# A description that restates a threshold. description drives auto-invocation,
-# so a stale copy there is the one being matched.
-for s in skills/*/SKILL.md; do
+  | grep -v "synthesize-knowledge/SKILL.md"          # thresholds
+for s in skills/*/SKILL.md; do                       # descriptions
   sed -n '3p' "$s" | grep -qE "5\+|5 or more|20 entries|3\+ entries" && echo "BUG $s"
 done
+```
 
-# Definitions restated outside their owner.
-grep -rln "3 tool calls" skills/ knowledge/*.md     # Category A gate
-grep -rln '`stale` —' skills/ knowledge/            # Status values
+**Expected:** first two print `knowledge/CLAUDE.md` and nothing else. Last two print
+nothing. `description:` drives auto-invocation, so a stale threshold there is the copy
+being matched.
 
-# Dangling wikilinks. Template placeholders in prose will show; read the list.
+## Rule 4 — any sweep with a non-empty expected set carries that set inline
+
+Otherwise it decays into noise and gets ignored, which is worse than not having it —
+it reads as confirmation. Rules 1 and 2 above are the two with expected output; both
+state it.
+
+Scope sweeps to tracked files. An unscoped walk picks up `plugins/` and marketplace
+caches, whose broken links are not ours to fix.
+
+## Rule 5 — edit reader and writer in the same change
+
+**Manual: no command covers this.**
+
+When a field is added to both in one pass it holds; when the writer is left for later,
+later doesn't come. If you can't do both, leave the half-done state visibly broken rather
+than silently degraded.
+
+This applies *within* a file too. A preamble and a numbered step are a reader/writer
+pair. So are a step and a cross-reference to it. Both copies of these skills
+independently produced the same two intra-file defects in `build-knowledge`.
+
+## Rule 6 — after reordering or moving anything, read the step sequence
+
+**Manual: no command covers this.** "Does step N depend on step M > N" needs the
+semantics of the steps.
+
+Read the numbered sequence straight through and ask what each step assumes already
+exists. Run it after inserting a step, reordering steps, or moving a file.
+
+Known-good baseline: `synthesize-knowledge` appends to `learnings.md` *after* trimming
+it — reverse that and the trim eats the synthesis entry. `check-knowledge` guards for a
+repository before using one. `build-knowledge` creates the conventions file before step 4
+reads it.
+
+## Rule 7 — links resolve, across every tracked file
+
+Scoped to `git ls-files`, not `find`. An earlier version of this walked only `skills/`
+and `knowledge/`, silently omitting `README.md`, `CLAUDE.md`, and this file — the three
+most-read files in the repo, unchecked. The parallel copy had the same gap and it hid
+five links broken by the round-1 flatten.
+
+```bash
+git ls-files '*.md' | while read f; do d=$(dirname "$f")
+  grep -oE '\]\([^)h#][^)]*\)' "$f" | sed 's/](\(.*\))/\1/' | while read l; do
+    [ -e "$d/${l%%#*}" ] || echo "BROKEN $f -> $l"
+  done
+done
+```
+
+**Expected:** no output.
+
+## Rule 8 — skills sit one level deep, or they are never registered
+
+```bash
+find -L ~/.claude/skills -mindepth 3 -name SKILL.md
+find -L ~/.claude/skills -name SKILL.md | wc -l
+```
+
+**Expected:** nothing from the first; `6` from the second.
+
+`-L` is load-bearing: the live skill directories are symlinks into this repo, and `find`
+won't follow them without it. Without `-L` the first command reports no nested skills —
+while the second reports zero skills at all, which is the only signal it's broken rather
+than clean. Check the count, not just the silence.
+
+## Rule 9 — KB link graph
+
+```bash
 pages=$(find knowledge -name '*.md' | sed 's#.*/##;s#\.md$##' | sort -u)
 for t in $(grep -rhoE '\[\[[a-z0-9-]+\]\]' knowledge/ | sort -u | tr -d '[]'); do
   echo "$pages" | grep -qx "$t" || echo "DANGLING [[$t]]"
 done
 
-# One-way links between topic pages. Hub pages are exempt by design.
 for f in $(find knowledge -name '*.md' ! -name 'INDEX.md'); do
   me=$(basename "$f" .md)
   case "$me" in gotchas|active-context|learnings|patterns|CLAUDE|README) continue;; esac
@@ -103,19 +164,17 @@ for f in $(find knowledge -name '*.md' ! -name 'INDEX.md'); do
     grep -q "\[\[$me\]\]" "$tf" || echo "ONE-WAY $me -> $t"
   done
 done
-
-# Skills must sit one level deep or they are never registered.
-# -L matters: the live directories are symlinks into this repo.
-find -L ~/.claude/skills -name SKILL.md | sed "s#$HOME/.claude/skills/##" \
-  | awk -F/ 'NF>2{print "UNREGISTERED: "$0}'
-
-# Relative links in docs.
-for f in $(find skills knowledge -name '*.md'); do d=$(dirname "$f")
-  grep -oE '\]\([^)h#][^)]*\)' "$f" | sed 's/](\(.*\))/\1/' | while read l; do
-    [ -e "$d/${l%%#*}" ] || echo "BROKEN $f -> $l"
-  done
-done
 ```
+
+**Expected:** the dangling check prints the template placeholders used in prose
+(`[[page-name]]`, `[[other-page]]`, `[[another-page]]`, `[[links]]`, `[[page-link]]`) and
+nothing else. The one-way check prints nothing — hub pages are exempt by design and are
+skipped above.
+
+## Rule 10 — stop condition
+
+Stop when every command above matches its documented output and rules 5 and 6 find
+nothing. Reopen on the next skill edit — that's when the asymmetry gets created.
 
 ---
 
@@ -123,13 +182,26 @@ done
 
 **`INDEX.md` is part template, part data.** The copy in this repo is an empty template.
 The live one at `~/.claude/knowledge/INDEX.md` is a real file, not a symlink, because it
-holds accumulated KB state. Edits to its *convention text* have to be applied in both
-places; edits to its *content* belong only in the live one. Diff them after touching
-either.
+holds accumulated KB state. Edits to its *convention text* go in both; edits to its
+*content* go only in the live one.
+
+```bash
+diff ~/.claude/knowledge/INDEX.md knowledge/INDEX.md
+```
+
+**Expected:** no output, until the live KB accumulates page rows and status dates — after
+which only those should differ.
 
 **Live KB content must never be symlinked into this repo.** Skills, the status line, the
 KB conventions, and the deck are symlinked here. `INDEX.md`, `learnings.md`,
 `gotchas.md`, `active-context.md`, and everything under `pages/`, `experiences/`, and
 `raw/` are deliberately not — they accumulate real notes about real work, and this repo
 is public. `.gitignore` carries the matching rules, commented out; uncomment them in the
-same change if that arrangement ever changes.
+same change if that ever changes.
+
+```bash
+find ~/.claude/knowledge -maxdepth 2 -type l
+```
+
+**Expected:** exactly three — `CLAUDE.md`, `presentation`, and `raw/README.md`. A symlink
+appearing for any content file is a leak waiting to happen.
