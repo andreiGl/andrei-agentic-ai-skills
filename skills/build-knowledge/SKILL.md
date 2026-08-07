@@ -8,6 +8,11 @@ description: Build or extend the personal knowledge base at ~/.claude/knowledge/
 Read `~/.claude/knowledge/CLAUDE.md` first — it defines the layout, the page header,
 and the **Category A gate**. This skill covers the procedure, not the conventions.
 
+**If that file doesn't exist, the KB has never been built and step 2 creates it.** Read
+it there, before step 4 writes the first page. Don't proceed past step 2 without it:
+every other skill defers to it, so a KB built without it starts with no conventions at
+all and nothing later notices.
+
 Apply that gate ruthlessly here, because this is where the most material arrives at
 once. Expect to discard most of what you gather. A KB that restates the codebase is
 worse than no KB: it goes stale silently and nobody notices.
@@ -33,10 +38,11 @@ worse than no KB: it goes stale silently and nobody notices.
 
    **Then check the files every skill assumes exist**, and write them if they don't:
 
-   - `~/.claude/knowledge/CLAUDE.md` — the conventions. Step 1 above tells you to read
-     it, and every other skill defers to it for the page header, the gate, and the link
-     rules. On a KB that has never been built, it is absent, and each of those pointers
-     resolves to nothing — the ownership scheme quietly becomes "nobody states this."
+   - `~/.claude/knowledge/CLAUDE.md` — the conventions. The preamble above tells you to
+     read it, and every other skill defers to it for the page header, the gate, and the
+     link rules. On a KB that has never been built it is absent, and each of those
+     pointers resolves to nothing — the ownership scheme quietly becomes "nobody states
+     this." Create it here, then read it before step 4.
    - `~/.claude/knowledge/raw/README.md` — the provenance convention `update-knowledge`
      points at when saving source material.
    - `INDEX.md`, `learnings.md`, `gotchas.md`, `active-context.md` — created in steps
@@ -48,8 +54,9 @@ worse than no KB: it goes stale silently and nobody notices.
 3. **Apply the gate to everything gathered.** Sort into: page-worthy, one-line gotcha,
    or discard. Most lands in the third bucket.
 
-4. **Write the pages** that survived, into `pages/<project>/`. Every structural fact
-   needs a **Why:** sentence — the why survives refactoring, the what doesn't.
+4. **Write the pages** that survived, into `~/.claude/knowledge/pages/<project>/`.
+   Every structural fact needs a **Why:** sentence — the why survives refactoring,
+   the what doesn't.
    Set `Status: inferred` for anything taken from exploration rather than verified
    against live code.
 
@@ -70,8 +77,8 @@ worse than no KB: it goes stale silently and nobody notices.
 
 8. **Seed `learnings.md`** with the non-obvious findings from the exploration.
 
-9. **Write an experience entry** in `experiences/YYYY-MM-DD-<topic>.md` with an
-   `Updated pages:` list.
+9. **Write an experience entry** in
+   `~/.claude/knowledge/experiences/YYYY-MM-DD-<topic>.md`, with an `Updated pages:` list.
 
 ---
 
@@ -79,7 +86,7 @@ worse than no KB: it goes stale silently and nobody notices.
 
 1. Read `learnings.md` and `INDEX.md` before writing anything — the fact may already
    be recorded, or contradicted.
-2. Save any raw source material in `raw/YYYY-MM-DD-<topic>.<ext>`.
+2. Save any raw source material in `~/.claude/knowledge/raw/YYYY-MM-DD-<topic>.<ext>`.
 3. Apply the gate.
 4. New fact → a line in `gotchas.md`. A full page only if three sentences won't do.
 5. Update `INDEX.md` and add `[[links]]` in both directions.

@@ -69,9 +69,9 @@ observation, and observations don't change what happens next time.
 
 ## 4. Write `pages/shared/patterns.md`
 
-Create `pages/shared/` if it doesn't exist yet. Use the standard page header from
-`~/.claude/knowledge/CLAUDE.md`, with `Project: shared`, `Tags: patterns, recurring,
-systemic`, and `Covers: —`. One entry per pattern.
+Create `~/.claude/knowledge/pages/shared/` if it doesn't exist yet. Use the standard
+page header from `~/.claude/knowledge/CLAUDE.md`, with `Project: shared`,
+`Tags: patterns, recurring, systemic`, and `Covers: —`. One entry per pattern.
 
 `load-knowledge` reads this file whenever it exists — no wiring needed.
 
@@ -85,9 +85,10 @@ tell whether synthesis has ever run.
 
 ## 6. Archive what you distilled
 
-- Move distilled experience entries into `experiences/archive/`, creating it if needed
+- Move distilled experience entries into `~/.claude/knowledge/experiences/archive/`,
+  creating it if needed
 - Trim `learnings.md` to its 10 most recent entries, appending the rest to
-  `experiences/archive/YYYY-MM-DD-distillation.md` under
+  `~/.claude/knowledge/experiences/archive/YYYY-MM-DD-distillation.md` under
   `# Distilled YYYY-MM-DD — promoted to patterns.md`
 
 Archive, don't delete. A pattern that later turns out to be wrong needs its evidence.

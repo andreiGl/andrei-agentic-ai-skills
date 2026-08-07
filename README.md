@@ -74,6 +74,10 @@ The knowledge skills do nothing until the global `CLAUDE.md` tells Claude when t
 them. See [`CLAUDE.md`](CLAUDE.md) in this repo for the wiring I use — copy the
 `## Knowledge base` section into your own `~/.claude/CLAUDE.md`.
 
+Editing these? Read [MAINTENANCE.md](MAINTENANCE.md) first. The skills read what each
+other write, and the defects that matter live in those seams — they degrade silently
+rather than erroring.
+
 ## Skills
 
 ### Code quality
