@@ -32,6 +32,12 @@ commits `--since` filters out — widen the window if a known-busy area shows no
 Widen or narrow the window generally: too little returned means it's too short, and
 everything matching means it's too long to be useful.
 
+**This two-week lookback is unrelated to the two-week staleness interval below**, even
+though the numbers match. This one asks "what changed recently"; that one asks "how
+long since anyone checked". Changing one does not imply changing the other — but if
+**Last verified** is older than this window, widen the window to reach back at least
+that far, or the changes in between are never examined by anything.
+
 ## 2. Map changed files to pages
 
 Read `~/.claude/knowledge/INDEX.md`. For each page whose **Project** is the current

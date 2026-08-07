@@ -82,6 +82,12 @@ scanning: `db-`, `build-`, `auth-`.
 `Covers` drives staleness — `check-knowledge` matches recently changed files against
 these globs.
 
+**The header is the source of truth for both.** `INDEX.md` carries the same values as a
+derived cache, so a skill can route without opening every page. When the two disagree,
+the header wins — copy it across rather than reconciling by hand. Verify a glob matches
+something real before writing it: an invented glob is worse than `—`, because then every
+unrelated commit flags the page.
+
 Write `Covers: —` when the page describes no particular paths, as the cross-cutting
 pages (`gotchas`, `active-context`, `learnings`, `patterns`) all do. That's a real
 value, not a blank to be filled in later: it tells `check-knowledge` to skip the page
@@ -100,8 +106,30 @@ without them will never be loaded by anything.
 2. Key concepts — terms and facts a reader needs first.
 3. Detail sections — H2/H3, code blocks annotated with a language.
 4. Gotchas — a dedicated section for what bites.
-5. Cross-references — `[[page-name]]`, no `.md` extension, always bidirectional.
-   If A links to B, add the link back from B.
+5. Cross-references — `[[page-name]]`, no `.md` extension. See below for how they
+   resolve and when a back-link is required.
+
+### How `[[links]]` resolve
+
+A link is the page's filename without `.md`. Resolve it by looking, in order, at:
+
+1. The KB root — `learnings`, `gotchas`, `active-context`, `INDEX`
+2. `pages/<current project>/`
+3. `pages/shared/`
+
+Filenames are unique across the whole KB, so a link never needs a path. Two pages in
+different projects must not share a name — if you want `db-notes` in two projects,
+prefix them.
+
+### When a back-link is required
+
+Topic page to topic page: **always both ways.** If A links B, add the link back from B.
+
+The four hub pages — `gotchas`, `active-context`, `learnings`, `patterns` — are exempt.
+They aggregate across the whole KB and link outward to many topic pages; requiring
+reciprocity would put a near-identical `Related:` line on every page in the KB, which
+carries no navigational information. A topic page links a hub only when that hub is
+genuinely worth reading alongside it.
 
 ---
 

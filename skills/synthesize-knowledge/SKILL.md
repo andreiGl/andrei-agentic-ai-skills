@@ -1,6 +1,6 @@
 ---
 name: synthesize-knowledge
-description: Find recurring patterns across past sessions in the personal knowledge base and distill them into pattern-level knowledge, then archive the raw logs. Use when undistilled experience entries have accumulated, or when the same module, bug class, or failure mode keeps reappearing in learnings.
+description: Find recurring patterns across past sessions in the personal knowledge base and distill them into pattern-level knowledge, then archive the raw logs. Use when asked to synthesize the knowledge base, extract recurring patterns, or distill experience entries, or when accumulated experiences and learnings are due for a synthesis pass. The "When to run" section states the thresholds.
 ---
 
 # Synthesize Knowledge — Pattern Extraction

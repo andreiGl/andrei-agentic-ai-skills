@@ -22,11 +22,8 @@ be repeated in `INDEX.md`, and the two drifted.
 
 ## Status field
 
-| Status | Meaning |
-| :--- | :--- |
-| `verified` | Checked against the live codebase — act on it |
-| `inferred` | From exploration — spot-check specific claims before acting |
-| `stale` | Known to need updating — read with skepticism |
+The values are defined in `knowledge/CLAUDE.md`. This skill covers what to *do* with a
+page that isn't `verified` — spot-check a claim before acting on it, then promote or fix.
 
 ## Related
 

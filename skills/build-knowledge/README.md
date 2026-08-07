@@ -25,10 +25,9 @@ the page describes no particular paths, which tells `check-knowledge` to skip it
 
 ## The gate does most of the work
 
-> "Can this fact be derived from reading the code in under 3 tool calls?"
-
-If yes, no page. Expect to discard most of what exploration turns up — a KB that
-restates the codebase goes stale silently and stops being read.
+The Category A gate is defined in `knowledge/CLAUDE.md`. Expect to discard most of what
+exploration turns up — a KB that restates the codebase goes stale silently and stops
+being read.
 
 ## Related
 

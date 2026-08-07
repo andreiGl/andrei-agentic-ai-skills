@@ -8,10 +8,9 @@ description: Build or extend the personal knowledge base at ~/.claude/knowledge/
 Read `~/.claude/knowledge/CLAUDE.md` first — it defines the layout, the page header,
 and the **Category A gate**. This skill covers the procedure, not the conventions.
 
-The gate does most of the work here: **if a fact can be derived from reading the code
-in under 3 tool calls, it does not become a page.** Expect to discard most of what
-you gather. A KB that restates the codebase is worse than no KB, because it goes
-stale silently and nobody notices.
+Apply that gate ruthlessly here, because this is where the most material arrives at
+once. Expect to discard most of what you gather. A KB that restates the codebase is
+worse than no KB: it goes stale silently and nobody notices.
 
 ---
 
@@ -32,6 +31,20 @@ stale silently and nobody notices.
             ~/.claude/knowledge/experiences/archive ~/.claude/knowledge/raw
    ```
 
+   **Then check the files every skill assumes exist**, and write them if they don't:
+
+   - `~/.claude/knowledge/CLAUDE.md` — the conventions. Step 1 above tells you to read
+     it, and every other skill defers to it for the page header, the gate, and the link
+     rules. On a KB that has never been built, it is absent, and each of those pointers
+     resolves to nothing — the ownership scheme quietly becomes "nobody states this."
+   - `~/.claude/knowledge/raw/README.md` — the provenance convention `update-knowledge`
+     points at when saving source material.
+   - `INDEX.md`, `learnings.md`, `gotchas.md`, `active-context.md` — created in steps
+     5-8 below, but create them empty now so nothing reads a missing file mid-run.
+
+   Copy these from an existing KB if you have one. Don't invent conventions here: this
+   skill is a consumer of that file, not its author.
+
 3. **Apply the gate to everything gathered.** Sort into: page-worthy, one-line gotcha,
    or discard. Most lands in the third bucket.
 
@@ -42,10 +55,16 @@ stale silently and nobody notices.
 
 5. **Populate `gotchas.md`** from the Gotchas section of every page written.
 
-6. **Add rows to `INDEX.md`** — Page, Project, Tags, Covers, Status. Tags are never
-   optional: a page without them will never be surfaced by `load-knowledge`. Covers
-   may be `—` when the page describes no particular paths, which tells
-   `check-knowledge` to skip it rather than invent globs.
+6. **Build `INDEX.md`.** It needs two things:
+
+   - A **KB status** block with `Last verified: never` and `Last synthesized: never`.
+     `check-knowledge` and `synthesize-knowledge` stamp those fields and read them to
+     decide whether they are due. Omit the block and both triggers have nothing to
+     evaluate — they never fire, silently.
+   - A **row per page** — Page, Project, Tags, Covers, Status. Tags are never optional:
+     a page without them will never be surfaced by `load-knowledge`. Covers may be `—`
+     when the page describes no particular paths, which tells `check-knowledge` to skip
+     it rather than invent globs.
 
 7. **Update `active-context.md`** with open work and areas currently in flux.
 

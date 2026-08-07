@@ -6,8 +6,8 @@ Every page under `pages/`. Match **Tags** against your task to decide what to lo
 `load-knowledge` owns the list of what gets read at the start of a session — it isn't
 restated here, so the two can't drift apart.
 
-**Category A only** — every page listed holds facts that can't be derived from reading
-the code in under 3 tool calls. See [CLAUDE.md](CLAUDE.md).
+**Category A only** — every page listed has passed the gate defined in
+[CLAUDE.md](CLAUDE.md).
 
 ---
 
@@ -27,6 +27,9 @@ evaluate.
 | Page | Project | Tags | Covers | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | _(none yet)_ | | | | |
+
+This table is a **derived cache** of the page headers, kept so skills can route without
+opening every page. The header wins on disagreement — copy it across.
 
 Fill every column. `—` is a valid Covers value; an empty cell is an omission. See
 [CLAUDE.md](CLAUDE.md) for what the fields mean.

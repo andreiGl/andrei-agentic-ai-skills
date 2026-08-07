@@ -28,8 +28,8 @@ keeps coming up. Skip them on quiet sessions and that signal disappears.
 
 ## 1. Apply the Category A gate
 
-From `~/.claude/knowledge/CLAUDE.md`: if the fact can be derived from reading the code
-in under 3 tool calls, it does not become a page.
+The gate is defined in `~/.claude/knowledge/CLAUDE.md` — apply it as written there.
+What it tends to catch in practice:
 
 Worth recording:
 - A gotcha that depends on external system behavior the code can't reveal
@@ -61,8 +61,17 @@ against live code.
 ### A new page
 
 Follow the header and body conventions in `~/.claude/knowledge/CLAUDE.md`. Write it to
-`pages/<project>/`, add a row to `INDEX.md` filling in every column (Page, Project,
-Tags, Covers, Status), and add `[[links]]` in both directions.
+`pages/<project>/` and add a row to `INDEX.md` filling in every column.
+
+Two header fields decide whether the page is ever seen again, so don't leave either to
+be filled in later:
+
+- **Tags** — keywords `load-knowledge` matches against a task description
+- **Covers** — repo-relative path globs `check-knowledge` matches against changed
+  files, or `—` if the page describes no particular paths
+
+A page with an empty `Covers` is invisible to staleness checks. Confirm a glob matches
+something real before writing it; an invented one is worse than `—`.
 
 ### Source material handed to you this session
 

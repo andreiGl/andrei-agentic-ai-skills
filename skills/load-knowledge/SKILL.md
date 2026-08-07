@@ -46,14 +46,18 @@ Load the whole page, not an excerpt — pages are small by design. When more tha
 pages match, load the ones whose Covers globs are closest to the files in play, and
 say which ones you skipped.
 
-## 3. Trust the Status field
+## 3. Act on the Status field
 
-- `verified` — checked against the live codebase; act on it
-- `inferred` — written from exploration, never verified. Before acting on a specific
-  claim (class name, path, method signature), spot-check it with one `grep` or `ls`.
-  If it holds, set `Status: verified` and bump **Last updated**. If it doesn't, fix
-  the page and note the correction in `learnings.md`.
-- `stale` — known to need updating; read with skepticism, verify before acting
+`~/.claude/knowledge/CLAUDE.md` defines what the three values mean. What to do with a
+page that isn't `verified`:
+
+- **`inferred`** — before acting on a specific claim (class name, path, method
+  signature), spot-check it with one `grep` or `ls`. If it holds, set
+  `Status: verified` and bump **Last updated**. If it doesn't, fix the page and note
+  the correction in `learnings.md`.
+- **`stale`** — verify before acting on anything in it, and don't promote it to
+  `verified` on the strength of one spot-check; a stale page was flagged for a reason
+  the note should name.
 
 ## When there is nothing to load
 
