@@ -5,13 +5,15 @@
 > so your mileage may vary.
 
 Claude Code skills for development workflows — a persistent cross-project knowledge
-base and a set of coding behavioral guidelines — plus a custom status line.
+base, a set of coding behavioral guidelines, a prose cleanup skill — plus a custom
+status line.
 
 ## Contents
 
 - [Installation](#installation)
 - [Skills](#skills)
   - [Code quality](#code-quality)
+  - [Writing](#writing)
   - [Knowledge base](#knowledge-base)
 - [How the knowledge base works](#how-the-knowledge-base-works)
 - [Status line](#status-line)
@@ -88,6 +90,17 @@ rather than erroring.
 
 Referenced directly from `CLAUDE.md` rather than invoked, so it applies to every
 coding task.
+
+### Writing
+
+| Skill | Description |
+| :--- | :--- |
+| [`stop-slop`](skills/stop-slop) | Strips the patterns that make prose read as AI-written: filler phrases, formulaic structures, passive voice, metronomic rhythm |
+
+Third-party — written by [Hardik Pandya](https://hvpandya.com) and vendored here from
+[hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop) under MIT, so a
+single symlink pass installs it alongside the rest. The skill's
+[README](skills/stop-slop/README.md) records the upstream commit and how to refresh it.
 
 ### Knowledge base
 
