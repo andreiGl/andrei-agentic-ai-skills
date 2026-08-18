@@ -102,6 +102,10 @@ Third-party — written by [Hardik Pandya](https://hvpandya.com) and vendored he
 single symlink pass installs it alongside the rest. The skill's
 [README](skills/stop-slop/README.md) records the upstream commit and how to refresh it.
 
+Wired in through the `## Writing` section of [`CLAUDE.md`](CLAUDE.md), so like the
+behavioral guidelines it applies without being invoked — scoped to prose that gets
+committed or published, and kept off chat replies and code comments.
+
 ### Knowledge base
 
 Five skills that maintain a knowledge base carrying context across sessions.

@@ -5,6 +5,11 @@
 - Follow the generic behavioral guidelines defined in ~/.claude/skills/behavioral-guidelines/SKILL.md when writing, reviewing, or refactoring code in any project.
 - When writing commit messages, do not include a Co-Authored-By line or any mention of Claude or Anthropic.
 
+## Writing
+
+- Follow the prose rules in ~/.claude/skills/stop-slop/SKILL.md when writing or editing prose that gets committed or published: READMEs, docs, commit messages, PR and issue text. Run its Quick Checks before delivering; the reference files load on demand.
+- Prose in chat replies and code comments is out of scope. Comment style is owned by the behavioral guidelines above.
+
 ## Models
 
 - Multi-agent tasks (review/analysis/research): sub-agents default to Sonnet; escalate verify/synthesis stages to Opus or high/xhigh effort.
