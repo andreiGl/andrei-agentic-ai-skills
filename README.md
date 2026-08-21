@@ -319,24 +319,41 @@ search and then exits quietly, which means a broken version of it is invisible.
 ## Experience entry check
 
 `update-knowledge` writes an experience entry unconditionally, and that entry is what
-`synthesize-knowledge` counts. It is also the one output that depends entirely on the
-model choosing to invoke a skill. [`kb-session-end.sh`](kb-session-end.sh) and
+`synthesize-knowledge` counts. It is also the one output that depends entirely on the model
+choosing to invoke a skill. [`kb-session-end.sh`](kb-session-end.sh) and
 [`kb-session-start.sh`](kb-session-start.sh) turn a missed entry into a recorded fact.
 
-A `SessionEnd` hook cannot ask for the entry itself: its stdout reaches the debug log
-only, and the session is over. So the work is split. At session end the first script
-decides whether an entry was owed and, if one was, appends a line to
-`~/.claude/knowledge/.experience-debt`. At the start of the next session the second
-script prints that queue, which for `SessionStart` lands in the transcript as context
-Claude can see, then moves it to `.experience-debt.log` so the queue clears but the
-history survives.
+A `SessionEnd` hook cannot ask for the entry itself. The session is over, Claude Code discards
+a `SessionEnd` hook's JSON output fields including `systemMessage`, and plain stdout from one
+reaches the debug log only. Nothing that hook prints is seen by anyone. So the work is split:
+at session end the first script decides whether an entry was owed and queues a line, and at
+the start of the next session the second script prints that queue, which for `SessionStart`
+does land in the transcript as context Claude can see.
 
-Owed means two things held: the transcript carried at least five `tool_use` records, and
-nothing under `experiences/` was written after the session began. The window comes from a
-marker file that `kb-session-start.sh` stamps per session and `find -newer` compares
-against, which keeps both scripts free of `stat` and its incompatible BSD and GNU flags.
-A `resume` or `compact` start leaves the marker alone, so the window tracks the stretch
-of work rather than the process. No marker means no window, and the check makes no claim.
+> Do not register the end script on `Stop`: that event fires after every turn.
+
+Owed means two things held. The transcript carried at least `KB_EXPERIENCE_MIN_TOOL_USES`
+`tool_use` blocks, and no file directly under `experiences/` was written after the session
+began. The window comes from a marker stamped per session and compared with `find -newer`,
+which keeps both scripts free of `stat` and its incompatible BSD and GNU flags. A `resume` or
+`compact` start leaves the marker alone, so the window tracks the stretch of work rather than
+the process. No marker means no window, and the check makes no claim rather than guessing.
+
+### Runtime state
+
+State lives outside the KB checkout, so the guard never writes to a versioned file:
+
+```text
+~/.claude/kb-session/
+├── markers/<session-id>.start
+├── experience-debt
+├── experience-debt.log
+└── experience-decisions.log
+```
+
+`KB_ROOT` and `KB_SESSION_STATE_ROOT` override `~/.claude/knowledge` and
+`~/.claude/kb-session`, which is what lets the tests run against a temp directory.
+`KB_EXPERIENCE_MIN_TOOL_USES` sets the threshold and defaults to 20.
 
 ### Install
 
@@ -349,35 +366,95 @@ ln -sfn "$REPO"/kb-session-start.sh ~/.claude/kb-session-start.sh
 ```json
 {
   "hooks": {
-    "SessionEnd": [
-      { "hooks": [{ "type": "command", "command": "sh ~/.claude/kb-session-end.sh", "timeout": 10 }] }
-    ],
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "sh ~/.claude/kb-session-start.sh", "timeout": 10 }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "sh ~/.claude/kb-session-end.sh", "timeout": 10 }] }
     ]
   }
 }
 ```
 
-Requires `jq` on `$PATH`.
+Merge those arrays with whatever is already configured rather than replacing them. Requires
+`jq`; both scripts exit quietly without it.
+
+The `timeout` of 10 is load-bearing. `SessionEnd` hooks default to a 1.5 second timeout, and
+the overall budget is raised to the highest per-hook timeout set in settings files. Reading a
+very large transcript can outlast the default.
+
+### Decision log
+
+Every evaluation appends one tab-separated row to `experience-decisions.log`:
+
+```text
+timestamp<TAB>project<TAB>raw-tool-use-count<TAB>verdict
+```
+
+| Verdict | Meaning |
+| :--- | :--- |
+| `below-threshold` | The session did not reach the local cutoff. |
+| `no-marker` | The session began before the start hook was active, or has no usable marker. |
+| `entry-written` | A file directly under `experiences/` is newer than the session marker. |
+| `flagged` | A qualifying session ended without such an entry, and a reminder was queued. |
+
+Skipped sessions are recorded too, so the skipping is visible rather than silent.
+
+Two installs comparing rates should exclude `no-marker` from both halves of the fraction, the
+same way `n/a` is excluded in the invocation-rate rule above: a session that began before the
+hook existed could not have been measured, and scoring it as a miss pads the rate with
+impossible cases. The unit is one `SessionEnd` evaluation, which is one session. Recording the
+raw count rather than only the verdict is what lets either side recompute a different
+threshold retroactively, so two installs never have to agree on one up front.
 
 ### About that threshold
 
-Five tool calls is a proxy for "task of substance", and proxies drift. Every session ends
-with a row in `.experience-decisions.log` recording the count and the verdict -
-`below-threshold`, `no-marker`, `entry-written`, or `flagged` - including the sessions
-that were skipped, so the skipping is visible rather than silent.
+The default is a proxy for "task of substance", and proxies drift. Measure rather than adopt
+it:
 
-Measured across 40 transcripts on the machine this was written on, sessions fell into
-0-2 tool calls and 35-264, with nothing in between. Any threshold from 3 to 34 sorted
-that history identically, so the number was not worth tuning there. On a busier install
-the gap may not exist, and the log is what settles it: if rows marked `below-threshold`
-start naming work worth recording, move the line to fit their counts.
+```bash
+cd ~/.claude/projects
+for f in $(find . -name "*.jsonl"); do
+  printf "%s\n" "$(grep -c '"type":"tool_use"' "$f" 2>/dev/null || echo 0)"
+done | sort -rn | uniq -c
+```
 
-The same data ruled out the sharper-looking signal. Counting file edits instead of tool
-calls would have discarded a 250-call session that made zero edits and was pure research,
-which is exactly the kind of session an experience entry is for. Counting `"type":"user"`
-records is no better, because the transcript tags tool results as user messages.
+Two installs have now run that, and got different shapes. On this one, across 40 transcripts,
+sessions fell into 0-2 tool uses and 35-264 with nothing in between, so every threshold from 3
+to 34 sorted that history identically and the number was not worth tuning. On a second, busier
+install the distribution was continuous with no such gap, a large share of sessions used no
+tools at all, and moving the cutoff by ten shifted the flagged share by several percent. The
+lesson is that the shape is local: read your own distribution before picking, and do not
+assume there is a gap to hide in.
+
+Note that the decision log finds false positives but not false negatives. A `below-threshold`
+row says a session was skipped, not whether it deserved an entry, and judging that needs the
+transcript. Sample the band just under your cutoff deliberately, because misses there never
+announce themselves.
+
+Two sharper-looking signals are worse. Counting file edits instead of tool uses discards
+research sessions, and one 250-call session on the first install made zero edits while being
+exactly the kind of work an experience entry is for. Counting `"type":"user"` records fails
+differently, since the transcript tags tool results as user messages, so a session with three
+real prompts can report forty turns.
+
+### Tests
+
+```bash
+sh -n kb-session-start.sh && sh -n kb-session-end.sh
+sh test-experience-entry-guard.sh
+```
+
+[`test-experience-entry-guard.sh`](test-experience-entry-guard.sh) runs both scripts against a
+temp directory via the environment overrides, covering a below-threshold session, a qualifying
+session with no entry, an archive-only entry, a direct entry, and marker preservation across
+`resume`. A file under `experiences/archive/` deliberately does not satisfy the requirement,
+since a distilled entry moved there is not a new entry.
+
+One known false positive: `mv` preserves mtime, so a session whose only work was a
+`synthesize-knowledge` run creates nothing newer under `experiences/` and will be flagged
+despite having done the right thing.
+
 
 ## License
 
