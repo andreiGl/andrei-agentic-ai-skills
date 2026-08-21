@@ -48,8 +48,14 @@ CMDS=$(jq -r 'try (.message.content[] | select(.type=="tool_use" and .name=="Bas
 writes=$(jq -r 'try (.message.content[] | select(.type=="tool_use" and (.name=="Write" or .name=="Edit")) | .name) // empty' "$T" 2>/dev/null | num '.')
 shw=$(printf '%s\n' "$CMDS" | num '(^|[^>])>[^>&]|>>|\btee\b|sed -i|<<|\bmv \b|\bcp \b|\brm ')
 
+# self means the session EDITED the skills repository, not that it mentioned one.
+# Grepping the whole transcript also flags a session that merely discussed the repo,
+# and excluding those shrinks a denominator that is already the scarce resource.
+# Reuses $CMDS, so this costs nothing extra.
 self=no
-grep -q "$SELF_MATCH" "$T" 2>/dev/null && self=yes
+printf '%s\n' "$CMDS" | grep "$SELF_MATCH" \
+  | grep -qE '(^|[^>])>[^>&]|>>|\btee\b|sed -i|<<|\bmv \b|\bcp \b|\brm |git (add|commit|push)' \
+  && self=yes
 
 printf '%s %s wg=%s bg=%s skills=%s writes=%s sh=%s self=%s\n' \
   "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$(printf '%s' "$SID" | cut -c1-8)" \
