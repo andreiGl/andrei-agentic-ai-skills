@@ -89,14 +89,9 @@ rather than erroring.
 | [`behavioral-guidelines`](skills/behavioral-guidelines) | How to carry out a task: surface assumptions, keep it simple, make surgical changes, define checkable success criteria, ground every claim in a source actually opened |
 | [`writing-guidelines`](skills/writing-guidelines) | How the result reads: plain language, no invented terms, register matched to the venue, none of the sentence shapes that mark text as machine-written |
 
-These started as one file aimed at code. It stopped firing the moment the task was a long
-piece of research and argument with no code in it — every clause of the description named
-code, so nothing prose-shaped ever matched, and the `CLAUDE.md` entry pointed at a file
-path, which reads as a citation rather than an instruction to open it.
-
-Both halves now carry a description written for their own kind of work, and `CLAUDE.md`
-invokes them by name. They compose: most tasks want both, and each file points at the
-other.
+These were one file until its description, which named code in every clause, stopped
+matching a long piece of research and argument that had no code in it. Split so each half
+carries a description for its own kind of work; they compose, and each points at the other.
 
 The writing half applies to any prose, in any language, whether or not code is involved —
 comments and commit messages, and equally reports, emails, and forum posts.
