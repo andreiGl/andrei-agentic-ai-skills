@@ -180,12 +180,20 @@ walking through the system - clone and open it in a browser.
 per turn, whether the guidance skills were invoked in that session:
 
 ```
-2026-08-21T18:22:57Z 64654c2f wg=yes bg=yes skills=4 writes=0
+2026-08-21T18:50:46Z 64654c2f wg=yes bg=yes skills=5 writes=0 sh=131 self=yes
 ```
 
 Session, whether the writing and work guidance skills were invoked, how many skill
-invocations in total, and how many file writes. The last column is what makes the data
-readable: `wg=no writes=12` is a signal, `wg=no writes=0` is a quiet turn.
+invocations in total, how many `Write`/`Edit` calls, how many shell commands that look
+like they changed a file, and whether the session edited this repository.
+
+`sh` exists because `writes` alone is blind. A session driven through heredocs, `sed`, and
+inline scripts logs `writes=0` while rewriting twenty five files, and the first version of
+this hook recorded exactly that. The line above is real: zero `Write` calls, 131 shell
+commands that touched files.
+
+`self=yes` marks a session that edited the skills repository. Those invoke the skills by
+construction and are excluded when computing a rate, not counted as successes.
 
 A third value, `n/a`, means the skill is not installed on this machine at all. `no` claims
 the skill was available and went unused, which is the thing being measured; a missing skill
@@ -207,7 +215,8 @@ This exists because a second install of this script does call its prose skill
 `write-for-humans`, and the first version hardcoded the greps.
 
 It reports and nothing else. No blocking, no output, exit 0 on every path including a
-malformed payload or a missing transcript.
+malformed payload or a missing transcript. About 260ms per turn on a 3MB transcript, run
+asynchronously.
 
 ### Why it exists
 
