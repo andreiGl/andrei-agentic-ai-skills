@@ -1,12 +1,21 @@
 ---
 name: check-knowledge
-description: Detect stale pages in the personal knowledge base by mapping recent repository changes to knowledge pages, then verifying their key claims against live code. Use before a large task, or when it has been more than two weeks since pages were last verified.
+description: Detect stale pages in the personal knowledge base by mapping recent repository changes to knowledge pages, then verifying their key claims against live code. Use before a large task, or when pages have gone unverified for a while. The When to run section states the trigger.
 ---
 
 # Check the Knowledge Base for Staleness
 
 Knowledge pages rot quietly. This maps recent activity in the current repository to
 the pages that claim to describe it, and verifies those claims still hold.
+
+## When to run
+
+This section is the single source for this trigger. `CLAUDE.md` and the other skills
+point here rather than restating it.
+
+- Before a large task — a new feature or a significant refactor
+- When **Last verified** in `INDEX.md` is more than two weeks old, or `never`
+- Mid-task, scoped to one page, the moment you catch a KB claim being wrong
 
 ## 1. Find what changed
 
@@ -91,11 +100,3 @@ and the trigger can never fire.
 
 If an uncovered area matters, flag it for a `build-knowledge` pass rather than
 writing the page here.
-
----
-
-## When to run
-
-- Before a large task — a new feature or a significant refactor
-- When **Last verified** in `INDEX.md` is more than two weeks old, or `never`
-- Mid-task, scoped to one page, the moment you catch a KB claim being wrong

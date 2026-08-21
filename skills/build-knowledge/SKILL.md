@@ -1,6 +1,6 @@
 ---
 name: build-knowledge
-description: Build or extend the personal knowledge base at ~/.claude/knowledge/ for a project. Use when asked to create a knowledge base, add a project to the KB, process source material into knowledge pages, or bootstrap context for a codebase that has none yet.
+description: Build or extend the personal knowledge base at ~/.claude/knowledge/ for a project. Use when asked to create a knowledge base, add a project to the KB, process source material into knowledge pages, or bootstrap context for a codebase that has none yet. The When to run section states the trigger.
 ---
 
 # Build or Extend the Knowledge Base
@@ -16,6 +16,22 @@ all and nothing later notices.
 Apply that gate ruthlessly here, because this is where the most material arrives at
 once. Expect to discard most of what you gather. A KB that restates the codebase is
 worse than no KB: it goes stale silently and nobody notices.
+
+## When to run
+
+This section is the single source for this trigger. `CLAUDE.md` and the other skills
+point here rather than restating it.
+
+Run only on request:
+
+- "Create a knowledge base" for a project that has none
+- "Add this project to the KB"
+- "Process this material into pages" — a design doc, a postmortem, a transcript
+
+Never start one mid-task as a detour. Finding that a project has no pages is not a
+trigger; it is the ordinary empty case `load-knowledge` reports in one line. A KB
+bootstrapped to justify itself in the middle of someone else's task is the kind that
+fills with restated code and stops being read.
 
 ---
 
