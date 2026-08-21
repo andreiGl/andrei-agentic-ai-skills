@@ -1,21 +1,30 @@
 # Behavioral Guidelines
 
-Behavioral guidelines to reduce common LLM coding mistakes when writing, reviewing, or refactoring code.
+How to carry out a task — code, research, analysis, review, planning, argument. Domain-
+and language-agnostic.
 
 ## What it does
 
-Referenced by the global `CLAUDE.md`, so it applies on every coding task without being
-invoked. Provides a set of principles Claude follows:
+Referenced by the global `CLAUDE.md` and invocable by name. Provides a set of principles
+Claude follows:
 
-1. **Think before coding** — surface assumptions, push back when warranted, ask rather than guess
-2. **Simplicity first** — minimum code that solves the problem, no speculative features or abstractions
-3. **Surgical changes** — touch only what the task requires, match existing style
+1. **Think before you start** — surface assumptions, push back when warranted, ask rather than guess
+2. **Simplicity first** — the minimum that solves the problem, no speculative features or sections
+3. **Surgical changes** — touch only what the task requires, match existing style and voice
 4. **Goal-driven execution** — define verifiable success criteria before starting
-5. **Read before you write** — understand existing usage and utilities before adding code
-6. **Checkpoint after every significant step** — summarize what was done, verified, and what's next
-7. **Fail loud** — surface uncertainty explicitly; never silently skip or assume away
-8. **Write for a human reader** — plain language in comments, docs, and PR text; no invented terms; clarity outranks brevity
-9. **Cut the AI tells** — throat-clearing openers, binary contrast, rhetorical setup, vague declaratives, hidden actors; adapted from [stop-slop](https://github.com/hardikpandya/stop-slop) under MIT
+5. **Read before you write** — open the real source; a search snippet is not the document
+6. **Checkpoint after every significant step** — what was done, verified, and what's next
+7. **Fail loud** — surface uncertainty explicitly; never silently skip
+8. **Ground every claim** — cite what you opened, carry each number's date and origin, concede early
+
+Section 8 is the counterpart to running the tests, for work that has no tests: research,
+comparison, fact-checking, argument.
+
+## Companion skill
+
+Wording lives in [`writing-guidelines`](../writing-guidelines) — plain language, register,
+and the sentence shapes that mark text as machine-written. This skill covers the work;
+that one covers how it reads. Most tasks want both.
 
 ## Tradeoff
 

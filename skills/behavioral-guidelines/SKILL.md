@@ -1,68 +1,90 @@
 ---
 name: behavioral-guidelines
-description: Generic, language- and project-agnostic behavioral guidelines to reduce common LLM coding mistakes. Use when writing, reviewing, or refactoring code in any project to avoid overcomplication, make surgical changes, surface assumptions, define verifiable success criteria, and write comments, docs, commit messages, and PR text in plain language, free of the phrases that mark prose as machine-written.
+description: Generic, domain- and language-agnostic guidelines for carrying out a task well - surface assumptions instead of guessing, keep it as simple as the problem allows, make surgical changes, define verifiable success criteria, read before writing, checkpoint progress, report uncertainty loudly, and ground every factual claim in a source actually opened. Use when writing, reviewing, or refactoring code in any project, and when carrying out any research, analysis, comparison, or multi-step task where being confidently wrong is the main risk. For the wording of whatever the task produces, see the writing-guidelines skill.
 ---
 
 # Behavioral Guidelines
 
-Behavioral guidelines to reduce common LLM coding mistakes.
+How to carry out a task. These apply to code and to everything else — research, analysis,
+review, planning, argument. Where a rule needs a concrete example, both kinds are given.
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+For the wording of the result — comments, commit messages, docs, reports, posts, chat
+replies — see the **writing-guidelines** skill. This file covers the work; that one covers
+how it reads.
 
-## 1. Think Before Coding
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use
+judgment.
+
+## 1. Think Before You Start
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-Before implementing:
+Before producing anything:
 - State your assumptions explicitly. If uncertain, ask.
 - If multiple interpretations exist, present them - don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
+Only interpretations that change the work are worth raising. "Function or method" usually
+isn't one. "Summary or rebuttal" is.
+
 ## 2. Simplicity First
 
-**Minimum code that solves the problem. Nothing speculative.**
+**The minimum that solves the problem. Nothing speculative.**
 
-- No features beyond what was asked.
-- No abstractions for single-use code.
+- No features, sections, or caveats beyond what was asked.
+- No abstractions for single-use code. No framework for a one-page document.
 - No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
+- No error handling for impossible scenarios. No rebuttal of arguments nobody made.
+- If you wrote 200 lines and it could be 50, rewrite it. Same for 2000 words.
 
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+Ask yourself: would someone experienced call this overbuilt? If yes, cut.
 
 ## 3. Surgical Changes
 
 **Touch only what you must. Clean up only your own mess.**
 
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
+When editing something that already exists:
+- Don't "improve" adjacent code, comments, formatting, or wording.
+- Don't refactor or rewrite what isn't broken.
+- Match the existing style and voice, even where you'd do it differently. Someone else's
+  document keeps their voice - you are editing it, not replacing them.
+- If you notice an unrelated problem, mention it. Don't fix it uninvited.
 
 When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
+- Remove imports, variables, functions, headings, or references that YOUR changes made
+  unused.
+- Leave pre-existing dead material alone unless asked.
 
-The test: Every changed line should trace directly to the user's request.
+The test: every changed line should trace directly to the request.
 
 ## 4. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**
 
-Transform tasks into verifiable goals:
+Turn the task into something checkable before starting:
 - "Add validation" → "Write tests for invalid inputs, then make them pass"
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - "Refactor X" → "Ensure tests pass before and after"
+- "Summarize this" → "Every claim traces to a named section of the source"
+- "Rebut this" → "Each of their points is answered or explicitly conceded, none skipped"
+- "Compare A and B" → "Same criteria applied to both, from sources of the same vintage"
+
+Strong criteria let you work independently. Weak criteria ("make it good") send you back
+to the user for every decision.
 
 ## 5. Read Before You Write
 
-**Before adding code, read exports, immediate callers, shared utilities.**
+**Understand what exists before adding to it.**
 
-- Understand how the thing you're about to change is already used.
-- Check for existing utilities that do what you're about to implement.
-- If you're unsure why code is structured a certain way, ask - don't guess and overwrite.
+- Code: read the exports, the immediate callers, the shared utilities. Check for an
+  existing helper that does what you're about to write.
+- Anything else: read the actual source, the whole thread, the prior messages. Check how
+  a term is already being used here before introducing your own.
+- Never characterize a document you haven't opened. A search-result snippet is not the
+  document - it is someone else's compression of it, and the part you need is often the
+  part they dropped.
+- If you're unsure why something is the way it is, ask. Don't guess and overwrite.
 
 ## 6. Checkpoint After Every Significant Step
 
@@ -75,14 +97,17 @@ After each meaningful step, restate:
 
 Don't continue from a state you can't describe clearly. Stop and restate.
 
+A few lines. This is a checkpoint, not a narration of every tool call.
+
 ## 7. Fail Loud
 
 **Surface uncertainty. Never silently skip.**
 
 - "Completed" is wrong if anything was skipped or assumed away.
 - "Tests pass" is wrong if any were skipped, excluded, or not run.
-- If something couldn't be verified, say so explicitly.
-- Default to surfacing uncertainty, not hiding it.
+- "Verified" is wrong if you checked one claim out of three.
+- If something couldn't be checked, say so, and name which part.
+- Default to surfacing uncertainty rather than hiding it.
 
 For multi-step tasks, state a brief plan:
 ```
@@ -91,75 +116,22 @@ For multi-step tasks, state a brief plan:
 3. [Step] → verify: [check]
 ```
 
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+## 8. Ground Every Claim
 
-## 8. Write for a Human Reader
+**A factual claim is worth only as much as the source you actually opened.**
 
-**Code comments, docstrings/Javadoc, commit messages, PR and Jira text, plans, reports,
-and chat replies should all read as if one person wrote them for another to read.**
+Running the tests has a counterpart outside code, and this is it.
 
-- Plain language. If a common word says the same thing, use the common word, and use no
-  jargon beyond what any engineer would already know.
-- No invented terms. Don't coin a phrase to compress an idea - state the idea. If a
-  domain term is genuinely unavoidable, say what it refers to in the same sentence.
-- Clarity outranks brevity. Where another rule says be terse, it means cut what the
-  reader doesn't need - never make what remains harder to follow. Don't compress until
-  it turns cryptic; don't pad to sound thorough.
-
-Usually padding, so reach for the plain word first: leverage, orthogonal, holistic,
-non-trivial, deep dive, circle back, double down, lean into, moving forward, navigate (a
-problem), unpack (an idea). Ban outright: any noun phrase you just coined.
-
-```
-Bad:  // Guards the freshness envelope against stale-read contract violations.
-Good: // Rejects the entry if it was read before the last write, returning stale data.
-```
-
-Applies to text you write or change - not a license to rewrite comments you're only
-reading past (see section 3).
-
-Test: would a colleague understand this on first read, without asking what a word means?
-
-## 9. Cut the AI Tells
-
-**A handful of sentence shapes mark text as machine-written. They carry no information,
-so they read as padding to a colleague and as filler to you a month later.**
-
-Applies to the same text as section 8, and to prose written on its own - a README, a doc,
-a commit message, a PR description.
-
-- **Throat-clearing openers.** "Here's the thing," "It turns out," "The truth is,"
-  "Let me be clear." Cut them and state the point.
-- **Binary contrast.** "It's not X, it's Y," "The problem isn't X. It's Y," "not just X
-  but Y." State Y and drop the negation.
-- **Negative listing.** Saying what a thing isn't before saying what it is. Say what it is.
-- **Rhetorical setup.** "What if...?", "Think about it:", "Here's what I mean:". Make the
-  point instead of announcing that you're about to.
-- **Emphasis crutches.** "Let that sink in," "Make no mistake," "Full stop."
-- **Meta-commentary.** "In this section we'll...", "As we'll see...", "Let me walk you
-  through." Let the document move.
-- **Vague declaratives.** "The implications are significant" names nothing. Name the
-  implication, or cut the sentence.
-- **Hidden actors.** Passive voice and inanimate subjects both drop the person who acted.
-  "The decision was reached" and "the decision emerges" are both "the team decided."
-
-```
-Bad:  Here's the thing: it's not a caching problem, it's an invalidation problem.
-      The implications are significant.
-Good: Invalidation is what breaks here. Two writers can clear the same key in either
-      order, and the loser's value survives.
-```
-
-Not banned: em dashes, adverbs, three-item lists, and sentences opening with a Wh- word.
-Blanket bans on those come from essay style guides, and enforcing them rewrites prose
-that was already fine. Cut a word because it carries no information, never because of its
-part of speech.
-
-Test: does the sentence survive deleting its first four words? Then those four words were
-throat-clearing.
-
----
-
-The pattern list in section 9 is adapted from
-[stop-slop](https://github.com/hardikpandya/stop-slop) by Hardik Pandya, MIT licensed.
-
+- Cite what you read, not what you searched for. If a search summary handed you a number,
+  open the source before using it. Summaries paraphrase, round, and drop qualifiers, and
+  the dropped qualifier is usually the one that decides the argument.
+- Carry each number's date and origin with it. "1,200 premature deaths (Health Canada,
+  published 2022, analysis year 2015)" survives scrutiny. "About 1,200 deaths" does not,
+  and collapses the moment someone asks how old the data is.
+- Keep verified, inferred, and assumed distinct, and mark which is which in the
+  deliverable rather than only in your head.
+- Check the figures that support your conclusion at least as hard as the ones that don't.
+  A number that fits too neatly is the one to open the PDF for.
+- When the other side is right, say so plainly and early. A concession you volunteer costs
+  one sentence. One that gets extracted from you costs the argument.
+- Don't stack inference on inference. Two uncertain steps make one worthless conclusion.

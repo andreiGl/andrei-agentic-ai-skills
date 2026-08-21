@@ -4,14 +4,14 @@
 > Shared as-is. These work for me but haven't been tested much beyond my own setup,
 > so your mileage may vary.
 
-Claude Code skills for development workflows — a persistent cross-project knowledge
-base and a set of coding behavioral guidelines — plus a custom status line.
+Claude Code skills — a persistent cross-project knowledge base, guidelines for how work
+gets carried out, and guidelines for how the result reads — plus a custom status line.
 
 ## Contents
 
 - [Installation](#installation)
 - [Skills](#skills)
-  - [Code quality](#code-quality)
+  - [Working and writing](#working-and-writing)
   - [Knowledge base](#knowledge-base)
 - [How the knowledge base works](#how-the-knowledge-base-works)
 - [Status line](#status-line)
@@ -80,16 +80,24 @@ rather than erroring.
 
 ## Skills
 
-### Code quality
+### Working and writing
 
 | Skill | Description |
 | :--- | :--- |
-| [`behavioral-guidelines`](skills/behavioral-guidelines) | Principles that reduce common LLM coding mistakes: avoid overcomplication, make surgical changes, surface assumptions, write for a human reader |
+| [`behavioral-guidelines`](skills/behavioral-guidelines) | How to carry out a task: surface assumptions, keep it simple, make surgical changes, define checkable success criteria, ground every claim in a source actually opened |
+| [`writing-guidelines`](skills/writing-guidelines) | How the result reads: plain language, no invented terms, register matched to the venue, none of the sentence shapes that mark text as machine-written |
 
-Referenced directly from `CLAUDE.md` rather than invoked, so it applies to every
-coding task. Sections 8 and 9 cover the prose that comes with the code — comments,
-commit messages, PR text — and own the writing rules on their own, so nothing else here
-duplicates them.
+These started as one file aimed at code. It stopped firing the moment the task was a long
+piece of research and argument with no code in it — every clause of the description named
+code, so nothing prose-shaped ever matched, and the `CLAUDE.md` entry pointed at a file
+path, which reads as a citation rather than an instruction to open it.
+
+Both halves now carry a description written for their own kind of work, and `CLAUDE.md`
+invokes them by name. They compose: most tasks want both, and each file points at the
+other.
+
+The writing half applies to any prose, in any language, whether or not code is involved —
+comments and commit messages, and equally reports, emails, and forum posts.
 
 ### Knowledge base
 
