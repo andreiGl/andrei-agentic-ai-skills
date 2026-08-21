@@ -423,9 +423,9 @@ Two installs have now run that, and got different shapes. On this one, across 40
 sessions fell into 0-2 tool uses and 35-264 with nothing in between, so every threshold from 3
 to 34 sorted that history identically and the number was not worth tuning. On a second, busier
 install the distribution was continuous with no such gap, a large share of sessions used no
-tools at all, and moving the cutoff by ten shifted the flagged share by several percent. The
-lesson is that the shape is local: read your own distribution before picking, and do not
-assume there is a gap to hide in.
+tools at all, and the cutoff therefore decides which sessions get reminded rather than
+inheriting an answer from the data. The lesson is that the shape is local: read your own
+distribution before picking, and do not assume there is a gap to hide in.
 
 Note that the decision log finds false positives but not false negatives. A `below-threshold`
 row says a session was skipped, not whether it deserved an entry, and judging that needs the
