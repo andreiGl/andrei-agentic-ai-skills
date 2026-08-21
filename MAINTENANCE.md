@@ -72,9 +72,10 @@ Not on the term. A skill that says "set `Status: stale`" is a consumer doing its
 ```bash
 grep -rln "3 tool calls" skills/ knowledge/*.md      # Category A gate
 grep -rln '`stale` —' skills/ knowledge/             # Status values
-grep -rn "20 entries\|5 or more entries\|5+ entries" skills/ knowledge/*.md CLAUDE.md \
+grep -rn "20 entries\|5 or more entries\|5+ entries\|5+ experience" \
+  skills/ knowledge/*.md CLAUDE.md README.md \
   | grep -v "synthesize-knowledge/"                  # synthesis thresholds
-grep -rn "two weeks" skills/ knowledge/*.md CLAUDE.md \
+grep -rn "two weeks\|2+ weeks" skills/ knowledge/*.md CLAUDE.md README.md \
   | grep -v "check-knowledge/"                       # staleness window
 for s in skills/*/SKILL.md; do                       # descriptions
   sed -n '3p' "$s" | grep -qE "5\+|5 or more|20 entries|3\+ entries" && echo "BUG $s"
@@ -89,6 +90,11 @@ Each numeric trigger has one owner: synthesis thresholds in `synthesize-knowledg
 staleness window in `check-knowledge`, the update trigger in `update-knowledge`'s *When
 to run*, the load trigger in `load-knowledge`'s description. `CLAUDE.md` names the
 skills and none of their conditions, which is why it appears in both sweeps above.
+
+`README.md` is in the file list because it wasn't, and quietly held both thresholds in a
+"When it runs" table — the same omission Rule 7 documents. Shorthand spellings are in the
+patterns for the same reason: the table wrote them as `2+ weeks` and `5+ experience
+entries`, which the original patterns missed.
 
 The exclusions are directories, not files. A skill owns its trigger across both its
 `SKILL.md` and its `README.md` — narrowing the exclusion to `SKILL.md` flags the owner's
