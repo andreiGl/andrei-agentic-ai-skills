@@ -1,12 +1,24 @@
 ---
 name: update-knowledge
-description: Persist learnings from the current task into the personal knowledge base at ~/.claude/knowledge/. Use after finishing a task that produced a surprise, a correction, a non-obvious constraint, or a rule worth carrying into future sessions.
+description: Persist learnings from the current task into the personal knowledge base at ~/.claude/knowledge/. Run after finishing any task of substance, not only a memorable one - most sessions produce a single experience entry and nothing else, which is the normal outcome and the signal synthesize-knowledge reads. Pages, gotchas lines, and learnings entries are written only when the task produced a surprise, a correction, a non-obvious constraint, or a rule worth carrying into future sessions. See the When to run section for the trigger.
 ---
 
 # Update the Knowledge Base After a Task
 
 Before the session ends, decide what — if anything — is worth keeping, and write it
 into `~/.claude/knowledge/`. Conventions are in `~/.claude/knowledge/CLAUDE.md`.
+
+## When to run
+
+This section is the single source for this trigger. `CLAUDE.md` and the other skills
+point here rather than restating it.
+
+Run at the end of any task of substance — anything beyond a one-line answer or a
+trivial edit. Don't wait for the session to feel memorable. The experience entry is
+unconditional, and a quiet session is exactly the input `synthesize-knowledge` needs to
+notice that an unremarkable area keeps coming up.
+
+What gets written is conditional; whether to run is not.
 
 ## What is conditional and what isn't
 

@@ -1,6 +1,6 @@
 ---
 name: load-knowledge
-description: Load the personal knowledge base at ~/.claude/knowledge/ to prime context before starting work. Use at the start of any substantial task, so gotchas, conventions, and open context recorded by past sessions are in hand before the first tool call.
+description: Load the personal knowledge base at ~/.claude/knowledge/ to prime context before starting work. Run it before the first substantive tool call of a task - the first file read, search, edit, or web fetch that goes beyond answering a one-line question - so gotchas, conventions, and open context recorded by past sessions are in hand before any of it. This is the single source for that trigger.
 ---
 
 # Load the Knowledge Base
@@ -8,9 +8,13 @@ description: Load the personal knowledge base at ~/.claude/knowledge/ to prime c
 Read the knowledge base before working, so context from past sessions is in hand
 before the first tool call. Conventions live in `~/.claude/knowledge/CLAUDE.md`.
 
-Run this at the start of substantial work without checking first whether the project
-has pages — finding that out *is* step 1, and the empty case costs one line (see the
-end of this file).
+Run before the first substantive tool call of a task — the first file read, search,
+edit, or web fetch that goes beyond answering a one-line question. "Substantive" is a
+test you can apply before acting, which is the point: a trigger phrased as "when the
+task feels big" resolves to "not now" every time.
+
+Run it without checking first whether the project has pages — finding that out *is*
+step 1, and the empty case costs one line (see the end of this file).
 
 ## 1. Always load
 
