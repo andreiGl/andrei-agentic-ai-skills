@@ -73,15 +73,26 @@ Not on the term. A skill that says "set `Status: stale`" is a consumer doing its
 grep -rln "3 tool calls" skills/ knowledge/*.md      # Category A gate
 grep -rln '`stale` —' skills/ knowledge/             # Status values
 grep -rn "20 entries\|5 or more entries\|5+ entries" skills/ knowledge/*.md CLAUDE.md \
-  | grep -v "synthesize-knowledge/SKILL.md"          # thresholds
+  | grep -v "synthesize-knowledge/"                  # synthesis thresholds
+grep -rn "two weeks" skills/ knowledge/*.md CLAUDE.md \
+  | grep -v "check-knowledge/"                       # staleness window
 for s in skills/*/SKILL.md; do                       # descriptions
   sed -n '3p' "$s" | grep -qE "5\+|5 or more|20 entries|3\+ entries" && echo "BUG $s"
 done
 ```
 
-**Expected:** first two print `knowledge/CLAUDE.md` and nothing else. Last two print
+**Expected:** first two print `knowledge/CLAUDE.md` and nothing else. Last three print
 nothing. `description:` drives auto-invocation, so a stale threshold there is the copy
 being matched.
+
+Each numeric trigger has one owner: synthesis thresholds in `synthesize-knowledge`, the
+staleness window in `check-knowledge`, the update trigger in `update-knowledge`'s *When
+to run*, the load trigger in `load-knowledge`'s description. `CLAUDE.md` names the
+skills and none of their conditions, which is why it appears in both sweeps above.
+
+The exclusions are directories, not files. A skill owns its trigger across both its
+`SKILL.md` and its `README.md` — narrowing the exclusion to `SKILL.md` flags the owner's
+own README as a foreign copy, which is how this rule first fired on a clean repo.
 
 ## Rule 4 — any sweep with a non-empty expected set carries that set inline
 
