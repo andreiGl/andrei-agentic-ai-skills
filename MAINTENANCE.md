@@ -1,14 +1,14 @@
 # Maintaining These Skills
 
 The skills form a system: one writes what another reads. Most defects found so far were
-not in any single file but in the seams between them, and none of them threw an error —
+not in any single file but in the seams between them, and none of them threw an error -
 they degraded silently and looked correct in review.
 
 This file is the procedure that catches them. It lives in the repo because it is the
 maintenance procedure for the thing it sits next to.
 
 **Every rule below carries its command and that command's expected output.** A rule
-written as prose is not a check — it passes review, reads as coverage, and never runs.
+written as prose is not a check - it passes review, reads as coverage, and never runs.
 Where a rule genuinely can't be a command it says so explicitly, so it's visibly a manual
 step rather than something a sweep is assumed to cover.
 
@@ -38,7 +38,7 @@ it. Two sub-forms, and only the first is greppable:
 Every rule here has a command for this reason.
 
 **A skill that never fires.** Every rule below checks whether the repository agrees with
-itself. None checks whether a skill is reachable — whether its `description` matches the
+itself. None checks whether a skill is reachable - whether its `description` matches the
 work a person is actually doing, which is what decides if it gets invoked at all. A skill
 whose description names only code will sit out a long research task, silently, while the
 work gets done without it.
@@ -46,11 +46,11 @@ work gets done without it.
 No command covers this, and none is offered, because a sweep that can't see the defect
 would read as coverage. The symptom is behavioural: you finish something substantial,
 then notice the skill that governs it was never invoked. When that happens, the fix is
-almost always in the `description` — it is the only part a model matches against.
+almost always in the `description` - it is the only part a model matches against.
 
 ---
 
-## Rule 1 — every path a skill reads, some skill writes
+## Rule 1 - every path a skill reads, some skill writes
 
 ```bash
 grep -rhoE '~/\.claude/knowledge/[A-Za-z0-9_./<>-]+' skills/*/SKILL.md \
@@ -63,7 +63,7 @@ grep -rhoE '~/\.claude/knowledge/[A-Za-z0-9_./<>-]+' skills/*/SKILL.md \
 **Expected:** exactly one line, `~/.claude/knowledge/pages/shared/patterns.md`. It's
 created on first synthesis and its reader guards for absence. Anything else is a bug.
 
-## Rule 2 — path targets absolute, prose referents may stay relative
+## Rule 2 - path targets absolute, prose referents may stay relative
 
 Absolute form means one sweep finds them all. Bare directory names used as prose
 ("files directly in `experiences/`") aren't targets and shouldn't be normalized.
@@ -72,17 +72,17 @@ Absolute form means one sweep finds them all. Bare directory names used as prose
 grep -rnoE '`(raw|pages|experiences)/[A-Za-z0-9_./<>-]*`' skills/*/SKILL.md
 ```
 
-**Expected:** exactly two lines — a prose referent in `synthesize-knowledge`'s trigger
+**Expected:** exactly two lines - a prose referent in `synthesize-knowledge`'s trigger
 list, and a section heading naming its own output file. Anything else is a target that
 needs absolutising.
 
-## Rule 3 — sweeps for duplicated definitions anchor on defining syntax
+## Rule 3 - sweeps for duplicated definitions anchor on defining syntax
 
 Not on the term. A skill that says "set `Status: stale`" is a consumer doing its job.
 
 ```bash
 grep -rln "3 tool calls" skills/ knowledge/*.md      # Category A gate
-grep -rln '`stale` —' skills/ knowledge/             # Status values
+grep -rln '`stale` -' skills/ knowledge/             # Status values
 grep -rn "20 entries\|5 or more entries\|5+ entries\|5+ experience" \
   skills/ knowledge/*.md CLAUDE.md README.md \
   | grep -v "synthesize-knowledge/"                  # synthesis thresholds
@@ -103,25 +103,25 @@ to run*, the load trigger in `load-knowledge`'s description. `CLAUDE.md` names t
 skills and none of their conditions, which is why it appears in both sweeps above.
 
 `README.md` is in the file list because it wasn't, and quietly held both thresholds in a
-"When it runs" table — the same omission Rule 7 documents. Shorthand spellings are in the
+"When it runs" table - the same omission Rule 7 documents. Shorthand spellings are in the
 patterns for the same reason: the table wrote them as `2+ weeks` and `5+ experience
 entries`, which the original patterns missed.
 
 The exclusions are directories, not files. A skill owns its trigger across both its
-`SKILL.md` and its `README.md` — narrowing the exclusion to `SKILL.md` flags the owner's
+`SKILL.md` and its `README.md` - narrowing the exclusion to `SKILL.md` flags the owner's
 own README as a foreign copy, which is how this rule first fired on a clean repo.
 
-## Rule 4 — any sweep with a non-empty expected set carries that set inline
+## Rule 4 - any sweep with a non-empty expected set carries that set inline
 
-Otherwise it decays into noise and gets ignored, which is worse than not having it —
-it reads as confirmation. Ten checks here carry a non-empty expected set — rules 1, 2,
-3, 8, 10, 11 and both traps — and each states it inline. Rules whose expected output is
+Otherwise it decays into noise and gets ignored, which is worse than not having it -
+it reads as confirmation. Ten checks here carry a non-empty expected set - rules 1, 2,
+3, 8, 10, 11 and both traps - and each states it inline. Rules whose expected output is
 silence say so too, so a run is never ambiguous about what passing looks like.
 
 Scope sweeps to tracked files. An unscoped walk picks up `plugins/` and marketplace
 caches, whose broken links are not ours to fix.
 
-## Rule 5 — edit reader and writer in the same change
+## Rule 5 - edit reader and writer in the same change
 
 **Manual: no command covers this.**
 
@@ -133,7 +133,7 @@ This applies *within* a file too. A preamble and a numbered step are a reader/wr
 pair. So are a step and a cross-reference to it. Both copies of these skills
 independently produced the same two intra-file defects in `build-knowledge`.
 
-## Rule 6 — after reordering or moving anything, read the step sequence
+## Rule 6 - after reordering or moving anything, read the step sequence
 
 **Manual: no command covers this.** "Does step N depend on step M > N" needs the
 semantics of the steps.
@@ -142,14 +142,14 @@ Read the numbered sequence straight through and ask what each step assumes alrea
 exists. Run it after inserting a step, reordering steps, or moving a file.
 
 Known-good baseline: `synthesize-knowledge` appends to `learnings.md` *after* trimming
-it — reverse that and the trim eats the synthesis entry. `check-knowledge` guards for a
+it - reverse that and the trim eats the synthesis entry. `check-knowledge` guards for a
 repository before using one. `build-knowledge` creates the conventions file before step 4
 reads it.
 
-## Rule 7 — links resolve, across every tracked file
+## Rule 7 - links resolve, across every tracked file
 
 Scoped to `git ls-files`, not `find`. An earlier version of this walked only `skills/`
-and `knowledge/`, silently omitting `README.md`, `CLAUDE.md`, and this file — the three
+and `knowledge/`, silently omitting `README.md`, `CLAUDE.md`, and this file - the three
 most-read files in the repo, unchecked. The parallel copy had the same gap and it hid
 five links broken by the round-1 flatten.
 
@@ -163,7 +163,7 @@ done
 
 **Expected:** no output.
 
-## Rule 8 — skills sit one level deep, or they are never registered
+## Rule 8 - skills sit one level deep, or they are never registered
 
 ```bash
 find -L ~/.claude/skills -mindepth 3 -name SKILL.md
@@ -174,11 +174,11 @@ find -L ~/.claude/skills -name SKILL.md | wc -l
 `skills/`).
 
 `-L` is load-bearing: the live skill directories are symlinks into this repo, and `find`
-won't follow them without it. Without `-L` the first command reports no nested skills —
+won't follow them without it. Without `-L` the first command reports no nested skills -
 while the second reports zero skills at all, which is the only signal it's broken rather
 than clean. Check the count, not just the silence.
 
-## Rule 9 — frontmatter parses as YAML
+## Rule 9 - frontmatter parses as YAML
 
 ```bash
 for s in skills/*/SKILL.md; do
@@ -188,7 +188,7 @@ done
 
 **Expected:** no output.
 
-An unquoted YAML scalar cannot contain `: ` — the parser reads it as a nested key and
+An unquoted YAML scalar cannot contain `: ` - the parser reads it as a nested key and
 the whole block fails. Claude Code tolerates this and matches the description anyway, so
 the only place it surfaces is GitHub's rendered view of the file, as *mapping values are
 not allowed in this context*. Nothing in the local workflow catches it.
@@ -196,7 +196,7 @@ not allowed in this context*. Nothing in the local workflow catches it.
 The fix is a dash or a semicolon, not quoting: all seven descriptions are unquoted, and
 one quoted outlier invites the next editor to quote inconsistently.
 
-## Rule 10 — KB link graph
+## Rule 10 - KB link graph
 
 ```bash
 pages=$(find knowledge -name '*.md' | sed 's#.*/##;s#\.md$##' | sort -u)
@@ -216,21 +216,21 @@ done
 
 **Expected:** the dangling check prints the template placeholders used in prose
 (`[[page-name]]`, `[[other-page]]`, `[[another-page]]`, `[[links]]`, `[[page-link]]`) and
-nothing else. The one-way check prints nothing — hub pages are exempt by design and are
+nothing else. The one-way check prints nothing - hub pages are exempt by design and are
 skipped above.
 
-## Rule 11 — repository integrity
+## Rule 11 - repository integrity
 
 ```bash
 git fsck --no-progress --no-dangling
-find .git/refs -name 'Icon?' | wc -l   # blocking — one of these stops fetch
+find .git/refs -name 'Icon?' | wc -l   # blocking - one of these stops fetch
 find .git -name 'Icon?' | wc -l        # total; anything beyond refs/ is noise
 ```
 
 **Expected:** no output from the first; `0` from both counts.
 
 macOS Finder creates a file named `Icon` followed by a carriage return in every
-directory of a folder carrying a custom icon — including inside `.git`. Git treats every
+directory of a folder carrying a custom icon - including inside `.git`. Git treats every
 file under `refs/` as a ref, so `refs/Icon\r` becomes a ref pointing at the null SHA and
 **`git fetch` fails outright** with `bad object refs/Icon?`. The same files under
 `objects/` make `fsck` report `bad sha1 file` for each one.
@@ -257,7 +257,7 @@ Clean up with:
 find . -name 'Icon?' -type f -delete
 ```
 
-`--no-dangling` is not optional. Dangling blobs are normal — staging a file and then
+`--no-dangling` is not optional. Dangling blobs are normal - staging a file and then
 editing it leaves one, and so does any amend or reset. Without the flag the rule fails on
 ordinary work and gets ignored, which Rule 4 warns about.
 
@@ -267,10 +267,44 @@ icon. It is not the only cause: these have reappeared here with no such attribut
 repository or any parent, so treat recurrence as expected and re-run the check rather
 than assuming one clean-up settles it.
 
-## Rule 12 — stop condition
+## Rule 12 - em dashes stay out of prose
+
+```bash
+EM=$(printf '\342\200\224')
+git ls-files | xargs grep -n "$EM" | grep -v "\`$EM\`" | grep -v "Covers:.*$EM"
+```
+
+**Expected:** no output.
+
+The character is built with `printf` rather than typed. Written literally, the sweep
+matches its own command line and reports this file forever.
+
+`writing-guidelines` calls for a spaced hyphen instead, because the em dash now reads as
+a machine's default punctuation. This sweep is the only thing that keeps that from
+decaying, since a single one slips back in unnoticed.
+
+The two exclusions are not punctuation. `—` is the literal value of a page's `Covers`
+field, meaning the page describes no particular paths, and `check-knowledge` reads it to
+decide whether to skip that page. Converting those would break the skill, which is why
+the rule excludes them by form rather than by file.
+
+Two traps when converting in bulk, both hit on the first pass here:
+
+- A backtick span is not a safe protection pattern. Text sitting between two adjacent
+  inline code spans looks like one, so prose dashes get protected by accident. Match the
+  data values exactly.
+- `MAINTENANCE.md` greps for a literal string that lives in `knowledge/CLAUDE.md`. A
+  conversion that touches one side and not the other silently breaks rule 3. Both sides
+  moved together here; check that pair after any bulk edit.
+
+Scoped to `git ls-files`, so the live knowledge base is not swept. Its `INDEX.md` is a
+real file rather than a symlink, and was converted in the same change to keep the trap
+below quiet.
+
+## Rule 13 - stop condition
 
 Stop when every command above matches its documented output and rules 5 and 6 find
-nothing. Reopen on the next skill edit — that's when the asymmetry gets created.
+nothing. Reopen on the next skill edit - that's when the asymmetry gets created.
 
 ---
 
@@ -285,13 +319,13 @@ holds accumulated KB state. Edits to its *convention text* go in both; edits to 
 diff ~/.claude/knowledge/INDEX.md knowledge/INDEX.md
 ```
 
-**Expected:** no output, until the live KB accumulates page rows and status dates — after
+**Expected:** no output, until the live KB accumulates page rows and status dates - after
 which only those should differ.
 
 **Live KB content must never be symlinked into this repo.** Skills, the status line, the
 KB conventions, and the deck are symlinked here. `INDEX.md`, `learnings.md`,
 `gotchas.md`, `active-context.md`, and everything under `pages/`, `experiences/`, and
-`raw/` are deliberately not — they accumulate real notes about real work, and this repo
+`raw/` are deliberately not - they accumulate real notes about real work, and this repo
 is public. `.gitignore` carries the matching rules, commented out; uncomment them in the
 same change if that ever changes.
 
@@ -299,5 +333,5 @@ same change if that ever changes.
 find ~/.claude/knowledge -maxdepth 2 -type l
 ```
 
-**Expected:** exactly three — `CLAUDE.md`, `presentation`, and `raw/README.md`. A symlink
+**Expected:** exactly three - `CLAUDE.md`, `presentation`, and `raw/README.md`. A symlink
 appearing for any content file is a leak waiting to happen.
