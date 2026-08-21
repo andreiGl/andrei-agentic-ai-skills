@@ -20,6 +20,7 @@ gets carried out, and guidelines for how the result reads - plus a custom status
 - [How the knowledge base works](#how-the-knowledge-base-works)
 - [Status line](#status-line)
 - [Skill invocation log](#skill-invocation-log)
+- [Experience entry check](#experience-entry-check)
 - [License](#license)
 
 ## Installation
@@ -53,6 +54,8 @@ REPO=~/myProjects/andrei-agentic-ai-skills
 for s in "$REPO"/skills/*/; do ln -sfn "$s" ~/.claude/skills/"$(basename "$s")"; done
 ln -sfn "$REPO"/statusline-command.sh ~/.claude/statusline-command.sh
 ln -sfn "$REPO"/skill-invocation-log.sh ~/.claude/skill-invocation-log.sh
+ln -sfn "$REPO"/kb-session-end.sh ~/.claude/kb-session-end.sh
+ln -sfn "$REPO"/kb-session-start.sh ~/.claude/kb-session-start.sh
 ln -sfn "$REPO"/knowledge/CLAUDE.md ~/.claude/knowledge/CLAUDE.md
 ln -sfn "$REPO"/knowledge/raw/README.md ~/.claude/knowledge/raw/README.md
 ln -sfn "$REPO"/knowledge/presentation ~/.claude/knowledge/presentation
@@ -312,6 +315,69 @@ Two limits worth knowing. The check is per session, not per task, so one invocat
 in a long session satisfies it for everything after. And the transcript path it reads is
 an implementation detail rather than a documented contract, so the script falls back to a
 search and then exits quietly, which means a broken version of it is invisible.
+
+## Experience entry check
+
+`update-knowledge` writes an experience entry unconditionally, and that entry is what
+`synthesize-knowledge` counts. It is also the one output that depends entirely on the
+model choosing to invoke a skill. [`kb-session-end.sh`](kb-session-end.sh) and
+[`kb-session-start.sh`](kb-session-start.sh) turn a missed entry into a recorded fact.
+
+A `SessionEnd` hook cannot ask for the entry itself: its stdout reaches the debug log
+only, and the session is over. So the work is split. At session end the first script
+decides whether an entry was owed and, if one was, appends a line to
+`~/.claude/knowledge/.experience-debt`. At the start of the next session the second
+script prints that queue, which for `SessionStart` lands in the transcript as context
+Claude can see, then moves it to `.experience-debt.log` so the queue clears but the
+history survives.
+
+Owed means two things held: the transcript carried at least five `tool_use` records, and
+nothing under `experiences/` was written after the session began. The window comes from a
+marker file that `kb-session-start.sh` stamps per session and `find -newer` compares
+against, which keeps both scripts free of `stat` and its incompatible BSD and GNU flags.
+A `resume` or `compact` start leaves the marker alone, so the window tracks the stretch
+of work rather than the process. No marker means no window, and the check makes no claim.
+
+### Install
+
+```bash
+REPO=~/myProjects/andrei-agentic-ai-skills
+ln -sfn "$REPO"/kb-session-end.sh ~/.claude/kb-session-end.sh
+ln -sfn "$REPO"/kb-session-start.sh ~/.claude/kb-session-start.sh
+```
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "sh ~/.claude/kb-session-end.sh", "timeout": 10 }] }
+    ],
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "sh ~/.claude/kb-session-start.sh", "timeout": 10 }] }
+    ]
+  }
+}
+```
+
+Requires `jq` on `$PATH`.
+
+### About that threshold
+
+Five tool calls is a proxy for "task of substance", and proxies drift. Every session ends
+with a row in `.experience-decisions.log` recording the count and the verdict -
+`below-threshold`, `no-marker`, `entry-written`, or `flagged` - including the sessions
+that were skipped, so the skipping is visible rather than silent.
+
+Measured across 40 transcripts on the machine this was written on, sessions fell into
+0-2 tool calls and 35-264, with nothing in between. Any threshold from 3 to 34 sorted
+that history identically, so the number was not worth tuning there. On a busier install
+the gap may not exist, and the log is what settles it: if rows marked `below-threshold`
+start naming work worth recording, move the line to fit their counts.
+
+The same data ruled out the sharper-looking signal. Counting file edits instead of tool
+calls would have discarded a 250-call session that made zero edits and was pure research,
+which is exactly the kind of session an experience entry is for. Counting `"type":"user"`
+records is no better, because the transcript tags tool results as user messages.
 
 ## License
 
