@@ -13,6 +13,7 @@ gets carried out, and guidelines for how the result reads — plus a custom stat
 - [Skills](#skills)
   - [Working and writing](#working-and-writing)
   - [Knowledge base](#knowledge-base)
+  - [Where triggers live](#where-triggers-live)
 - [How the knowledge base works](#how-the-knowledge-base-works)
 - [Status line](#status-line)
 
@@ -70,8 +71,9 @@ The same reasoning applies to [`CLAUDE.md`](CLAUDE.md) at the repo root: it's an
 of the wiring, not a symlink target, because global instructions tend to accumulate
 project-specific and private rules over time.
 
-The knowledge skills do nothing until the global `CLAUDE.md` tells Claude when to run
-them. See [`CLAUDE.md`](CLAUDE.md) in this repo for the wiring I use — copy the
+The knowledge skills do nothing until the global `CLAUDE.md` names them, so Claude knows
+they exist and reaches for the Skill tool. When each one fires is stated inside the skill,
+not there. See [`CLAUDE.md`](CLAUDE.md) in this repo for the wiring I use — copy the
 `## Knowledge base` section into your own `~/.claude/CLAUDE.md`.
 
 Editing these? Read [MAINTENANCE.md](MAINTENANCE.md) first. The skills read what each
@@ -103,13 +105,38 @@ comments and commit messages, and equally reports, emails, and forum posts.
 
 Five skills that maintain a knowledge base carrying context across sessions.
 
-| Skill | When it runs |
+| Skill | What it does |
 | :--- | :--- |
-| [`load-knowledge`](skills/load-knowledge) | Start of a substantial task in a project that has pages |
-| [`update-knowledge`](skills/update-knowledge) | After a task that produced a surprise, correction, or rule |
-| [`build-knowledge`](skills/build-knowledge) | On request, to create or extend a KB |
-| [`check-knowledge`](skills/check-knowledge) | Before a large task, or 2+ weeks since pages were verified |
-| [`synthesize-knowledge`](skills/synthesize-knowledge) | 5+ experience entries, or a theme repeating in learnings |
+| [`load-knowledge`](skills/load-knowledge) | Reads the KB into context before work starts |
+| [`update-knowledge`](skills/update-knowledge) | Writes back whatever the session produced |
+| [`build-knowledge`](skills/build-knowledge) | Creates a KB, or adds a project to one |
+| [`check-knowledge`](skills/check-knowledge) | Verifies pages against the code they describe |
+| [`synthesize-knowledge`](skills/synthesize-knowledge) | Distills repeated experience into patterns |
+
+Each skill's `## When to run` section states when it fires. This table stays out of that
+on purpose — see below.
+
+### Where triggers live
+
+Every skill owns its trigger, and nothing outside it restates the condition. `CLAUDE.md`
+names the skills and how to invoke them, and carries no conditions at all.
+
+Where inside the skill depends on the shape of the condition. The five knowledge skills
+each have a list of them — counts, dates, whether you asked — so each carries a
+`## When to run` section near the top of its `SKILL.md`. The two guideline skills answer
+"always", which fits in the description and needs no section. A heading that says
+"always" carries nothing and becomes a third copy to keep in sync.
+
+This started as a bug worth recording. `CLAUDE.md` claimed each skill stated its own
+trigger and then restated all five, and the copies had already drifted: it told
+`update-knowledge` to run after any substantial task, while that skill's description
+said to run only when the task produced something memorable. The skill's own body said
+the first — the experience entry is unconditional, and `synthesize-knowledge` needs quiet
+sessions to produce one — so the description was the copy that was wrong, and the obvious
+fix of deferring to it would have starved the synthesis input.
+
+`MAINTENANCE.md` Rule 3 sweeps for restated thresholds, this file included. It was added
+to that sweep after this table was found holding two of them.
 
 ## How the knowledge base works
 
