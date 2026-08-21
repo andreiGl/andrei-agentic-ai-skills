@@ -192,8 +192,41 @@ inline scripts logs `writes=0` while rewriting twenty five files, and the first 
 this hook recorded exactly that. The line above is real: zero `Write` calls, 131 shell
 commands that touched files.
 
-`self=yes` marks a session that edited the skills repository. Those invoke the skills by
-construction and are excluded when computing a rate, not counted as successes.
+`self=yes` marks a session that **edited** this repository, not one that mentioned it. The
+first version grepped the whole transcript for the repo name, which also caught sessions
+that merely discussed it. Over-exclusion is the expensive direction: sample size is the
+scarce resource, and the first four lines ever collected were worthless precisely because
+all of them were `self=yes`. Those sessions invoke the guidance skills by construction, so
+counting them as successes flatters the rate.
+
+### How the rate is computed
+
+Agreed with a second install of this hook so both sides measure the same thing. Written
+down here because an agreement that lives only in a chat is not an agreement.
+
+> Of sessions where `self=no` and `writes + sh` is greater than zero, the fraction whose
+> **last** line reads `bg=no`. Same for `wg`. Rows reading `n/a` are excluded from both
+> numerator and denominator.
+
+Three details that are easy to get wrong:
+
+- **Sessions, not lines.** The hook fires once per turn while every column is
+  session-cumulative, so a long session contributes many near-identical lines and a short
+  one contributes a single line. Counting lines weights by session length. Group by session
+  id and take the last line.
+- **`writes + sh`, not `writes`.** A session driven through the shell logs `writes=0`. Using
+  `writes` alone drops exactly the sessions that produced the most.
+- **`n/a` is not a failure.** It means the skill was never installed, so the session could
+  not have invoked it. Counting it as `no` pads the rate with impossible cases.
+
+First comparison window: 2026-08-21 through 2026-08-27 inclusive, local time on each side,
+compared on the 28th. A session spanning midnight counts to the day its last line falls on.
+
+```bash
+awk '$8=="self=no"' ~/.claude/skill-invocation.log | sort -k2,2 -k1,1 | awk '{a[$2]=$0} END{for(s in a) print a[s]}'
+```
+
+That prints the last line per non-self session, which is the input to the fraction above.
 
 A third value, `n/a`, means the skill is not installed on this machine at all. `no` claims
 the skill was available and went unused, which is the thing being measured; a missing skill
