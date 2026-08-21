@@ -1,13 +1,14 @@
 # Global Claude Code Instructions
 
-## Code
+## Doing the work
 
-- Follow the generic behavioral guidelines defined in ~/.claude/skills/behavioral-guidelines/SKILL.md when writing, reviewing, or refactoring code in any project.
+- Follow ~/.claude/skills/behavioral-guidelines/SKILL.md on any task where being confidently wrong is the main risk: writing, reviewing, or refactoring code, and equally research, analysis, comparison, or fact-checking. Invoke it with the Skill tool. A path reference on its own leaves the rules out of context, which is how it went unread before.
 - When writing commit messages, do not include a Co-Authored-By line or any mention of Claude or Anthropic.
 
 ## Writing
 
-- Prose that gets committed or published - READMEs, docs, commit messages, PR and issue text - follows sections 8 and 9 of ~/.claude/skills/behavioral-guidelines/SKILL.md, the same file the code rules live in. That applies when the task is writing alone and no code changes.
+- Follow ~/.claude/skills/writing-guidelines/SKILL.md for every piece of prose produced for a human reader, in any language: code comments, READMEs, docs, commit messages, PR and issue text, reports, analyses, plans, emails, forum and social posts, and chat replies. Those are examples. If a person will read it, the rules apply.
+- Invoke it before drafting anything longer than a couple of paragraphs, not after. Stripping the tells out afterwards costs more than writing without them.
 
 ## Models
 
