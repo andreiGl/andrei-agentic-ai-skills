@@ -5,9 +5,9 @@ describe them, then verifying their claims against live code.
 
 ## When to use
 
-- Before a large task (new feature, significant refactor)
-- When **Last verified** in `INDEX.md` is more than two weeks old, or `never`
-- Mid-task, scoped to a single page, when you catch a KB claim being wrong
+The trigger lives in [`SKILL.md`](SKILL.md) and only there. In short: before a large
+task, once the **Last verified** stamp has gone cold, or the moment you catch a page
+claiming something untrue.
 
 ## What it does
 

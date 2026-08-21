@@ -4,11 +4,11 @@ Builds or extends the personal knowledge base at `~/.claude/knowledge/` for a pr
 
 ## When to use
 
-- "create a knowledge base for this project"
-- "add this to the knowledge base"
-- "process this into the KB"
+The trigger lives in [`SKILL.md`](SKILL.md) and only there. In short: only when asked —
+to create a KB, add a project to one, or turn source material into pages.
 
-Building a KB is a deliberate task, not something to do as a detour mid-work.
+Building a KB is a deliberate task, not something to do as a detour mid-work. Finding
+that a project has no pages is not a reason to start one.
 
 ## What it does
 

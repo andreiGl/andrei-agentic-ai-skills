@@ -5,8 +5,8 @@ starting work.
 
 ## When to use
 
-At the start of any substantial task. Wired into the global `CLAUDE.md`, so it usually
-runs without being asked.
+The trigger lives in [`SKILL.md`](SKILL.md) and only there. In short: before the first
+substantive tool call of a task, rather than whenever the task starts to feel big.
 
 Don't check whether the project has pages before running it — that check is the skill's
 first step, and the empty case costs one line.
