@@ -16,6 +16,7 @@ gets carried out, and guidelines for how the result reads — plus a custom stat
   - [Where triggers live](#where-triggers-live)
 - [How the knowledge base works](#how-the-knowledge-base-works)
 - [Status line](#status-line)
+- [License](#license)
 
 ## Installation
 
@@ -167,6 +168,10 @@ surface and never be verified.
 
 There's a [presentation deck](knowledge/presentation/knowledge-base-deck.html)
 walking through the system — clone and open it in a browser.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ## Status line
 
