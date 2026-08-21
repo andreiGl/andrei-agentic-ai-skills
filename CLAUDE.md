@@ -2,18 +2,32 @@
 
 ## Doing the work
 
-- Follow ~/.claude/skills/behavioral-guidelines/SKILL.md on any task where being confidently wrong is the main risk: writing, reviewing, or refactoring code, and equally research, analysis, comparison, or fact-checking. Invoke it with the Skill tool. A path reference on its own leaves the rules out of context, which is how it went unread before.
-- When writing commit messages, do not include a Co-Authored-By line or any mention of Claude or Anthropic.
+- Invoke the behavioral-guidelines skill with the Skill tool on any task where being
+  confidently wrong is the main risk: writing, reviewing, or refactoring code, and
+  equally research, analysis, comparison, or fact-checking. A path reference on its own
+  leaves the rules out of context.
 
 ## Writing
 
-- Follow ~/.claude/skills/writing-guidelines/SKILL.md for every piece of prose produced for a human reader, in any language: code comments, READMEs, docs, commit messages, PR and issue text, reports, analyses, plans, emails, forum and social posts, and chat replies. Those are examples. If a person will read it, the rules apply.
-- Invoke it before drafting anything longer than a couple of paragraphs, not after. Stripping the tells out afterwards costs more than writing without them.
+- Invoke the writing-guidelines skill with the Skill tool before drafting any prose a
+  person will read, in any language — code comments, docs, commit messages, PR and issue
+  text, reports, emails, forum posts, chat replies. Those are examples. If a person will
+  read it, the rules apply. Invoke it before drafting, not after.
+- Commit messages carry no Co-Authored-By line and no mention of Claude or Anthropic.
+
+## Git
+
+- Commit and push only when I ask.
+- These repositories work directly on the default branch. Don't create a branch unless
+  I ask for one.
 
 ## Models
 
-- Multi-agent tasks (review/analysis/research): sub-agents default to Sonnet; escalate verify/synthesis stages to Opus or high/xhigh effort.
-- If the session is running on Sonnet and the task is complex enough to warrant Opus, say so and suggest `/model opus` before proceeding.
+- Multi-agent tasks (review, analysis, research): sub-agents default to Sonnet; escalate
+  verify and synthesis stages to Opus, or to high/xhigh effort.
+- If the session runs on Sonnet and the task warrants Opus, say so before proceeding. In
+  a terminal session that is `/model opus`; elsewhere just say so, since that command
+  isn't available in every client.
 
 ## Knowledge base
 
