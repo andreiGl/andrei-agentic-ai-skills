@@ -149,7 +149,25 @@ won't follow them without it. Without `-L` the first command reports no nested s
 while the second reports zero skills at all, which is the only signal it's broken rather
 than clean. Check the count, not just the silence.
 
-## Rule 9 — KB link graph
+## Rule 9 — frontmatter parses as YAML
+
+```bash
+for s in skills/*/SKILL.md; do
+  awk -v f="$s" '/^description:/{d=substr($0,13); if (d ~ /: /) print "YAML BREAK " f}' "$s"
+done
+```
+
+**Expected:** no output.
+
+An unquoted YAML scalar cannot contain `: ` — the parser reads it as a nested key and
+the whole block fails. Claude Code tolerates this and matches the description anyway, so
+the only place it surfaces is GitHub's rendered view of the file, as *mapping values are
+not allowed in this context*. Nothing in the local workflow catches it.
+
+The fix is a dash or a semicolon, not quoting: all seven descriptions are unquoted, and
+one quoted outlier invites the next editor to quote inconsistently.
+
+## Rule 10 — KB link graph
 
 ```bash
 pages=$(find knowledge -name '*.md' | sed 's#.*/##;s#\.md$##' | sort -u)
@@ -172,7 +190,7 @@ done
 nothing else. The one-way check prints nothing — hub pages are exempt by design and are
 skipped above.
 
-## Rule 10 — repository integrity
+## Rule 11 — repository integrity
 
 ```bash
 git fsck --no-progress
@@ -201,7 +219,7 @@ It recurs while the directory carries the `com.apple.FinderInfo` attribute. Chec
 `xattr <dir>`; clear it with `xattr -d com.apple.FinderInfo <dir>`, which also removes
 the folder's custom icon.
 
-## Rule 11 — stop condition
+## Rule 12 — stop condition
 
 Stop when every command above matches its documented output and rules 5 and 6 find
 nothing. Reopen on the next skill edit — that's when the asymmetry gets created.

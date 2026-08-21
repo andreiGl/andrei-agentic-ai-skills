@@ -1,6 +1,6 @@
 ---
 name: writing-guidelines
-description: Write prose a person will actually read - plain language, no invented terms, register matched to the venue, and none of the sentence shapes that mark text as machine-written. Use whenever drafting or editing prose in any language for any audience: code comments, docstrings, READMEs, docs, commit messages, PR and issue text, design notes, reports, analyses, research summaries, essays, emails, forum and social posts, and chat replies. Load it before drafting, not after - it is cheaper to write this way than to strip the tells out afterwards.
+description: Write prose a person will actually read - plain language, no invented terms, register matched to the venue, and none of the sentence shapes that mark text as machine-written. Use whenever drafting or editing prose in any language for any audience — code comments, docstrings, READMEs, docs, commit messages, PR and issue text, design notes, reports, analyses, research summaries, essays, emails, forum and social posts, and chat replies. Load it before drafting, not after - it is cheaper to write this way than to strip the tells out afterwards.
 ---
 
 # Writing Guidelines
