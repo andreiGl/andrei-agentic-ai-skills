@@ -105,7 +105,7 @@ fills with restated code and stops being read.
 2. Save any raw source material in `~/.claude/knowledge/raw/YYYY-MM-DD-<topic>.<ext>`.
 3. Apply the gate.
 4. New fact → a line in `gotchas.md`. A full page only if three sentences won't do.
-5. Update `INDEX.md` and add `[[links]]` in both directions.
+5. Update `INDEX.md` and add wiki links in both directions.
 6. Append to `learnings.md` and write an experience entry.
 
 ---
@@ -116,7 +116,7 @@ fills with restated code and stops being read.
 - Every structural fact has a **Why:**
 - Every header has Project, Tags, Covers, Status, Last updated, Related
 - Code blocks are annotated with a language
-- `[[links]]` resolve, in both directions
+- Wiki links resolve, in both directions
 - `INDEX.md` has a row per page, every column filled - `-` where Covers doesn't apply,
   never an empty cell
 - No module lists, class hierarchies, or restated style rules

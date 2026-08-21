@@ -58,7 +58,7 @@ Not worth recording:
 
 ### A cross-cutting gotcha → `gotchas.md`
 
-One line, plain statement, `[[page-link]]` if a full page exists. If it belongs to a
+One line, plain statement, `[[<page>]]` if a full page exists. If it belongs to a
 recurring failure mode, add it under **Fragile areas**.
 
 Create a full page only when the fact needs more than three sentences to be

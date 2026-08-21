@@ -75,7 +75,7 @@ scanning: `db-`, `build-`, `auth-`.
 **Covers:** repo-relative path globs this page describes
 **Status:** verified | inferred | stale
 **Last updated:** YYYY-MM-DD
-**Related:** [[other-page]], [[another-page]]
+**Related:** [[<other-page>]], [[<another-page>]]
 ```
 
 `Tags` drives loading - `load-knowledge` matches them against task keywords.
@@ -106,10 +106,10 @@ without them will never be loaded by anything.
 2. Key concepts - terms and facts a reader needs first.
 3. Detail sections - H2/H3, code blocks annotated with a language.
 4. Gotchas - a dedicated section for what bites.
-5. Cross-references - `[[page-name]]`, no `.md` extension. See below for how they
+5. Cross-references - `[[<page-name>]]`, no `.md` extension. See below for how they
    resolve and when a back-link is required.
 
-### How `[[links]]` resolve
+### How wiki links resolve
 
 A link is the page's filename without `.md`. Resolve it by looking, in order, at:
 
@@ -139,7 +139,7 @@ genuinely worth reading alongside it.
 2. Apply the Category A gate. Most material won't survive it - that's expected.
 3. What survives goes into `pages/<project>/`, one concept per page. Merge into an
    existing page when the material belongs there.
-4. Update `INDEX.md` and add `[[links]]` both ways.
+4. Update `INDEX.md` and add wiki links both ways.
 5. Add to `learnings.md` if the session produced a surprise or a rule.
 6. Write a dated entry in `experiences/`.
 

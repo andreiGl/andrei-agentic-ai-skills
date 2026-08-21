@@ -61,7 +61,7 @@ gives it more weight than it has earned.
 **Why it keeps happening:** the underlying cause - a gap in the code, a missing
   convention, a misleading API
 **Preventive rule:** the check or habit that catches it before it becomes a problem
-**Related pages:** [[page1]], [[page2]]
+**Related pages:** [[<page>]], [[<page>]]
 ```
 
 The preventive rule is the point of the entry. A pattern without one is an
