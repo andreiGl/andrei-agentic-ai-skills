@@ -114,9 +114,12 @@ own README as a foreign copy, which is how this rule first fired on a clean repo
 ## Rule 4 - any sweep with a non-empty expected set carries that set inline
 
 Otherwise it decays into noise and gets ignored, which is worse than not having it -
-it reads as confirmation. Ten checks here carry a non-empty expected set - rules 1, 2,
-3, 8, 10, 11 and both traps - and each states it inline. Rules whose expected output is
-silence say so too, so a run is never ambiguous about what passing looks like.
+it reads as confirmation. Every check here states its expected output inline, whether
+that is a set of lines, a count, or silence.
+
+Prefer a count to silence where one is available. A sweep that prints nothing on success
+prints nothing on a botched invocation too, and the enumeration that used to sit in this
+paragraph went stale twice, which is the same defect one level up.
 
 Scope sweeps to tracked files. An unscoped walk picks up `plugins/` and marketplace
 caches, whose broken links are not ours to fix.
@@ -159,19 +162,37 @@ git ls-files '*.md' | while read f; do d=$(dirname "$f")
     [ -e "$d/${l%%#*}" ] || echo "BROKEN $f -> $l"
   done
 done
+echo "scanned: $(git ls-files '*.md' | wc -l | tr -d ' ') files"
 ```
 
-**Expected:** no output.
+**Expected:** no `BROKEN` lines, and a scanned count matching the tracked Markdown files.
+
+The count is the point of the second line. Silence alone cannot tell a clean sweep from
+one that listed no files, matched no glob, or ran in the wrong directory. Two of those
+fail open.
 
 ## Rule 8 - skills sit one level deep, or they are never registered
 
 ```bash
 find -L ~/.claude/skills -mindepth 3 -name SKILL.md
-find -L ~/.claude/skills -name SKILL.md | wc -l
+for s in $(find -L ~/.claude/skills -maxdepth 2 -name SKILL.md); do
+  d=$(basename "$(dirname "$s")"); n=$(sed -n 's/^name: *//p' "$s" | head -1)
+  [ "$d" = "$n" ] || echo "NAME MISMATCH: dir $d declares name $n"
+done
+echo "registered: $(find -L ~/.claude/skills -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')"
+echo "repo dirs:  $(ls -d skills/*/ | wc -l | tr -d ' ')"
 ```
 
-**Expected:** nothing from the first; `7` from the second (one per directory in
-`skills/`).
+**Expected:** nothing from the first two; the two counts equal.
+
+An earlier version asserted a fixed number here. It went stale on every legitimate
+addition, and two commits exist for no purpose other than bumping it - `03b9e74` and
+`0140b0a`. A check that generates a maintenance commit per addition is one people learn
+to edit rather than trust, so it now compares counts instead of naming one.
+
+The name check is the other half. Claude Code registers a skill by directory, and the
+frontmatter `name` is what everything else refers to; when they disagree the skill is
+reachable under one label and documented under another.
 
 `-L` is load-bearing: the live skill directories are symlinks into this repo, and `find`
 won't follow them without it. Without `-L` the first command reports no nested skills -
@@ -184,9 +205,10 @@ than clean. Check the count, not just the silence.
 for s in skills/*/SKILL.md; do
   awk -v f="$s" '/^description:/{d=substr($0,13); if (d ~ /: /) print "YAML BREAK " f}' "$s"
 done
+echo "scanned: $(ls skills/*/SKILL.md | wc -l | tr -d ' ') skills"
 ```
 
-**Expected:** no output.
+**Expected:** no `YAML BREAK` lines, and a scanned count equal to the skill directories.
 
 An unquoted YAML scalar cannot contain `: ` - the parser reads it as a nested key and
 the whole block fails. Claude Code tolerates this and matches the description anyway, so
@@ -214,10 +236,17 @@ for f in $(find knowledge -name '*.md' ! -name 'INDEX.md'); do
 done
 ```
 
-**Expected:** the dangling check prints the template placeholders used in prose
-(`[[page-name]]`, `[[other-page]]`, `[[another-page]]`, `[[links]]`, `[[page-link]]`) and
-nothing else. The one-way check prints nothing - hub pages are exempt by design and are
-skipped above.
+**Expected:** no output from either check.
+
+The dangling check used to expect five template placeholders, which meant a rule whose
+documented pass state included five failures. A check that expects failures stops being
+read. The placeholders now carry angle brackets inside them, `[[<page-name>]]`, so they
+read as placeholders to a person and match nothing as a link.
+
+The one-way check prints nothing because hub pages are exempt by design and skipped
+above. Dated entries under `experiences/` reference pages by plain name rather than link
+syntax, for the same reason: a durable page should not accumulate a back-link to every
+session that mentioned it.
 
 ## Rule 11 - repository integrity
 
@@ -272,9 +301,10 @@ than assuming one clean-up settles it.
 ```bash
 EM=$(printf '\342\200\224')
 git ls-files | xargs grep -n "$EM" | grep -v "\`$EM\`" | grep -v "Covers:.*$EM"
+echo "scanned: $(git ls-files | wc -l | tr -d ' ') files"
 ```
 
-**Expected:** no output.
+**Expected:** no matches, and a scanned count matching the tracked files.
 
 The character is built with `printf` rather than typed. Written literally, the sweep
 matches its own command line and reports this file forever.
@@ -301,9 +331,31 @@ Scoped to `git ls-files`, so the live knowledge base is not swept. Its `INDEX.md
 real file rather than a symlink, and was converted in the same change to keep the trap
 below quiet.
 
-## Rule 13 - stop condition
+## Rule 13 - test a trigger change at its boundaries
 
-Stop when every command above matches its documented output and rules 5 and 6 find
+**Manual: no command covers this.** Belongs with rules 5 and 6; it sits here only so
+adding it renumbered nothing else.
+
+Changing a skill's `description`, or the conditions in its `When to run`, changes which
+tasks reach it. Run four cases before considering the change done:
+
+1. A direct request that must select the skill.
+2. A neighbouring request that could plausibly select an adjacent skill instead.
+3. A request that must not select it at all.
+4. A full run proving the intended workflow actually happened.
+
+The fourth is the one that catches real failures. Selection is not the success
+condition. A skill can be chosen and still not change what gets produced, and more
+importantly the reverse: the work completes, looks correct, and the skill that governs it
+was never invoked. That is the fourth failure shape above, and this rule is the only
+thing that looks for it.
+
+Widening a description is the case most in need of case 3. A description broadened until
+it matches everything competes with every other skill and wins nothing.
+
+## Rule 14 - stop condition
+
+Stop when every command above matches its documented output and rules 5, 6, and 13 find
 nothing. Reopen on the next skill edit - that's when the asymmetry gets created.
 
 ---
