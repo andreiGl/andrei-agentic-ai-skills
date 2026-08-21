@@ -16,7 +16,7 @@ Run everything from the repo root.
 
 ---
 
-## The three failure shapes
+## The four failure shapes
 
 **One fact, several files.** A rule written in two places drifts, because nothing forces
 copies to agree. Every fact has one owner; other files point at it.
@@ -36,6 +36,17 @@ it. Two sub-forms, and only the first is greppable:
 
 **A check that exists only as prose.** "Confirm that X" in a document is not a check.
 Every rule here has a command for this reason.
+
+**A skill that never fires.** Every rule below checks whether the repository agrees with
+itself. None checks whether a skill is reachable — whether its `description` matches the
+work a person is actually doing, which is what decides if it gets invoked at all. A skill
+whose description names only code will sit out a long research task, silently, while the
+work gets done without it.
+
+No command covers this, and none is offered, because a sweep that can't see the defect
+would read as coverage. The symptom is behavioural: you finish something substantial,
+then notice the skill that governs it was never invoked. When that happens, the fix is
+almost always in the `description` — it is the only part a model matches against.
 
 ---
 
@@ -103,8 +114,9 @@ own README as a foreign copy, which is how this rule first fired on a clean repo
 ## Rule 4 — any sweep with a non-empty expected set carries that set inline
 
 Otherwise it decays into noise and gets ignored, which is worse than not having it —
-it reads as confirmation. Rules 1 and 2 above are the two with expected output; both
-state it.
+it reads as confirmation. Ten checks here carry a non-empty expected set — rules 1, 2,
+3, 8, 10, 11 and both traps — and each states it inline. Rules whose expected output is
+silence say so too, so a run is never ambiguous about what passing looks like.
 
 Scope sweeps to tracked files. An unscoped walk picks up `plugins/` and marketplace
 caches, whose broken links are not ours to fix.
@@ -210,7 +222,7 @@ skipped above.
 ## Rule 11 — repository integrity
 
 ```bash
-git fsck --no-progress
+git fsck --no-progress --no-dangling
 find .git/refs -name 'Icon?' | wc -l   # blocking — one of these stops fetch
 find .git -name 'Icon?' | wc -l        # total; anything beyond refs/ is noise
 ```
@@ -245,9 +257,15 @@ Clean up with:
 find . -name 'Icon?' -type f -delete
 ```
 
-It recurs while the directory carries the `com.apple.FinderInfo` attribute. Check with
-`xattr <dir>`; clear it with `xattr -d com.apple.FinderInfo <dir>`, which also removes
-the folder's custom icon.
+`--no-dangling` is not optional. Dangling blobs are normal — staging a file and then
+editing it leaves one, and so does any amend or reset. Without the flag the rule fails on
+ordinary work and gets ignored, which Rule 4 warns about.
+
+`com.apple.FinderInfo` on the directory is one cause, and clearing it with
+`xattr -d com.apple.FinderInfo <dir>` removes both the attribute and the folder's custom
+icon. It is not the only cause: these have reappeared here with no such attribute on the
+repository or any parent, so treat recurrence as expected and re-run the check rather
+than assuming one clean-up settles it.
 
 ## Rule 12 — stop condition
 

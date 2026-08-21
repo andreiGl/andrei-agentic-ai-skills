@@ -10,6 +10,9 @@ gets carried out, and guidelines for how the result reads — plus a custom stat
 ## Contents
 
 - [Installation](#installation)
+  - [Copy](#copy)
+  - [Symlink (what I run)](#symlink-what-i-run)
+  - [What deliberately stays out of the symlinks](#what-deliberately-stays-out-of-the-symlinks)
 - [Skills](#skills)
   - [Working and writing](#working-and-writing)
   - [Knowledge base](#knowledge-base)
