@@ -2,6 +2,15 @@
 # Stop hook, report only. Records whether the guidance skills were invoked this
 # session, alongside how much was produced. Never blocks, never speaks.
 # Log: ~/.claude/skill-invocation.log   Columns: ts session wg bg skills writes
+
+# Which skills to watch. Installs that name them differently override these
+# rather than editing the greps below; a second install of this script already
+# had to, because it calls its prose skill write-for-humans.
+#   SKILL_LOG_WRITING=write-for-humans sh skill-invocation-log.sh
+# or set them in the env block of ~/.claude/settings.json.
+WRITING_SKILL="${SKILL_LOG_WRITING:-writing-guidelines}"
+WORK_SKILL="${SKILL_LOG_WORK:-behavioral-guidelines}"
+
 IN=$(cat 2>/dev/null)
 SID=$(printf '%s' "$IN" | jq -r '.session_id // empty' 2>/dev/null)
 [ -z "$SID" ] && exit 0
@@ -11,9 +20,16 @@ T="$HOME/.claude/projects/$(printf '%s' "$PWD" | sed 's#/#-#g')/$SID.jsonl"
 [ -f "$T" ] || T=$(find "$HOME/.claude/projects" -name "$SID.jsonl" -maxdepth 2 2>/dev/null | head -1)
 [ -f "$T" ] || exit 0
 
-wg=no; bg=no
-grep -q '"skill":"writing-guidelines"'    "$T" 2>/dev/null && wg=yes
-grep -q '"skill":"behavioral-guidelines"' "$T" 2>/dev/null && bg=yes
+# A skill this install does not have reports n/a, never no. `no` claims the skill
+# was available and went unused, which is the measurement; a missing skill would
+# otherwise pad the failure rate with sessions that never could have invoked it.
+seen() {
+  [ -e "$HOME/.claude/skills/$1/SKILL.md" ] || { echo "n/a"; return; }
+  if grep -q "\"skill\":\"$1\"" "$T" 2>/dev/null; then echo yes; else echo no; fi
+}
+wg=$(seen "$WRITING_SKILL")
+bg=$(seen "$WORK_SKILL")
+
 # grep -c prints the count and still exits 1 on zero matches, so `|| echo 0`
 # would append a second zero. Take the count, then normalise.
 skills=$(grep -c '"name":"Skill"' "$T" 2>/dev/null | tr -d ' \n')

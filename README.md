@@ -183,9 +183,28 @@ per turn, whether the guidance skills were invoked in that session:
 2026-08-21T18:22:57Z 64654c2f wg=yes bg=yes skills=4 writes=0
 ```
 
-Session, whether `writing-guidelines` and `behavioral-guidelines` were invoked, how many
-skill invocations in total, and how many file writes. The last column is what makes the
-data readable: `wg=no writes=12` is a signal, `wg=no writes=0` is a quiet turn.
+Session, whether the writing and work guidance skills were invoked, how many skill
+invocations in total, and how many file writes. The last column is what makes the data
+readable: `wg=no writes=12` is a signal, `wg=no writes=0` is a quiet turn.
+
+A third value, `n/a`, means the skill is not installed on this machine at all. `no` claims
+the skill was available and went unused, which is the thing being measured; a missing skill
+reported as `no` would pad the failure rate with sessions that never could have invoked it.
+
+### If your skills are named differently
+
+The watched names are variables at the top of the script, overridable from the environment:
+
+```json
+{ "env": { "SKILL_LOG_WRITING": "write-for-humans" } }
+```
+
+`SKILL_LOG_WRITING` defaults to `writing-guidelines`, `SKILL_LOG_WORK` to
+`behavioral-guidelines`. The `wg` and `bg` column names stay fixed so two installs with
+different skill names still produce comparable logs.
+
+This exists because a second install of this script does call its prose skill
+`write-for-humans`, and the first version hardcoded the greps.
 
 It reports and nothing else. No blocking, no output, exit 0 on every path including a
 malformed payload or a missing transcript.
