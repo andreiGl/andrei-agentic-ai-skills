@@ -342,16 +342,39 @@ tasks reach it. Run four cases before considering the change done:
 1. A direct request that must select the skill.
 2. A neighbouring request that could plausibly select an adjacent skill instead.
 3. A request that must not select it at all.
-4. A full run proving the intended workflow actually happened.
-
-The fourth is the one that catches real failures. Selection is not the success
-condition. A skill can be chosen and still not change what gets produced, and more
-importantly the reverse: the work completes, looks correct, and the skill that governs it
-was never invoked. That is the fourth failure shape above, and this rule is the only
-thing that looks for it.
+4. Where the skill has observable required behaviour, verify its artifact, command, tool
+   call, or output section.
 
 Widening a description is the case most in need of case 3. A description broadened until
 it matches everything competes with every other skill and wins nothing.
+
+### What this rule does not do
+
+Case 4 validates a workflow after invocation. It does not prove invocation, and nothing
+in this file does.
+
+For a procedural skill the gap is small: `check-knowledge` either stamped a date or it
+did not. For a guidelines skill there is no artifact to look for and no mechanical proof
+that the guidance shaped the output. A transcript shows the `Skill` call, which settles
+the question once someone thinks to ask, but review is not monitoring, and the only
+non-invocation caught here so far was caught because a person asked directly.
+
+So the fourth failure shape stays uncovered. What reduces it is enforcement before the
+fact rather than detection after:
+
+- `CLAUDE.md` naming the skill and the Skill tool, which is what carries it today
+- a hook requiring an observable precursor before an irreversible action
+- a wrapper that loads mandatory guidance regardless of selection
+
+| Requirement | What can validate it |
+| :--- | :--- |
+| The description routes likely prompts | Cases 1 to 3 above |
+| A procedural workflow ran | Its required artifact, command, or tool call |
+| Guidance shaped the reasoning | Nothing mechanical. Enforce it in global instructions and use transcript review for audits only |
+
+The last row is the uncomfortable one, and stating it plainly is the point. The first
+version of this rule claimed case 4 caught the fourth failure shape. It does not, and a
+rule implying otherwise is the exact defect rule 4 warns about.
 
 ## Rule 14 - stop condition
 
