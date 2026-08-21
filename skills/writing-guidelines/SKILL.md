@@ -112,8 +112,3 @@ Russian, common ones: «стоит отметить», «важно понима
 The structural tells carry across languages unchanged - throat-clearing, rhetorical setup,
 meta-commentary, vague declaratives, hidden actors. Check for those in any language; check
 the word list only in English.
-
----
-
-The pattern list in section 3 is adapted from
-[stop-slop](https://github.com/hardikpandya/stop-slop) by Hardik Pandya, MIT licensed.

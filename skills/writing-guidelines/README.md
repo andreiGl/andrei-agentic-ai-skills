@@ -27,8 +27,3 @@ any rebuttal.
 **Part-of-speech bans stay out.** Em dashes, adverbs, three-item lists, and Wh- openers
 are not tells. Banning them comes from essay style guides and rewrites prose that was
 already fine.
-
-## Credit
-
-Section 3's pattern list is adapted from
-[stop-slop](https://github.com/hardikpandya/stop-slop) by Hardik Pandya, MIT licensed.
