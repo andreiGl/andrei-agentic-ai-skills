@@ -1,6 +1,6 @@
 # Writing Guidelines
 
-How the result reads. Any prose, any language, any reader — whether it ships alongside
+How the result reads. Any prose, any language, any reader - whether it ships alongside
 code or stands on its own.
 
 ## What it does
@@ -9,10 +9,10 @@ Invoked whenever there is prose to draft or edit: code comments, docstrings, REA
 docs, commit messages, PR and issue text, design notes, reports, analyses, research
 summaries, essays, emails, forum and social posts, chat replies.
 
-1. **Write for a human reader** — plain language, no invented terms (headings included), clarity over brevity
-2. **Match the register** — who reads it, where it appears, what they do next; length follows the venue, not the effort
-3. **Cut the AI tells** — throat-clearing, binary contrast, rhetorical setup, meta-commentary, vague declaratives, hidden actors
-4. **Other languages** — the word lists are English; the structural tells carry across unchanged
+1. **Write for a human reader** - plain language, no invented terms (headings included), clarity over brevity
+2. **Match the register** - who reads it, where it appears, what they do next; length follows the venue, not the effort
+3. **Cut the AI tells** - throat-clearing, binary contrast, rhetorical setup, meta-commentary, vague declaratives, hidden actors
+4. **Other languages** - the word lists are English; the structural tells carry across unchanged
 
 Load it before drafting. Writing this way costs less than stripping the tells out
 afterwards.

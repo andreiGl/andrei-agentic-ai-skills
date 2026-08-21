@@ -1,6 +1,6 @@
 ---
 name: writing-guidelines
-description: Write prose a person will actually read - plain language, no invented terms, register matched to the venue, and none of the sentence shapes that mark text as machine-written. Use whenever drafting or editing prose in any language for any audience — code comments, docstrings, READMEs, docs, commit messages, PR and issue text, design notes, reports, analyses, research summaries, essays, emails, forum and social posts, and chat replies. Load it before drafting, not after - it is cheaper to write this way than to strip the tells out afterwards.
+description: Write prose a person will actually read - plain language, no invented terms, register matched to the venue, and none of the sentence shapes that mark text as machine-written. Use whenever drafting or editing prose in any language for any audience - code comments, docstrings, READMEs, docs, commit messages, PR and issue text, design notes, reports, analyses, research summaries, essays, emails, forum and social posts, and chat replies. Load it before drafting, not after - it is cheaper to write this way than to strip the tells out afterwards.
 ---
 
 # Writing Guidelines
@@ -84,6 +84,13 @@ so they read as padding to a colleague and as filler to you a month later.**
   implication, or cut the sentence.
 - **Hidden actors.** Passive voice and inanimate subjects both drop the person who acted.
   "The decision was reached" and "the decision emerges" are both "the team decided."
+- **Em dashes.** Write a plain hyphen with spaces around it - like this - instead of an
+  em dash. Whatever its typographic merits, it now reads as a machine's default
+  punctuation, and a reader who has seen enough generated text clocks it before anything
+  else on the page. Often the better fix is neither dash: a comma, a full stop, or
+  brackets usually carry the same break with less furniture.
+  This governs punctuation only. An em dash that is a literal value in data or a table
+  field is not punctuation and stays as it is.
 
 ```
 Bad:  Here's the thing: it's not a caching problem, it's an invalidation problem.
@@ -92,10 +99,10 @@ Good: Invalidation is what breaks here. Two writers can clear the same key in ei
       order, and the loser's value survives.
 ```
 
-Not banned: em dashes, adverbs, three-item lists, and sentences opening with a Wh- word.
-Blanket bans on those come from essay style guides, and enforcing them rewrites prose
-that was already fine. Cut a word because it carries no information, never because of its
-part of speech.
+Not banned: adverbs, three-item lists, and sentences opening with a Wh- word. Blanket
+bans on those come from essay style guides, and enforcing them rewrites prose that was
+already fine. Cut a word because it carries no information, never because of its part of
+speech.
 
 Test: does the sentence survive deleting its first four words? Then those four words were
 throat-clearing.
