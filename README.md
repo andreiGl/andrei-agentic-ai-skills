@@ -5,15 +5,13 @@
 > so your mileage may vary.
 
 Claude Code skills for development workflows — a persistent cross-project knowledge
-base, a set of coding behavioral guidelines, a prose cleanup skill — plus a custom
-status line.
+base and a set of coding behavioral guidelines — plus a custom status line.
 
 ## Contents
 
 - [Installation](#installation)
 - [Skills](#skills)
   - [Code quality](#code-quality)
-  - [Writing](#writing)
   - [Knowledge base](#knowledge-base)
 - [How the knowledge base works](#how-the-knowledge-base-works)
 - [Status line](#status-line)
@@ -89,22 +87,9 @@ rather than erroring.
 | [`behavioral-guidelines`](skills/behavioral-guidelines) | Principles that reduce common LLM coding mistakes: avoid overcomplication, make surgical changes, surface assumptions, write for a human reader |
 
 Referenced directly from `CLAUDE.md` rather than invoked, so it applies to every
-coding task.
-
-### Writing
-
-| Skill | Description |
-| :--- | :--- |
-| [`stop-slop`](skills/stop-slop) | Strips the patterns that make prose read as AI-written: filler phrases, formulaic structures, passive voice, metronomic rhythm |
-
-Third-party — written by [Hardik Pandya](https://hvpandya.com) and vendored here from
-[hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop) under MIT, so a
-single symlink pass installs it alongside the rest. The skill's
-[README](skills/stop-slop/README.md) records the upstream commit and how to refresh it.
-
-Wired in through the `## Writing` section of [`CLAUDE.md`](CLAUDE.md), so like the
-behavioral guidelines it applies without being invoked — scoped to prose that gets
-committed or published, and kept off chat replies and code comments.
+coding task. Sections 8 and 9 cover the prose that comes with the code — comments,
+commit messages, PR text — and own the writing rules on their own, so nothing else here
+duplicates them.
 
 ### Knowledge base
 

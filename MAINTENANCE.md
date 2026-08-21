@@ -141,7 +141,7 @@ find -L ~/.claude/skills -mindepth 3 -name SKILL.md
 find -L ~/.claude/skills -name SKILL.md | wc -l
 ```
 
-**Expected:** nothing from the first; `7` from the second (one per directory in
+**Expected:** nothing from the first; `6` from the second (one per directory in
 `skills/`).
 
 `-L` is load-bearing: the live skill directories are symlinks into this repo, and `find`

@@ -7,8 +7,7 @@
 
 ## Writing
 
-- Follow the prose rules in ~/.claude/skills/stop-slop/SKILL.md when writing or editing prose that gets committed or published: READMEs, docs, commit messages, PR and issue text. Run its Quick Checks before delivering; the reference files load on demand.
-- Prose in chat replies and code comments is out of scope. Comment style is owned by the behavioral guidelines above.
+- Prose that gets committed or published - READMEs, docs, commit messages, PR and issue text - follows sections 8 and 9 of ~/.claude/skills/behavioral-guidelines/SKILL.md, the same file the code rules live in. That applies when the task is writing alone and no code changes.
 
 ## Models
 

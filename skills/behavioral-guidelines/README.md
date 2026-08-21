@@ -15,6 +15,7 @@ invoked. Provides a set of principles Claude follows:
 6. **Checkpoint after every significant step** — summarize what was done, verified, and what's next
 7. **Fail loud** — surface uncertainty explicitly; never silently skip or assume away
 8. **Write for a human reader** — plain language in comments, docs, and PR text; no invented terms; clarity outranks brevity
+9. **Cut the AI tells** — throat-clearing openers, binary contrast, rhetorical setup, vague declaratives, hidden actors; adapted from [stop-slop](https://github.com/hardikpandya/stop-slop) under MIT
 
 ## Tradeoff
 
