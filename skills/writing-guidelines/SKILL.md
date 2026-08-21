@@ -36,7 +36,7 @@ Good: // Rejects the entry if it was read before the last write, returning stale
 ```
 
 Applies to text you write or change - not a license to rewrite text you're only reading
-past (see section 3 of behavioral-guidelines).
+past (see *Surgical changes* in behavioral-guidelines).
 
 Test: would a colleague understand this on first read, without asking what a word means?
 

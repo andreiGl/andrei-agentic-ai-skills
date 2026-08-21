@@ -17,7 +17,7 @@ Claude follows:
 7. **Fail loud** — surface uncertainty explicitly; never silently skip
 8. **Ground every claim** — cite what you opened, carry each number's date and origin, concede early
 
-Section 8 is the counterpart to running the tests, for work that has no tests: research,
+*Ground every claim* is the counterpart to running the tests, for work that has no tests: research,
 comparison, fact-checking, argument.
 
 ## Companion skill
