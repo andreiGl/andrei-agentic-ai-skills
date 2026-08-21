@@ -13,28 +13,28 @@ before the first tool call. Conventions live in `~/.claude/knowledge/CLAUDE.md`.
 This section is the single source for this trigger. `CLAUDE.md` and the other skills
 point here rather than restating it.
 
-Run before the first substantive tool call of a task — the first file read, search,
+Run before the first substantive tool call of a task - the first file read, search,
 edit, or web fetch that goes beyond answering a one-line question.
 
 "Substantive" is a test you can apply before acting, which is the whole point. A trigger
 phrased as "when the task feels big" resolves to "not now" every time, because nothing
 forces the judgment at a moment when making it would cost anything.
 
-Run without checking first whether the project has pages — finding that out *is* step 1,
+Run without checking first whether the project has pages - finding that out *is* step 1,
 and the empty case costs one line (see the end of this file).
 
 ## 1. Always load
 
 This list is authoritative; no other file restates it.
 
-1. `~/.claude/knowledge/learnings.md` — rules and surprises from past sessions
-2. `~/.claude/knowledge/INDEX.md` — every page, with tags and covered paths
-3. `~/.claude/knowledge/gotchas.md` — sharp facts, fast to scan
-4. `~/.claude/knowledge/active-context.md` — open work and areas in flux
-5. `~/.claude/knowledge/pages/shared/patterns.md` — recurring patterns, if it exists
+1. `~/.claude/knowledge/learnings.md` - rules and surprises from past sessions
+2. `~/.claude/knowledge/INDEX.md` - every page, with tags and covered paths
+3. `~/.claude/knowledge/gotchas.md` - sharp facts, fast to scan
+4. `~/.claude/knowledge/active-context.md` - open work and areas in flux
+5. `~/.claude/knowledge/pages/shared/patterns.md` - recurring patterns, if it exists
 
 Skip anything already in the current context. If a file is missing, note it and move
-on — that part of the KB just hasn't been built yet.
+on - that part of the KB just hasn't been built yet.
 
 ## 2. Then load by tag match
 
@@ -53,7 +53,7 @@ Then read `INDEX.md` and load any page where:
 - **Tags** overlap the task description, **or** **Covers** matches a file the task
   will touch
 
-Load the whole page, not an excerpt — pages are small by design. When more than five
+Load the whole page, not an excerpt - pages are small by design. When more than five
 pages match, load the ones whose Covers globs are closest to the files in play, and
 say which ones you skipped.
 
@@ -62,16 +62,16 @@ say which ones you skipped.
 `~/.claude/knowledge/CLAUDE.md` defines what the three values mean. What to do with a
 page that isn't `verified`:
 
-- **`inferred`** — before acting on a specific claim (class name, path, method
+- **`inferred`** - before acting on a specific claim (class name, path, method
   signature), spot-check it with one `grep` or `ls`. If it holds, set
   `Status: verified` and bump **Last updated**. If it doesn't, fix the page and note
   the correction in `learnings.md`.
-- **`stale`** — verify before acting on anything in it, and don't promote it to
+- **`stale`** - verify before acting on anything in it, and don't promote it to
   `verified` on the strength of one spot-check; a stale page was flagged for a reason
   the note should name.
 
 ## When there is nothing to load
 
 If the project has no pages and `gotchas.md` is empty, say so in one line and start
-the task. Don't run `build-knowledge` on the spot — building a KB is its own task,
+the task. Don't run `build-knowledge` on the spot - building a KB is its own task,
 worth doing deliberately rather than as a detour.

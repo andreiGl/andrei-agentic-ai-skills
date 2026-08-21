@@ -2,11 +2,11 @@
 .DS_Store
 
 # macOS custom folder icons. The real filename is "Icon" followed by a carriage
-# return, and a literal CR in this file gets eaten as the line ending — so match
+# return, and a literal CR in this file gets eaten as the line ending - so match
 # it with "?" instead. `cp -R` drags these along from Finder-customized folders.
 Icon?
 
-# Live knowledge-base content must never be published — only the empty scaffold
+# Live knowledge-base content must never be published - only the empty scaffold
 # is tracked here. These are inert while ~/.claude/knowledge holds the real KB
 # and only its conventions are symlinked in; uncomment if that ever changes.
 # knowledge/pages/**

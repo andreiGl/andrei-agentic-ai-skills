@@ -5,7 +5,7 @@ Finds recurring patterns across past sessions and distills them into
 
 ## When to use
 
-The thresholds live in [`SKILL.md`](SKILL.md) and only there — the other skills and
+The thresholds live in [`SKILL.md`](SKILL.md) and only there - the other skills and
 `knowledge/CLAUDE.md` point at it rather than restating, because three slightly
 different copies of one rule is exactly how this drifted before.
 
@@ -16,7 +16,7 @@ in `learnings.md`, or that file has grown too long to scan.
 
 1. Reads undistilled entries in `experiences/`, plus `learnings.md`,
    `active-context.md`, and any existing `patterns.md`
-2. Identifies repetition at a threshold of three occurrences — fragile areas,
+2. Identifies repetition at a threshold of three occurrences - fragile areas,
    recurring bug classes, unwritten conventions, repeating CI failures
 3. Names each pattern with frequency, area, instances, root cause, and a
    **preventive rule**
@@ -37,6 +37,6 @@ and a patterns page full of near-misses is one nobody trusts.
 
 ## Related
 
-- [`update-knowledge`](../update-knowledge) — writes the experience entries this reads
-- [`load-knowledge`](../load-knowledge) — loads `patterns.md` automatically when present
+- [`update-knowledge`](../update-knowledge) - writes the experience entries this reads
+- [`load-knowledge`](../load-knowledge) - loads `patterns.md` automatically when present
 - [`build-knowledge`](../build-knowledge) · [`check-knowledge`](../check-knowledge)

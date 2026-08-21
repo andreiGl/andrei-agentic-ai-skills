@@ -1,7 +1,7 @@
 # Global Claude Code Instructions
 
 This file names skills and how to invoke them. Trigger conditions live inside the
-skills — in a When to run section, or in the description where the condition is a
+skills - in a When to run section, or in the description where the condition is a
 single clause. Don't restate them here.
 
 ## Doing the work

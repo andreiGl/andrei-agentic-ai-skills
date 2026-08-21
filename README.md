@@ -4,8 +4,8 @@
 > Shared as-is. These work for me but haven't been tested much beyond my own setup,
 > so your mileage may vary.
 
-Claude Code skills — a persistent cross-project knowledge base, guidelines for how work
-gets carried out, and guidelines for how the result reads — plus a custom status line.
+Claude Code skills - a persistent cross-project knowledge base, guidelines for how work
+gets carried out, and guidelines for how the result reads - plus a custom status line.
 
 ## Contents
 
@@ -23,7 +23,7 @@ gets carried out, and guidelines for how the result reads — plus a custom stat
 
 ## Installation
 
-Clone it wherever you keep repositories — `~/myProjects` below is a placeholder,
+Clone it wherever you keep repositories - `~/myProjects` below is a placeholder,
 substitute your own:
 
 ```bash
@@ -42,7 +42,7 @@ cp -R "$REPO"/skills/* ~/.claude/skills/
 cp -R "$REPO"/knowledge ~/.claude/knowledge
 ```
 
-Simple, but edits made while working don't flow back — you have to remember to copy
+Simple, but edits made while working don't flow back - you have to remember to copy
 them across, and in practice you won't.
 
 ### Symlink (what I run)
@@ -68,7 +68,7 @@ Nesting them in subdirectories stops them being registered.
 
 Those accumulate real notes about real work. Symlinking them would put every recorded
 learning straight into this repo's working tree, one `git add -A` away from being
-published. The copies here are empty templates for a fresh install — they're meant to
+published. The copies here are empty templates for a fresh install - they're meant to
 diverge from a live knowledge base, which is why they aren't linked.
 
 The same reasoning applies to [`CLAUDE.md`](CLAUDE.md) at the repo root: it's an example
@@ -77,11 +77,11 @@ project-specific and private rules over time.
 
 The knowledge skills do nothing until the global `CLAUDE.md` names them, so Claude knows
 they exist and reaches for the Skill tool. When each one fires is stated inside the skill,
-not there. See [`CLAUDE.md`](CLAUDE.md) in this repo for the wiring I use — copy the
+not there. See [`CLAUDE.md`](CLAUDE.md) in this repo for the wiring I use - copy the
 `## Knowledge base` section into your own `~/.claude/CLAUDE.md`.
 
 Editing these? Read [MAINTENANCE.md](MAINTENANCE.md) first. The skills read what each
-other write, and the defects that matter live in those seams — they degrade silently
+other write, and the defects that matter live in those seams - they degrade silently
 rather than erroring.
 
 ## Skills
@@ -97,7 +97,7 @@ These were one file until its description, which named code in every clause, sto
 matching a long piece of research and argument that had no code in it. Split so each half
 carries a description for its own kind of work; they compose, and each points at the other.
 
-The writing half applies to any prose, in any language, whether or not code is involved —
+The writing half applies to any prose, in any language, whether or not code is involved -
 comments and commit messages, and equally reports, emails, and forum posts.
 
 ### Knowledge base
@@ -113,7 +113,7 @@ Five skills that maintain a knowledge base carrying context across sessions.
 | [`synthesize-knowledge`](skills/synthesize-knowledge) | Distills repeated experience into patterns |
 
 Each skill's `## When to run` section states when it fires. This table stays out of that
-on purpose — see below.
+on purpose - see below.
 
 ### Where triggers live
 
@@ -121,7 +121,7 @@ Every skill owns its trigger, and nothing outside it restates the condition. `CL
 names the skills and how to invoke them, and carries no conditions at all.
 
 Where inside the skill depends on the shape of the condition. The five knowledge skills
-each have a list of them — counts, dates, whether you asked — so each carries a
+each have a list of them - counts, dates, whether you asked - so each carries a
 `## When to run` section near the top of its `SKILL.md`. The two guideline skills answer
 "always", which fits in the description and needs no section. A heading that says
 "always" carries nothing and becomes a third copy to keep in sync.
@@ -130,8 +130,8 @@ This started as a bug worth recording. `CLAUDE.md` claimed each skill stated its
 trigger and then restated all five, and the copies had already drifted: it told
 `update-knowledge` to run after any substantial task, while that skill's description
 said to run only when the task produced something memorable. The skill's own body said
-the first — the experience entry is unconditional, and `synthesize-knowledge` needs quiet
-sessions to produce one — so the description was the copy that was wrong, and the obvious
+the first - the experience entry is unconditional, and `synthesize-knowledge` needs quiet
+sessions to produce one - so the description was the copy that was wrong, and the obvious
 fix of deferring to it would have starved the synthesis input.
 
 `MAINTENANCE.md` Rule 3 sweeps for restated thresholds, this file included. It was added
@@ -140,20 +140,20 @@ to that sweep after this table was found holding two of them.
 ## How the knowledge base works
 
 Context windows reset between sessions. Some facts aren't recoverable from the code at
-all — how an external system actually behaves, why one approach was chosen over
+all - how an external system actually behaves, why one approach was chosen over
 another, which failure mode already burned you twice. The knowledge base is where
 those go.
 
 ```
 knowledge/
-├── CLAUDE.md           — conventions and structure (the single source for them)
-├── INDEX.md            — every page, with project, tags, and covered paths
-├── learnings.md        — chronological journal across projects
-├── gotchas.md          — one-line sharp facts
-├── active-context.md   — open work and areas in flux
-├── pages/<project>/    — curated pages, one directory per repo
-├── experiences/        — per-session notes
-└── raw/                — source material before extraction
+├── CLAUDE.md           - conventions and structure (the single source for them)
+├── INDEX.md            - every page, with project, tags, and covered paths
+├── learnings.md        - chronological journal across projects
+├── gotchas.md          - one-line sharp facts
+├── active-context.md   - open work and areas in flux
+├── pages/<project>/    - curated pages, one directory per repo
+├── experiences/        - per-session notes
+└── raw/                - source material before extraction
 ```
 
 The gate that keeps it useful:
@@ -161,7 +161,7 @@ The gate that keeps it useful:
 > "Can this fact be derived from reading the code in under 3 tool calls?"
 
 If yes, it doesn't become a page. A knowledge base that restates the codebase goes
-stale silently and stops being read — the discipline is discarding most of what you
+stale silently and stops being read - the discipline is discarding most of what you
 gather.
 
 Two header fields drive everything. `Tags` decides what `load-knowledge` pulls in for
@@ -170,11 +170,11 @@ commits onto the pages that claim to describe them. A page with neither will nev
 surface and never be verified.
 
 There's a [presentation deck](knowledge/presentation/knowledge-base-deck.html)
-walking through the system — clone and open it in a browser.
+walking through the system - clone and open it in a browser.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).
 
 ## Status line
 

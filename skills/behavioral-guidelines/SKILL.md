@@ -5,11 +5,11 @@ description: Generic, domain- and language-agnostic guidelines for carrying out 
 
 # Behavioral Guidelines
 
-How to carry out a task. These apply to code and to everything else — research, analysis,
+How to carry out a task. These apply to code and to everything else - research, analysis,
 review, planning, argument. Where a rule needs a concrete example, both kinds are given.
 
-For the wording of the result — comments, commit messages, docs, reports, posts, chat
-replies — see the **writing-guidelines** skill. This file covers the work; that one covers
+For the wording of the result - comments, commit messages, docs, reports, posts, chat
+replies - see the **writing-guidelines** skill. This file covers the work; that one covers
 how it reads.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use

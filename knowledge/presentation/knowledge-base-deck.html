@@ -153,7 +153,7 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
   <section class="slide active">
     <div class="kicker">Team Presentation</div>
     <h1>A Knowledge Base for Working with Claude</h1>
-    <p class="subtitle">A persistent, file-based memory system that survives context resets —
+    <p class="subtitle">A persistent, file-based memory system that survives context resets -
       so the assistant doesn't relearn the same deployment quirk, silent failure mode, or
       database surprise every single session.</p>
   </section>
@@ -163,9 +163,9 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
     <div class="kicker">The Problem</div>
     <h2>Every session starts from zero</h2>
     <ul class="points">
-      <li>Context windows <span class="pain">reset between sessions</span> — yesterday's hard-won discovery is gone tomorrow</li>
-      <li>Some facts <span class="pain">aren't in the code</span> — external behavior, silent failure modes, "why we chose X over Y"</li>
-      <li>Re-deriving them costs <span class="pain">real time</span> — re-reading the same logs, re-tracing the same silent failure</li>
+      <li>Context windows <span class="pain">reset between sessions</span> - yesterday's hard-won discovery is gone tomorrow</li>
+      <li>Some facts <span class="pain">aren't in the code</span> - external behavior, silent failure modes, "why we chose X over Y"</li>
+      <li>Re-deriving them costs <span class="pain">real time</span> - re-reading the same logs, re-tracing the same silent failure</li>
       <li>Tribal knowledge <span class="pain">lives in one person's head</span> until it bites someone else</li>
     </ul>
   </section>
@@ -180,7 +180,7 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
       <div class="hd">This KB</div>
 
       <div>When code changes</div>
-      <div class="wiki">Page silently goes stale — no signal</div>
+      <div class="wiki">Page silently goes stale - no signal</div>
       <div class="kb">Page carries a trust label; contradictions get caught and corrected</div>
 
       <div>When a fact is used</div>
@@ -206,7 +206,7 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
 ├── CLAUDE.md           <span class="comment"># conventions &amp; processing rules</span>
 ├── learnings.md        <span class="comment"># chronological log, read every session</span>
 ├── <span class="dir">raw/</span>                <span class="comment"># original source dumps, verbatim</span>
-├── <span class="dir">knowledge/</span>           <span class="comment"># curated pages — the actual KB</span>
+├── <span class="dir">knowledge/</span>           <span class="comment"># curated pages - the actual KB</span>
 │   ├── INDEX.md        <span class="comment"># tag-based navigation</span>
 │   ├── gotchas.md       <span class="comment"># one-line fast-scan facts</span>
 │   └── active-context.md <span class="comment"># open tickets, in-flux areas</span>
@@ -223,11 +223,11 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
       <div class="gate-ans">
         <div class="gate-col yes">
           <div class="verdict">YES → skip it</div>
-          <div class="action">Module lists, class hierarchies, style rules — <code class="inline">grep</code>/<code class="inline">find</code> answers it faster than a stale page ever will.</div>
+          <div class="action">Module lists, class hierarchies, style rules - <code class="inline">grep</code>/<code class="inline">find</code> answers it faster than a stale page ever will.</div>
         </div>
         <div class="gate-col no">
           <div class="verdict">NO → record it</div>
-          <div class="action">External behavior, silent failure modes, "why" decisions invisible in the diff — these are worth preserving.</div>
+          <div class="action">External behavior, silent failure modes, "why" decisions invisible in the diff - these are worth preserving.</div>
         </div>
       </div>
     </div>
@@ -240,36 +240,36 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
     <div class="feature-grid">
       <div class="feature-card">
         <div class="title">Gotchas</div>
-        <div class="body">One-line, fast-scan facts that bite — e.g. "DS RI plugin silently disables itself if an index is missing." Lives in <code class="inline">gotchas.md</code>, read first every session.</div>
+        <div class="body">One-line, fast-scan facts that bite - e.g. "DS RI plugin silently disables itself if an index is missing." Lives in <code class="inline">gotchas.md</code>, read first every session.</div>
       </div>
       <div class="feature-card">
         <div class="title">Knowledge pages</div>
-        <div class="body">Full pages for anything needing more than 3 sentences — class hierarchies with rationale, config differences between deployment profiles.</div>
+        <div class="body">Full pages for anything needing more than 3 sentences - class hierarchies with rationale, config differences between deployment profiles.</div>
       </div>
       <div class="feature-card">
         <div class="title">Active context</div>
-        <div class="body">Open tickets, areas in flux, things to watch — updated at the end of sessions touching open work.</div>
+        <div class="body">Open tickets, areas in flux, things to watch - updated at the end of sessions touching open work.</div>
       </div>
       <div class="feature-card">
         <div class="title">Fragile areas</div>
-        <div class="body">Patterns that have caused repeated failures across multiple PRs — flagged so future work in that area gets extra scrutiny.</div>
+        <div class="body">Patterns that have caused repeated failures across multiple PRs - flagged so future work in that area gets extra scrutiny.</div>
       </div>
     </div>
   </section>
 
   <!-- 6: The loop in action -->
   <section class="slide">
-    <div class="kicker">The Loop In Action — A Real Example</div>
+    <div class="kicker">The Loop In Action - A Real Example</div>
     <h2>Discovered once, never re-discovered</h2>
     <div class="story">
       <div class="story-step">
         <div class="story-marker"><div class="story-dot">1</div><div class="story-line"></div></div>
         <div class="story-body">
-          <div class="story-label">Discovered — 2026-06-15, PROJ-1234</div>
+          <div class="story-label">Discovered - 2026-06-15, PROJ-1234</div>
           <div class="story-quote">The two deployment profiles route the same object types to
             different storage backends. In the self-hosted profile, only
             <code class="inline">users</code> and <code class="inline">groups</code> live in the shared
-            store — everything else sits in the service's own repository. In the cloud profile, all of
+            store - everything else sits in the service's own repository. In the cloud profile, all of
             it lives in the shared store. That mismatch was the root cause of two earlier PRs scoping
             their plugin to the wrong backend.</div>
         </div>
@@ -277,7 +277,7 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
       <div class="story-step">
         <div class="story-marker"><div class="story-dot">2</div><div class="story-line"></div></div>
         <div class="story-body">
-          <div class="story-label">Recorded — same session, into gotchas.md + a full backend-routing page</div>
+          <div class="story-label">Recorded - same session, into gotchas.md + a full backend-routing page</div>
           <div class="story-quote">"Before scoping any plugin to the shared store: check the repository
             config for both profiles to confirm which backend each object type actually uses."</div>
         </div>
@@ -285,13 +285,13 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
       <div class="story-step prevented">
         <div class="story-marker"><div class="story-dot">✓</div></div>
         <div class="story-body">
-          <div class="story-label">Prevented — 2026-07-09, three weeks later, same ticket</div>
+          <div class="story-label">Prevented - 2026-07-09, three weeks later, same ticket</div>
           <div class="story-quote">Re-reading the config against the recorded rule surfaced a scope gap
             before it shipped: the existing integrity plugin is scoped to the service's own repository
-            only — it does <b>not</b> protect data in the shared store, even though both profiles load
+            only - it does <b>not</b> protect data in the shared store, even though both profiles load
             side by side. Easy to assume coverage precisely because they load together. That gap became
             the justification for a new PR, opened correctly the first time.</div>
-          <div class="story-meta">Two sessions, three weeks apart, same open ticket — the fact recorded on day one is what caught the mistake on day twenty-four.</div>
+          <div class="story-meta">Two sessions, three weeks apart, same open ticket - the fact recorded on day one is what caught the mistake on day twenty-four.</div>
         </div>
       </div>
     </div>
@@ -300,16 +300,16 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
   <!-- 7: Curation, not accumulation -->
   <section class="slide">
     <div class="kicker">It Prunes Itself, Too</div>
-    <h2>Growth is not the goal — signal is</h2>
+    <h2>Growth is not the goal - signal is</h2>
     <div class="stat-row">
       <div class="stat-box"><div class="num">1,769</div><div class="cap">lines before curation</div></div>
       <div class="stat-arrow">→</div>
       <div class="stat-box"><div class="num">~700</div><div class="cap">lines after deleting 10 pages</div></div>
     </div>
     <ul class="points" style="margin-top:30px;">
-      <li>~60% of the initial KB turned out to be <b>Category B</b> — derivable from the code, written anyway because exploration naturally produces structural summaries</li>
-      <li>The gate is applied <b>at write time now</b>, not fixed up later in a big cleanup — the 2026-06-15 curation pass was the correction that taught this rule</li>
-      <li>Result: <code class="inline">gotchas.md</code> stays a true fast-scan — a wiki nobody prunes becomes a wiki nobody reads</li>
+      <li>~60% of the initial KB turned out to be <b>Category B</b> - derivable from the code, written anyway because exploration naturally produces structural summaries</li>
+      <li>The gate is applied <b>at write time now</b>, not fixed up later in a big cleanup - the 2026-06-15 curation pass was the correction that taught this rule</li>
+      <li>Result: <code class="inline">gotchas.md</code> stays a true fast-scan - a wiki nobody prunes becomes a wiki nobody reads</li>
     </ul>
   </section>
 
@@ -332,14 +332,14 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
       </div>
     </div>
     <ul class="points" style="margin-top:32px;">
-      <li>If a page contradicts observed reality, <b>the page loses</b> — update it and note the correction in <code class="inline">learnings.md</code></li>
-      <li>Named entities (classes, files, flags) are treated as claims about the past — grep before recommending</li>
+      <li>If a page contradicts observed reality, <b>the page loses</b> - update it and note the correction in <code class="inline">learnings.md</code></li>
+      <li>Named entities (classes, files, flags) are treated as claims about the past - grep before recommending</li>
     </ul>
     <div class="story-quote" style="margin-top:22px; max-width:900px;">
       Real self-correction, one session apart: the gotcha said RF7 block 0 "has 1 string."
-      The next session hit a report file with an <b>empty</b> block 0 (<code class="inline">[]</code>) — the parser
+      The next session hit a report file with an <b>empty</b> block 0 (<code class="inline">[]</code>) - the parser
       silently over-counted and shifted every string index. The fix (<code class="inline">break</code> on <code class="inline">]</code>)
-      landed in the code AND the gotcha was rewritten same-day to say "size varies, never hardcode." The KB doesn't just store facts — it gets caught being wrong and corrects itself.
+      landed in the code AND the gotcha was rewritten same-day to say "size varies, never hardcode." The KB doesn't just store facts - it gets caught being wrong and corrects itself.
     </div>
   </section>
 
@@ -380,10 +380,10 @@ code.inline { background: #161b27; border: 1px solid #2d3748; border-radius: 4px
     <div class="kicker">The Payoff</div>
     <h2>Small file, compounding return</h2>
     <ul class="points">
-      <li><b>No re-deriving</b> — the DS RI plugin silent-disable gotcha gets caught before it burns another CI cycle</li>
-      <li><b>Faster onboarding</b> — anyone (human or LLM) picking up this project reads <code class="inline">gotchas.md</code> and <code class="inline">active-context.md</code> first, not the whole git history</li>
-      <li><b>Self-correcting</b> — freshness rules mean it degrades gracefully instead of silently rotting</li>
-      <li><b>Cheap to maintain</b> — the gate keeps it small; it stays a fast scan, not a wiki nobody reads</li>
+      <li><b>No re-deriving</b> - the DS RI plugin silent-disable gotcha gets caught before it burns another CI cycle</li>
+      <li><b>Faster onboarding</b> - anyone (human or LLM) picking up this project reads <code class="inline">gotchas.md</code> and <code class="inline">active-context.md</code> first, not the whole git history</li>
+      <li><b>Self-correcting</b> - freshness rules mean it degrades gracefully instead of silently rotting</li>
+      <li><b>Cheap to maintain</b> - the gate keeps it small; it stays a fast scan, not a wiki nobody reads</li>
     </ul>
   </section>
 

@@ -8,7 +8,7 @@
 **Related:** [[learnings]], [[active-context]]
 
 Sharp facts that bite. One line each, plain statement, `[[page-link]]` if a full page
-exists. Scannable in under a minute — if it needs a paragraph, it needs a page.
+exists. Scannable in under a minute - if it needs a paragraph, it needs a page.
 
 ---
 
@@ -20,6 +20,6 @@ _(none yet)_
 
 ## Fragile areas
 
-Recurring failure modes — places that have burned us more than once.
+Recurring failure modes - places that have burned us more than once.
 
 _(none yet)_

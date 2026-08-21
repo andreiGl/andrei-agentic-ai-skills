@@ -5,7 +5,7 @@ description: Build or extend the personal knowledge base at ~/.claude/knowledge/
 
 # Build or Extend the Knowledge Base
 
-Read `~/.claude/knowledge/CLAUDE.md` first — it defines the layout, the page header,
+Read `~/.claude/knowledge/CLAUDE.md` first - it defines the layout, the page header,
 and the **Category A gate**. This skill covers the procedure, not the conventions.
 
 **If that file doesn't exist, the KB has never been built and step 2 creates it.** Read
@@ -26,7 +26,7 @@ Run only on request:
 
 - "Create a knowledge base" for a project that has none
 - "Add this project to the KB"
-- "Process this material into pages" — a design doc, a postmortem, a transcript
+- "Process this material into pages" - a design doc, a postmortem, a transcript
 
 Never start one mid-task as a detour. Finding that a project has no pages is not a
 trigger; it is the ordinary empty case `load-knowledge` reports in one line. A KB
@@ -54,14 +54,14 @@ fills with restated code and stops being read.
 
    **Then check the files every skill assumes exist**, and write them if they don't:
 
-   - `~/.claude/knowledge/CLAUDE.md` — the conventions. The preamble above tells you to
+   - `~/.claude/knowledge/CLAUDE.md` - the conventions. The preamble above tells you to
      read it, and every other skill defers to it for the page header, the gate, and the
      link rules. On a KB that has never been built it is absent, and each of those
-     pointers resolves to nothing — the ownership scheme quietly becomes "nobody states
+     pointers resolves to nothing - the ownership scheme quietly becomes "nobody states
      this." Create it here, then read it before step 4.
-   - `~/.claude/knowledge/raw/README.md` — the provenance convention `update-knowledge`
+   - `~/.claude/knowledge/raw/README.md` - the provenance convention `update-knowledge`
      points at when saving source material.
-   - `INDEX.md`, `learnings.md`, `gotchas.md`, `active-context.md` — created in steps
+   - `INDEX.md`, `learnings.md`, `gotchas.md`, `active-context.md` - created in steps
      5-8 below, but create them empty now so nothing reads a missing file mid-run.
 
    Copy these from an existing KB if you have one. Don't invent conventions here: this
@@ -71,7 +71,7 @@ fills with restated code and stops being read.
    or discard. Most lands in the third bucket.
 
 4. **Write the pages** that survived, into `~/.claude/knowledge/pages/<project>/`.
-   Every structural fact needs a **Why:** sentence — the why survives refactoring,
+   Every structural fact needs a **Why:** sentence - the why survives refactoring,
    the what doesn't.
    Set `Status: inferred` for anything taken from exploration rather than verified
    against live code.
@@ -83,8 +83,8 @@ fills with restated code and stops being read.
    - A **KB status** block with `Last verified: never` and `Last synthesized: never`.
      `check-knowledge` and `synthesize-knowledge` stamp those fields and read them to
      decide whether they are due. Omit the block and both triggers have nothing to
-     evaluate — they never fire, silently.
-   - A **row per page** — Page, Project, Tags, Covers, Status. Tags are never optional:
+     evaluate - they never fire, silently.
+   - A **row per page** - Page, Project, Tags, Covers, Status. Tags are never optional:
      a page without them will never be surfaced by `load-knowledge`. Covers may be `—`
      when the page describes no particular paths, which tells `check-knowledge` to skip
      it rather than invent globs.
@@ -100,7 +100,7 @@ fills with restated code and stops being read.
 
 ## Extending an existing KB
 
-1. Read `learnings.md` and `INDEX.md` before writing anything — the fact may already
+1. Read `learnings.md` and `INDEX.md` before writing anything - the fact may already
    be recorded, or contradicted.
 2. Save any raw source material in `~/.claude/knowledge/raw/YYYY-MM-DD-<topic>.<ext>`.
 3. Apply the gate.
@@ -117,6 +117,6 @@ fills with restated code and stops being read.
 - Every header has Project, Tags, Covers, Status, Last updated, Related
 - Code blocks are annotated with a language
 - `[[links]]` resolve, in both directions
-- `INDEX.md` has a row per page, every column filled — `—` where Covers doesn't apply,
+- `INDEX.md` has a row per page, every column filled - `-` where Covers doesn't apply,
   never an empty cell
 - No module lists, class hierarchies, or restated style rules

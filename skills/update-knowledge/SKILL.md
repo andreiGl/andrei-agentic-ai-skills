@@ -5,7 +5,7 @@ description: Persist learnings from the current task into the personal knowledge
 
 # Update the Knowledge Base After a Task
 
-Before the session ends, decide what — if anything — is worth keeping, and write it
+Before the session ends, decide what - if anything - is worth keeping, and write it
 into `~/.claude/knowledge/`. Conventions are in `~/.claude/knowledge/CLAUDE.md`.
 
 ## When to run
@@ -13,7 +13,7 @@ into `~/.claude/knowledge/`. Conventions are in `~/.claude/knowledge/CLAUDE.md`.
 This section is the single source for this trigger. `CLAUDE.md` and the other skills
 point here rather than restating it.
 
-Run at the end of any task of substance — anything beyond a one-line answer or a
+Run at the end of any task of substance - anything beyond a one-line answer or a
 trivial edit. Don't wait for the session to feel memorable. The experience entry is
 unconditional, and a quiet session is exactly the input `synthesize-knowledge` needs to
 notice that an unremarkable area keeps coming up.
@@ -29,7 +29,7 @@ What gets written is conditional; whether to run is not.
 | An experience entry | Always |
 
 A routine task with no surprises produces **only** the experience entry. That is the
-normal outcome, not a failure — writing a page for every task is how a knowledge base
+normal outcome, not a failure - writing a page for every task is how a knowledge base
 fills with noise and stops being read.
 
 The experience entry is the exception because `synthesize-knowledge` reads those files
@@ -40,7 +40,7 @@ keeps coming up. Skip them on quiet sessions and that signal disappears.
 
 ## 1. Apply the Category A gate
 
-The gate is defined in `~/.claude/knowledge/CLAUDE.md` — apply it as written there.
+The gate is defined in `~/.claude/knowledge/CLAUDE.md` - apply it as written there.
 What it tends to catch in practice:
 
 Worth recording:
@@ -50,7 +50,7 @@ Worth recording:
 - A build or test behavior that contradicts reasonable expectations
 
 Not worth recording:
-- What the task did — the commit message covers it
+- What the task did - the commit message covers it
 - Structure you could re-derive by reading the code
 - Anything the project's own `CLAUDE.md` or style config already states
 
@@ -67,7 +67,7 @@ actionable.
 ### A correction to an existing page
 
 Read the page, edit in place, bump **Last updated**. If the old content was wrong,
-replace it — don't append a contradiction. Set `Status: verified` when you checked
+replace it - don't append a contradiction. Set `Status: verified` when you checked
 against live code.
 
 ### A new page
@@ -79,8 +79,8 @@ column.
 Two header fields decide whether the page is ever seen again, so don't leave either to
 be filled in later:
 
-- **Tags** — keywords `load-knowledge` matches against a task description
-- **Covers** — repo-relative path globs `check-knowledge` matches against changed
+- **Tags** - keywords `load-knowledge` matches against a task description
+- **Covers** - repo-relative path globs `check-knowledge` matches against changed
   files, or `—` if the page describes no particular paths
 
 A page with an empty `Covers` is invisible to staleness checks. Confirm a glob matches
@@ -97,7 +97,7 @@ source is the evidence.
 ## 3. A `learnings.md` entry, when there was something to learn
 
 Use the entry format from `~/.claude/knowledge/CLAUDE.md`. Include **Prevented** only
-when a `gotchas.md` bullet visibly caught something during this session — that field is
+when a `gotchas.md` bullet visibly caught something during this session - that field is
 the evidence a bullet is earning its place.
 
 Nothing surprising happened? No entry. A journal of "went fine" tells the next session
@@ -108,7 +108,7 @@ nothing.
 `~/.claude/knowledge/experiences/YYYY-MM-DD-<topic>.md`:
 
 - What the task was, in one line
-- Decisions made and why — especially ones a future session would otherwise re-litigate
+- Decisions made and why - especially ones a future session would otherwise re-litigate
 - What surprised you, if anything
 - `Updated pages:` list, or `Updated pages: none`
 

@@ -12,7 +12,7 @@ claiming something untrue.
 ## What it does
 
 1. Confirms it's in a git repository, and stops with a clear message if not
-2. Lists files changed in the last two weeks in the **current** repo — no hardcoded paths
+2. Lists files changed in the last two weeks in the **current** repo - no hardcoded paths
 3. Matches those files against each page's **Covers** globs in `INDEX.md`
 4. Spot-checks two or three specific, falsifiable claims per candidate page
 5. Updates each page's `Status` and **Last updated**
@@ -21,7 +21,7 @@ claiming something untrue.
 
 ## `Covers: —` means skip
 
-The cross-cutting pages — `gotchas`, `active-context`, `learnings`, `patterns` —
+The cross-cutting pages - `gotchas`, `active-context`, `learnings`, `patterns` -
 describe no particular paths and have no staleness signal to read. `—` is a real value
 telling this skill to leave them alone, not a blank to be filled in. An *empty* cell is
 different: that's an omission worth fixing during the pass.

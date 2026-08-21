@@ -3,7 +3,7 @@ name: synthesize-knowledge
 description: Find recurring patterns across past sessions in the personal knowledge base and distill them into pattern-level knowledge, then archive the raw logs. Use when asked to synthesize the knowledge base, extract recurring patterns, or distill experience entries, or when accumulated experiences and learnings are due for a synthesis pass. The "When to run" section states the thresholds.
 ---
 
-# Synthesize Knowledge — Pattern Extraction
+# Synthesize Knowledge - Pattern Extraction
 
 Individual session notes record what happened. Patterns record what keeps happening,
 which is the more useful thing and the part nobody notices without looking across
@@ -16,10 +16,10 @@ This section is the single source for these thresholds. The other skills and
 
 Run when any of these holds:
 
-- `~/.claude/knowledge/experiences/` has **5 or more entries** — counting files
+- `~/.claude/knowledge/experiences/` has **5 or more entries** - counting files
   directly in that directory, not the ones already moved to `experiences/archive/`
 - `learnings.md` shows the same area, bug class, or failure mode in **3+ entries**
-- `learnings.md` has grown past **20 entries**, whether or not a pattern is visible —
+- `learnings.md` has grown past **20 entries**, whether or not a pattern is visible -
   at that length it stops being scannable, which is its only job
 - You realize mid-session that you've solved this exact problem before
 
@@ -34,7 +34,7 @@ entries out of the count, so a run actually clears the condition it fired on.
   you're checking whether a pattern was already named)
 - `~/.claude/knowledge/learnings.md`
 - `~/.claude/knowledge/active-context.md`
-- `~/.claude/knowledge/pages/shared/patterns.md`, if it exists — a recurrence may
+- `~/.claude/knowledge/pages/shared/patterns.md`, if it exists - a recurrence may
   belong to a pattern that's already named, in which case bump its **Frequency**
   rather than adding a near-duplicate
 
@@ -58,7 +58,7 @@ gives it more weight than it has earned.
 **Instances:** ticket or PR references
 
 **What happens:** the symptom, in one sentence
-**Why it keeps happening:** the underlying cause — a gap in the code, a missing
+**Why it keeps happening:** the underlying cause - a gap in the code, a missing
   convention, a misleading API
 **Preventive rule:** the check or habit that catches it before it becomes a problem
 **Related pages:** [[page1]], [[page2]]
@@ -73,7 +73,7 @@ Create `~/.claude/knowledge/pages/shared/` if it doesn't exist yet. Use the stan
 page header from `~/.claude/knowledge/CLAUDE.md`, with `Project: shared`,
 `Tags: patterns, recurring, systemic`, and `Covers: —`. One entry per pattern.
 
-`load-knowledge` reads this file whenever it exists — no wiring needed.
+`load-knowledge` reads this file whenever it exists - no wiring needed.
 
 ## 5. Update `INDEX.md`
 
@@ -89,14 +89,14 @@ tell whether synthesis has ever run.
   creating it if needed
 - Trim `learnings.md` to its 10 most recent entries, appending the rest to
   `~/.claude/knowledge/experiences/archive/YYYY-MM-DD-distillation.md` under
-  `# Distilled YYYY-MM-DD — promoted to patterns.md`
+  `# Distilled YYYY-MM-DD - promoted to patterns.md`
 
 Archive, don't delete. A pattern that later turns out to be wrong needs its evidence.
 
 ## 7. Append to `learnings.md`
 
 ```markdown
-## YYYY-MM-DD — synthesis run
+## YYYY-MM-DD - synthesis run
 **What worked:** N patterns identified from M sessions
 **Rule extracted:** (list the pattern names)
 ```

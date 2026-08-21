@@ -11,7 +11,7 @@ global `CLAUDE.md`, so it usually runs without being asked.
 | A `learnings.md` entry | Only when there was a rule or surprise |
 | An experience entry | Always |
 
-A routine task produces only the experience entry. That's the normal outcome — a page
+A routine task produces only the experience entry. That's the normal outcome - a page
 per task is how a knowledge base fills with noise and stops being read.
 
 ## Why the experience entry is unconditional
@@ -22,7 +22,7 @@ sessions and that signal disappears. Quiet sessions get three lines, not a full 
 
 ## Also
 
-Source material handed to you during the session — a pasted doc, an exported guide —
+Source material handed to you during the session - a pasted doc, an exported guide -
 gets saved verbatim to `raw/` before extraction. The extract is a summary; the source
 is the evidence.
 
