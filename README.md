@@ -19,6 +19,7 @@ gets carried out, and guidelines for how the result reads - plus a custom status
   - [Where triggers live](#where-triggers-live)
 - [How the knowledge base works](#how-the-knowledge-base-works)
 - [Status line](#status-line)
+- [Skill invocation log](#skill-invocation-log)
 - [License](#license)
 
 ## Installation
@@ -51,6 +52,7 @@ them across, and in practice you won't.
 REPO=~/myProjects/andrei-agentic-ai-skills
 for s in "$REPO"/skills/*/; do ln -sfn "$s" ~/.claude/skills/"$(basename "$s")"; done
 ln -sfn "$REPO"/statusline-command.sh ~/.claude/statusline-command.sh
+ln -sfn "$REPO"/skill-invocation-log.sh ~/.claude/skill-invocation-log.sh
 ln -sfn "$REPO"/knowledge/CLAUDE.md ~/.claude/knowledge/CLAUDE.md
 ln -sfn "$REPO"/knowledge/raw/README.md ~/.claude/knowledge/raw/README.md
 ln -sfn "$REPO"/knowledge/presentation ~/.claude/knowledge/presentation
@@ -171,6 +173,74 @@ surface and never be verified.
 
 There's a [presentation deck](knowledge/presentation/knowledge-base-deck.html)
 walking through the system - clone and open it in a browser.
+
+## Skill invocation log
+
+[`skill-invocation-log.sh`](skill-invocation-log.sh) is a `Stop` hook that records, once
+per turn, whether the guidance skills were invoked in that session:
+
+```
+2026-08-21T18:22:57Z 64654c2f wg=yes bg=yes skills=4 writes=0
+```
+
+Session, whether `writing-guidelines` and `behavioral-guidelines` were invoked, how many
+skill invocations in total, and how many file writes. The last column is what makes the
+data readable: `wg=no writes=12` is a signal, `wg=no writes=0` is a quiet turn.
+
+It reports and nothing else. No blocking, no output, exit 0 on every path including a
+malformed payload or a missing transcript.
+
+### Why it exists
+
+A skill whose description does not match the task never loads, nothing errors, and the
+work completes looking correct. Nothing in this repository detects that, and nothing can:
+every check here verifies that files agree with each other, which is a different question
+from whether a skill was reachable.
+
+The only such failure caught so far was caught because someone asked directly. That is
+one incident, not a rate. This hook exists to produce the rate before deciding whether a
+blocking control is worth its friction.
+
+### Install
+
+```bash
+ln -sfn "$REPO"/skill-invocation-log.sh ~/.claude/skill-invocation-log.sh
+```
+
+Then in `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ~/.claude/skill-invocation-log.sh",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Requires `jq`. Writes to `~/.claude/skill-invocation.log`, which is outside this
+repository and stays there.
+
+### What it proves, and what it does not
+
+It proves the `Skill` tool was called. It does not prove the guidance shaped the output,
+and no hook can. What it converts is silent non-invocation into a recorded fact, which is
+the failure mode that actually occurred.
+
+Two limits worth knowing. The check is per session, not per task, so one invocation early
+in a long session satisfies it for everything after. And the transcript path it reads is
+an implementation detail rather than a documented contract, so the script falls back to a
+search and then exits quietly, which means a broken version of it is invisible.
 
 ## License
 
