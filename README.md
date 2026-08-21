@@ -204,29 +204,39 @@ counting them as successes flatters the rate.
 Agreed with a second install of this hook so both sides measure the same thing. Written
 down here because an agreement that lives only in a chat is not an agreement.
 
-> Of sessions where `self=no` and `writes + sh` is greater than zero, the fraction whose
-> **last** line reads `bg=no`. Same for `wg`. Rows reading `n/a` are excluded from both
-> numerator and denominator.
+1. Group records by session id and keep the final one. The hook fires per turn while every
+   column is session-cumulative, so counting lines weights by session length rather than by
+   session.
+2. Drop sessions where the relevant field reads `n/a`, and sessions where `writes + sh` is
+   zero. `n/a` means the skill was never installed, so the session could not have invoked
+   it; scoring that as `no` pads the rate with impossible cases.
+3. Keep `self=yes` sessions in the source set. `self` is a hint, not an exclusion rule.
+4. Classify each remaining session by hand as `meta` or `ordinary`, from what it was doing.
+5. Report each non-invocation rate twice: over all eligible sessions, and over ordinary
+   sessions only.
+6. Report the distinct session count beside each rate.
+7. Under ten sessions in a view, call that view insufficient data rather than a rate.
 
-Three details that are easy to get wrong:
+Steps 3 and 4 replace an earlier rule that excluded `self=yes` outright. That rule was
+argued from inflation: sessions editing this repository invoke the guidance skills by
+construction, so counting them as successes flatters the number. The argument only runs one
+way. It drops meta-work that scored `yes` and silently keeps meta-work that scored `no`,
+which makes the rate depend on which way the meta-work happened to fall. The parallel
+install produced exactly that case: a session authoring and validating skills, including
+running a validator against `behavioral-guidelines`, which never invoked it and recorded
+`self=no` because it touched no path naming this repository.
 
-- **Sessions, not lines.** The hook fires once per turn while every column is
-  session-cumulative, so a long session contributes many near-identical lines and a short
-  one contributes a single line. Counting lines weights by session length. Group by session
-  id and take the last line.
-- **`writes + sh`, not `writes`.** A session driven through the shell logs `writes=0`. Using
-  `writes` alone drops exactly the sessions that produced the most.
-- **`n/a` is not a failure.** It means the skill was never installed, so the session could
-  not have invoked it. Counting it as `no` pads the rate with impossible cases.
+Manual classification is affordable because the eligible set is small. If it stops being
+small, that is a better problem than an exclusion rule with a bias in it.
 
 First comparison window: 2026-08-21 through 2026-08-27 inclusive, local time on each side,
 compared on the 28th. A session spanning midnight counts to the day its last line falls on.
 
 ```bash
-awk '$8=="self=no"' ~/.claude/skill-invocation.log | sort -k2,2 -k1,1 | awk '{a[$2]=$0} END{for(s in a) print a[s]}'
+sort -k2,2 -k1,1 ~/.claude/skill-invocation.log | awk '{a[$2]=$0} END{for(s in a) print a[s]}'
 ```
 
-That prints the last line per non-self session, which is the input to the fraction above.
+That prints the last record per session, which is the input to steps 2 through 4.
 
 A third value, `n/a`, means the skill is not installed on this machine at all. `no` claims
 the skill was available and went unused, which is the thing being measured; a missing skill
