@@ -211,16 +211,29 @@ skipped above.
 
 ```bash
 git fsck --no-progress
-find .git -name 'Icon?' | wc -l
+find .git/refs -name 'Icon?' | wc -l   # blocking — one of these stops fetch
+find .git -name 'Icon?' | wc -l        # total; anything beyond refs/ is noise
 ```
 
-**Expected:** no output from the first; `0` from the second.
+**Expected:** no output from the first; `0` from both counts.
 
 macOS Finder creates a file named `Icon` followed by a carriage return in every
 directory of a folder carrying a custom icon — including inside `.git`. Git treats every
 file under `refs/` as a ref, so `refs/Icon\r` becomes a ref pointing at the null SHA and
 **`git fetch` fails outright** with `bad object refs/Icon?`. The same files under
 `objects/` make `fsck` report `bad sha1 file` for each one.
+
+Those two outcomes are not the same emergency, which is why the counts are separate.
+
+| Where | Effect | Urgency |
+| :--- | :--- | :--- |
+| `.git/refs/` | `git fetch` fails outright | fix before anything else |
+| `.git/objects/` | one `bad sha1 file` line per file, from `fsck` only | fix when convenient |
+
+Object names under `.git/objects/XX/` are the remaining 38 hex characters of a SHA.
+`Icon\r` isn't hex, so nothing ever looks it up; only `fsck`, which walks the directory
+whole, notices. Measured on this repo: 27 of them in `objects/` and none in `refs/`,
+with `git fetch --dry-run` exiting 0. A single one in `refs/` would have stopped it.
 
 The `Icon?` line in `.gitignore` cannot help here: `.gitignore` governs what gets
 committed, not what exists inside `.git`. This is a class of breakage no content sweep
