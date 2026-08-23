@@ -1,6 +1,6 @@
 ---
 name: writing-guidelines
-description: Write prose a person will actually read - plain language, no invented terms, register matched to the venue, and none of the sentence shapes that mark text as machine-written. Use whenever drafting or editing prose in any language for any audience - code comments, docstrings, READMEs, docs, commit messages, PR and issue text, design notes, reports, analyses, research summaries, essays, emails, forum and social posts, and chat replies. Load it before drafting, not after - it is cheaper to write this way than to strip the tells out afterwards.
+description: Write prose a person will actually read - plain language, no invented terms, register matched to the venue, and none of the sentence shapes that mark text as machine-written. Use whenever drafting or editing prose in any language for any audience - code comments, docstrings, READMEs, docs, commit messages, PR and issue text, design notes, reports, analyses, research summaries, essays, emails, forum and social posts, and chat replies, including text drafted for someone else to send under their own name. Load it before drafting, not after - it is cheaper to write this way than to strip the tells out afterwards.
 ---
 
 # Writing Guidelines
@@ -58,6 +58,14 @@ Signs you've drifted:
 
 Length follows the venue, not the effort you put in. Research that took twenty sources
 can land as four sentences, and usually should.
+
+**Writing as someone else.** When the text goes out under another person's name, their
+voice is the register, and it overrides your own defaults. Settle the concrete things
+first: usual sentence and paragraph length, punctuation habits, whether they use
+formatting at all, how they address people, what they use for emphasis. Then keep your
+own habits out of it. The sign you drifted is the owner trimming the draft before
+sending it - structure they would not have built, a concession they would not have
+offered, a paragraph arguing something they treat as settled.
 
 ## 3. Cut the AI Tells
 
@@ -119,3 +127,27 @@ Russian, common ones: «стоит отметить», «важно понима
 The structural tells carry across languages unchanged - throat-clearing, rhetorical setup,
 meta-commentary, vague declaratives, hidden actors. Check for those in any language; check
 the word list only in English.
+
+## 5. Corrections
+
+**When the text has to admit an error, the admission goes first and goes short.**
+
+One sentence, at the top. No apology, no softening paragraph in front of it, no
+narration of the sequence that produced the error. Naming the cause in a clause is fine;
+telling the story of it is not. Then carry on with the rest of the piece.
+
+Placement is most of the cost. A correction that leads reads as precision and takes a
+line. The same correction in the fourth paragraph reads as something you hoped would
+slide past, and the reader spends the rest of the piece looking for whatever else is
+buried there.
+
+This holds wherever a document carries a correction - a postmortem, a reply to review
+comments, a status update, a rebuttal.
+
+```
+Bad:  We should note that some figures in the previous section may warrant revisiting.
+      The methodology was sound at the time, and the discrepancy is minor, but it turns
+      out the 2015 baseline came from an edition that has since been superseded.
+Good: The 2015 baseline was wrong; it came from a superseded edition. Corrected figures
+      below.
+```
