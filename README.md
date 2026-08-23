@@ -21,6 +21,7 @@ gets carried out, and guidelines for how the result reads - plus a custom status
 - [Status line](#status-line)
 - [Skill invocation log](#skill-invocation-log)
 - [Experience entry check](#experience-entry-check)
+- [Knowledge base auto-commit](#knowledge-base-auto-commit)
 - [License](#license)
 
 ## Installation
@@ -56,6 +57,7 @@ ln -sfn "$REPO"/statusline-command.sh ~/.claude/statusline-command.sh
 ln -sfn "$REPO"/skill-invocation-log.sh ~/.claude/skill-invocation-log.sh
 ln -sfn "$REPO"/kb-session-end.sh ~/.claude/kb-session-end.sh
 ln -sfn "$REPO"/kb-session-start.sh ~/.claude/kb-session-start.sh
+ln -sfn "$REPO"/kb-autocommit.sh ~/.claude/kb-autocommit.sh
 ln -sfn "$REPO"/knowledge/CLAUDE.md ~/.claude/knowledge/CLAUDE.md
 ln -sfn "$REPO"/knowledge/raw/README.md ~/.claude/knowledge/raw/README.md
 ln -sfn "$REPO"/knowledge/presentation ~/.claude/knowledge/presentation
@@ -361,6 +363,7 @@ State lives outside the KB checkout, so the guard never writes to a versioned fi
 REPO=~/myProjects/andrei-agentic-ai-skills
 ln -sfn "$REPO"/kb-session-end.sh ~/.claude/kb-session-end.sh
 ln -sfn "$REPO"/kb-session-start.sh ~/.claude/kb-session-start.sh
+ln -sfn "$REPO"/kb-autocommit.sh ~/.claude/kb-autocommit.sh
 ```
 
 ```json
@@ -455,6 +458,68 @@ One known false positive: `mv` preserves mtime, so a session whose only work was
 `synthesize-knowledge` run creates nothing newer under `experiences/` and will be flagged
 despite having done the right thing.
 
+
+## Knowledge base auto-commit
+
+The knowledge base is the one thing here with no copy anywhere else. Every session that
+writes to it leaves the working tree dirty, and a backup that depends on someone
+remembering to commit is a backup that quietly stops being current.
+[`kb-autocommit.sh`](kb-autocommit.sh) is a `SessionEnd` hook that stages, commits and
+pushes `~/.claude/knowledge` when a session ends, and does nothing at all when the tree is
+clean.
+
+This assumes the knowledge base is itself a git repository with a remote. Mine is private,
+and the split described under [what stays out of the symlinks](#what-deliberately-stays-out-of-the-symlinks)
+is exactly why it has to be a separate one: this repository carries the scaffold and the
+conventions, that one carries the notes.
+
+### Files it will not push
+
+A first line reading `<!-- internal-only: do not extract -->` keeps a file out of every
+commit. The `raw/` convention says that material never leaves the machine, and a private
+remote is still off the machine, so an unattended push is precisely where that rule would
+be broken without anyone noticing. Held-back files are named in the commit body, so the
+exclusion is visible in `git log` rather than only in the script.
+
+The check reads the first line only. A whole-file grep matches the marker where it appears
+in prose - this README does it twice - and would hold back files nobody meant to mark.
+
+### Install
+
+```bash
+REPO=~/myProjects/andrei-agentic-ai-skills
+ln -sfn "$REPO"/kb-autocommit.sh ~/.claude/kb-autocommit.sh
+```
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      { "hooks": [
+        { "type": "command", "command": "sh ~/.claude/kb-session-end.sh", "timeout": 10 },
+        { "type": "command", "command": "sh ~/.claude/kb-autocommit.sh", "timeout": 30 }
+      ] }
+    ]
+  }
+}
+```
+
+Order matters only if a hook before it writes into the knowledge base; put this one last.
+The 30 second timeout is there because a push crosses the network, and because
+`SessionEnd`'s budget rises to the highest per-hook timeout configured. `GIT_TERMINAL_PROMPT`
+is forced off inside the script: a hook that blocks on a credential prompt hangs session
+exit rather than failing.
+
+### When it fails
+
+`SessionEnd` output reaches nobody, so the script cannot report anything. It appends to
+`~/.claude/kb-session/autocommit.log` instead, one line per run, recording the pushed SHA
+or a `PUSH FAILED` line with the number of commits sitting locally.
+
+A failed push is self-healing in the ordinary case, since the next successful one carries
+the backlog. A persistent failure is not, and nothing surfaces it. If that matters, the
+status line is the natural place to show an unpushed count - continuously visible beats a
+log nobody opens.
 
 ## License
 
