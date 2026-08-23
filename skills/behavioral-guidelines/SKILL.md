@@ -128,6 +128,12 @@ Running the tests has a counterpart outside code, and this is it.
 - Carry each number's date and origin with it. "1,200 premature deaths (Health Canada,
   published 2022, analysis year 2015)" survives scrutiny. "About 1,200 deaths" does not,
   and collapses the moment someone asks how old the data is.
+- The newest edition of a source is the better estimate, past years included: agencies
+  re-run the whole back-series when the method improves. Take every point in a comparison
+  from that one edition. Mixing editions manufactures a change that never happened.
+- Before calling someone else's number wrong, reproduce it from the edition they cited. A
+  superseded figure is not a fabricated one, and an analysis already published has to be
+  described by the inputs it actually used.
 - Keep verified, inferred, and assumed distinct, and mark which is which in the
   deliverable rather than only in your head.
 - Check the figures that support your conclusion at least as hard as the ones that don't.
