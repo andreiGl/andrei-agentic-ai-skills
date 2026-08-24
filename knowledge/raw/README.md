@@ -38,6 +38,12 @@ that matters is publication and handoff, not the disk.
 The marker never overrides credential or secret exclusions. It says where knowledge may go,
 not that a file is safe to commit.
 
+**Counterpart:** a second install of these conventions keeps its own copy of this section,
+worded for its own readers and stating its own answer on the backup question. The two are
+held in step by hand. Change the rule here and it has to be carried across; nothing reports
+the two having drifted apart, and both files reading plausibly is exactly what that failure
+looks like.
+
 Without this the two markers describe every file as either awaiting extraction or already
 extracted, and a file that is neither reads as the first one.
 

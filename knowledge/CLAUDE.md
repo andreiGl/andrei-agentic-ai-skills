@@ -146,6 +146,15 @@ genuinely worth reading alongside it.
 Once processed, mark the raw file in its first line:
 `<!-- processed: pages/<project>/<page>.md -->`
 
+Some material is kept for provenance and must never be extracted at all, so the steps above
+do not apply to it and neither does the gate. That case has its own first-line marker:
+`<!-- internal-only: do not extract -->`
+
+Both markers, what each one means, and where marked material may go are defined in
+[raw/README.md](raw/README.md), which is the single source for them. Don't restate the rules
+here - an unmarked file in `raw/` reads as awaiting extraction, and that is the only part
+worth knowing from this file.
+
 ---
 
 ## What does not go here
