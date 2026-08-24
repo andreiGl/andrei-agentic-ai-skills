@@ -48,17 +48,49 @@ for f in $(git diff --cached --name-only 2>/dev/null); do
 done
 [ -n "$held" ] && note "held back internal-only:$held"
 
-if git diff --cached --quiet 2>/dev/null; then
-    exit 0
+if ! git diff --cached --quiet 2>/dev/null; then
+    changed=$(git diff --cached --name-only | tr '\n' ' ')
+    if [ -n "$held" ]; then
+        git commit -q -m "Session notes from $project" -m "Files: $changed" \
+            -m "Held back as internal-only:$held" 2>/dev/null
+    else
+        git commit -q -m "Session notes from $project" -m "Files: $changed" 2>/dev/null
+    fi || { note "commit failed"; exit 0; }
 fi
 
-changed=$(git diff --cached --name-only | tr '\n' ' ')
-if [ -n "$held" ]; then
-    git commit -q -m "Session notes from $project" -m "Files: $changed" \
-        -m "Held back as internal-only:$held" 2>/dev/null
-else
-    git commit -q -m "Session notes from $project" -m "Files: $changed" 2>/dev/null
-fi || { note "commit failed"; exit 0; }
+# Carry on to the push even when this session recorded nothing. An earlier run may
+# have committed and then failed to push, and stopping here would leave that commit
+# waiting for the next KB edit to carry it - which is exactly the session where
+# nobody is thinking about the backup.
+ahead=$(git rev-list --count '@{u}..HEAD' 2>/dev/null || echo unknown)
+[ "$ahead" = "0" ] && exit 0
+
+# Push only where this knowledge base has always pushed. An unattended push means
+# nobody is at the keyboard to notice a remote that was repointed, or a second KB
+# cloned into place, so the destination is checked rather than assumed. The commit
+# is already made either way: refusing to push loses nothing but the upload.
+#
+# KB_REMOTE pins explicitly. Otherwise the first run records what it finds and every
+# later run must match it. The pin lives outside the repository, so a fresh clone
+# elsewhere pins itself rather than inheriting a stale expectation.
+pin="$STATE_ROOT/remote.pin"
+url=$(git config --get remote.origin.url 2>/dev/null || true)
+expected="${KB_REMOTE:-}"
+if [ -z "$expected" ] && [ -f "$pin" ]; then
+    expected=$(cat "$pin" 2>/dev/null || true)
+fi
+
+if [ -z "${url:-}" ]; then
+    note "no origin remote - commit kept local"
+    exit 0
+fi
+if [ -z "${expected:-}" ]; then
+    printf '%s\n' "$url" > "$pin" 2>/dev/null || true
+    note "pinned origin for future runs"
+elif [ "$url" != "$expected" ]; then
+    note "REMOTE MISMATCH - refused to push, commit kept local. Compare git remote -v against $pin"
+    exit 0
+fi
 
 if git push -q 2>/dev/null; then
     note "pushed $(git rev-parse --short HEAD)"

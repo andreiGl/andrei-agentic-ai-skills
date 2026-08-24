@@ -510,14 +510,31 @@ The 30 second timeout is there because a push crosses the network, and because
 is forced off inside the script: a hook that blocks on a credential prompt hangs session
 exit rather than failing.
 
+### Where it will push
+
+An unattended push means nobody is at the keyboard to notice that `origin` now points
+somewhere else. The script checks the destination rather than assuming it: `KB_REMOTE` pins
+it explicitly, and otherwise the first run records whatever `origin` is and every later run
+must match. A mismatch refuses the push and keeps the commit, so nothing is lost but the
+upload.
+
+The pin lives at `~/.claude/kb-session/remote.pin`, outside the repository, so a clone made
+elsewhere pins itself rather than inheriting an expectation from the machine it came from.
+
+This exists because two installs of this setup ended up with identically named repositories
+under different accounts, both pushing automatically. Checking the remote costs four lines
+and the failure it prevents is not one you would notice afterwards.
+
 ### When it fails
 
 `SessionEnd` output reaches nobody, so the script cannot report anything. It appends to
 `~/.claude/kb-session/autocommit.log` instead, one line per run, recording the pushed SHA
 or a `PUSH FAILED` line with the number of commits sitting locally.
 
-A failed push is self-healing in the ordinary case, since the next successful one carries
-the backlog. A persistent failure is not, and nothing surfaces it. If that matters, the
+A failed push is self-healing in the ordinary case, because a run whose tree is clean still
+attempts the push when local commits are ahead of the remote. Without that the backlog would
+wait for the next session that happened to edit the knowledge base, which is exactly the
+session where nobody is thinking about the backup. A persistent failure is not, and nothing surfaces it. If that matters, the
 status line is the natural place to show an unpushed count - continuously visible beats a
 log nobody opens.
 
