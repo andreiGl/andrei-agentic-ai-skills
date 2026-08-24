@@ -476,10 +476,15 @@ conventions, that one carries the notes.
 ### Files it will not push
 
 A first line reading `<!-- internal-only: do not extract -->` keeps a file out of every
-commit. The `raw/` convention says that material never leaves the machine, and a private
-remote is still off the machine, so an unattended push is precisely where that rule would
-be broken without anyone noticing. Held-back files are named in the commit body, so the
-exclusion is visible in `git log` rather than only in the script.
+commit. Held-back files are named in the commit body, so the exclusion is visible in
+`git log` rather than only in the script.
+
+That is this install's answer, not the rule. The [`raw/` convention](knowledge/raw/README.md)
+forbids promoting, quoting, publishing, and handing off marked material, and leaves it to
+each install to decide and state whether such files may go to an explicitly approved private
+backup. Mine says no, which costs nothing here because there are no marked files, and means
+an unattended push cannot be the thing that quietly widens the rule. A second install of
+this setup answers yes for its own approved remote, which is equally conformant.
 
 The check reads the first line only. A whole-file grep matches the marker where it appears
 in prose - this README does it twice - and would hold back files nobody meant to mark.

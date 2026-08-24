@@ -23,10 +23,20 @@ those, it is refused, so mark them in the first line instead:
 <!-- internal-only: do not extract -->
 ```
 
-A file marked that way is never promoted to `pages/`, never quoted into `gotchas.md` or
-`learnings.md`, and never copied into anything that leaves the machine. Don't apply the
-Category A gate to it: the gate decides what is page-worthy, and this marker says the
-question doesn't arise.
+A file marked that way is never promoted to `pages/`, never quoted into `gotchas.md`,
+`learnings.md` or any other shared file, never published, and never included in a
+cross-account handoff. Don't apply the Category A gate to it: the gate decides what is
+page-worthy, and this marker says the question doesn't arise.
+
+Whether marked material may go into an explicitly approved private backup is a decision each
+install makes and states, because the answer depends on what that remote is and who approved
+it. An earlier version of this file said such files never leave the machine at all. That
+forbids backing up your own restricted notes to your own approved remote, which is a rule
+people break, and a rule broken quietly is worse than one with a stated exception. The line
+that matters is publication and handoff, not the disk.
+
+The marker never overrides credential or secret exclusions. It says where knowledge may go,
+not that a file is safe to commit.
 
 Without this the two markers describe every file as either awaiting extraction or already
 extracted, and a file that is neither reads as the first one.

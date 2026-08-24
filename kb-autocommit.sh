@@ -92,7 +92,16 @@ elif [ "$url" != "$expected" ]; then
     exit 0
 fi
 
-if git push -q 2>/dev/null; then
+# Bound the push so a stalled connection fails here rather than being killed by the
+# SessionEnd deadline. That deadline is the highest per-hook timeout in settings and is
+# shared with every other SessionEnd hook, so the time actually available is less than it
+# looks. A process killed from outside never reaches the log, which turns a retryable
+# failure into an invisible one - the commit would sit local with nothing recording why.
+#
+# http.lowSpeed* catches a stall rather than capping total time, which suits a repository
+# this small: a real transfer finishes in about a second, so anything slow is stuck.
+# HTTPS remotes only; an SSH remote would need a different bound.
+if git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 push -q 2>/dev/null; then
     note "pushed $(git rev-parse --short HEAD)"
 else
     note "PUSH FAILED - $(git rev-list --count @{u}..HEAD 2>/dev/null || echo '?') commit(s) local only"
