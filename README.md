@@ -515,6 +515,23 @@ The 30 second timeout is there because a push crosses the network, and because
 is forced off inside the script: a hook that blocks on a credential prompt hangs session
 exit rather than failing.
 
+### What the messages say
+
+`SessionEnd` hands a hook almost nothing to describe a session with - `cwd`, a session id, a
+transcript path. Written from that alone, every message reads the same and the log stops
+being history.
+
+The diff is the better source, and one file in it is better still. `update-knowledge` writes
+an experience entry whose first line names the work in the session's own words, so that
+becomes the subject when one was added. Otherwise the subject is built from what changed:
+`Add <page>` for new files, `Update <page>` for edits. The body carries the project, a
+diffstat, and a count of lines added to `learnings.md` and `gotchas.md`, since a line landing
+in either is the point of the exercise. Held-back files are named last.
+
+A log of `Session notes from IdeaProjects` is a backup. A log of
+`The retry ordering bug and what it hid` is history, and it costs about twenty lines of shell
+to get the second one.
+
 ### Where it will push
 
 An unattended push means nobody is at the keyboard to notice that `origin` now points

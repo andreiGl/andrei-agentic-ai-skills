@@ -49,12 +49,45 @@ done
 [ -n "$held" ] && note "held back internal-only:$held"
 
 if ! git diff --cached --quiet 2>/dev/null; then
-    changed=$(git diff --cached --name-only | tr '\n' ' ')
+    added=$(git diff --cached --name-only --diff-filter=A 2>/dev/null)
+    modified=$(git diff --cached --name-only --diff-filter=M 2>/dev/null)
+
+    # Subject line. The session already described itself: update-knowledge writes an
+    # experience entry whose first line names the work in the session's own words, which
+    # beats anything derivable from cwd. Fall back to what changed, and only then to the
+    # project name.
+    newexp=$(printf '%s\n' "$added" | grep '^experiences/[^/]*\.md$' | head -1)
+    subject=
+    if [ -n "$newexp" ] && [ -f "$newexp" ]; then
+        subject=$(head -1 "$newexp" | sed 's/^#* *//; s/^[0-9][0-9-]* *- *//')
+    fi
+    if [ -z "$subject" ]; then
+        names=$(printf '%s\n' "$added" "$modified" | grep -v '^$' | sed 's#.*/##; s#\.md$##' \
+                | grep -v '^INDEX$' | paste -sd, - | cut -c1-50)
+        if [ -n "$(printf '%s' "$added" | tr -d '[:space:]')" ]; then
+            subject="Add ${names:-notes}"
+        else
+            subject="Update ${names:-notes}"
+        fi
+    fi
+    subject=$(printf '%s' "$subject" | cut -c1-72 \
+        | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
+
+    # Body. A diffstat says more per line than a file list, and the two journals are worth
+    # counting because a line landing in them is the point of the exercise.
+    body=$(printf 'Session in %s.\n' "$project")
+    for j in learnings.md gotchas.md; do
+        [ -f "$j" ] || continue
+        n=$(git diff --cached --numstat -- "$j" 2>/dev/null | awk '{print $1}')
+        [ -n "${n:-}" ] && [ "$n" != "0" ] && body=$(printf '%s\n%s: +%s lines' "$body" "${j%.md}" "$n")
+    done
+    stat=$(git diff --cached --stat 2>/dev/null)
+
     if [ -n "$held" ]; then
-        git commit -q -m "Session notes from $project" -m "Files: $changed" \
+        git commit -q -m "$subject" -m "$body" -m "$stat" \
             -m "Held back as internal-only:$held" 2>/dev/null
     else
-        git commit -q -m "Session notes from $project" -m "Files: $changed" 2>/dev/null
+        git commit -q -m "$subject" -m "$body" -m "$stat" 2>/dev/null
     fi || { note "commit failed"; exit 0; }
 fi
 
