@@ -116,7 +116,7 @@ Five skills that maintain a knowledge base carrying context across sessions.
 | [`load-knowledge`](skills/load-knowledge) | Reads the KB into context before work starts |
 | [`update-knowledge`](skills/update-knowledge) | Writes back whatever the session produced |
 | [`build-knowledge`](skills/build-knowledge) | Creates a KB, or adds a project to one |
-| [`check-knowledge`](skills/check-knowledge) | Verifies pages against the code they describe |
+| [`check-knowledge`](skills/check-knowledge) | Verifies the KB against its own conventions, and pages against the code they describe |
 | [`synthesize-knowledge`](skills/synthesize-knowledge) | Distills repeated experience into patterns |
 
 Each skill's `## When to run` section states when it fires. This table stays out of that

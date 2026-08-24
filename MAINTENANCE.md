@@ -243,6 +243,12 @@ documented pass state included five failures. A check that expects failures stop
 read. The placeholders now carry angle brackets inside them, `[[<page-name>]]`, so they
 read as placeholders to a person and match nothing as a link.
 
+`check-knowledge` section 1 carries a similar pair of link checks and is not a duplicate
+of this one. This rule runs from the repository root, where `knowledge/` holds only the
+empty scaffold, so it can never see a live page. That one runs against `~/.claude/knowledge`
+where the pages actually are. Merging them would silently drop whichever target the survivor
+does not walk.
+
 The one-way check prints nothing because hub pages are exempt by design and skipped
 above. Dated entries under `experiences/` reference pages by plain name rather than link
 syntax, for the same reason: a durable page should not accumulate a back-link to every
