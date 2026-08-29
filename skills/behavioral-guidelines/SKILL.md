@@ -140,4 +140,10 @@ Running the tests has a counterpart outside code, and this is it.
   A number that fits too neatly is the one to open the PDF for.
 - When the other side is right, say so plainly and early. A concession you volunteer costs
   one sentence. One that gets extracted from you costs the argument.
+- **Don't infer a mechanism from an effect a simpler cause explains.** Three shapes of the
+  same error: behaviour a default would produce equally well is not evidence your setting
+  took effect; knowing one implementation of a feature is not evidence that no other
+  implementation exists; an absence - missing files, missing output - is not evidence of a
+  systematic cause. When the artifact can be inspected, inspect it. `strings` on a binary,
+  an xattr, a config value: seconds to check, and it replaces an argument with a fact.
 - Don't stack inference on inference. Two uncertain steps make one worthless conclusion.
