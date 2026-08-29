@@ -47,6 +47,7 @@ read. Absent, both triggers have nothing to compare against and simply never fir
 ### Page headers carry all six fields
 
 ```bash
+echo "inspecting $(ls pages/*/*.md 2>/dev/null | wc -l | tr -d ' ') pages"
 for f in pages/*/*.md; do
   for k in Project Tags Covers Status "Last updated" Related; do
     grep -q "^\*\*$k:\*\*" "$f" || echo "$f missing $k"
@@ -82,13 +83,18 @@ pages=$(find . -name '*.md' | sed 's#.*/##;s#\.md$##' | sort -u)
 for t in $(grep -rhoE '\[\[[a-z0-9-]+\]\]' . 2>/dev/null | sort -u | tr -d '[]'); do
   echo "$pages" | grep -qx "$t" || echo "DANGLING [[$t]]"; done
 for f in $(find pages -name '*.md'); do me=$(basename "$f" .md)
+  case "$me" in gotchas|active-context|learnings|patterns) continue;; esac
   for t in $(grep -ohE '\[\[[a-z0-9-]+\]\]' "$f" | sort -u | tr -d '[]'); do
     case "$t" in gotchas|active-context|learnings|patterns|INDEX) continue;; esac
     tf=$(find . -name "$t.md" | head -1); [ -z "$tf" ] && continue
     grep -q "\[\[$me\]\]" "$tf" || echo "ONE-WAY $me -> $t"; done; done
 ```
 
-The four hub pages are exempt from reciprocity by design, which is why they are skipped.
+The four hub pages are exempt from reciprocity by design, so they are skipped in both
+directions - as link targets and as the page doing the linking. The second `case` matters
+once `patterns.md` exists, because `synthesize-knowledge` writes it under `pages/` where
+this loop iterates it; the other three hubs sit at the KB root and never reach the loop at
+all, which is why a target-only exemption looked sufficient for as long as it did.
 
 `MAINTENANCE.md` Rule 10 looks similar and is not a duplicate: it runs from the skills
 repository, where `knowledge/` holds only the empty scaffold. It cannot see a live page.
@@ -97,6 +103,7 @@ This one runs where the pages actually are.
 ### Every file in raw/ carries a first-line marker
 
 ```bash
+echo "inspecting $(ls raw/* 2>/dev/null | grep -v '/README.md$' | wc -l | tr -d ' ') raw files"
 for f in raw/*; do [ -f "$f" ] || continue
   case "$(basename "$f")" in README.md) continue;; esac
   case "$(head -1 "$f")" in
@@ -129,8 +136,14 @@ non-repo directory isn't its job.
 Then list what moved:
 
 ```bash
+[ "$(git rev-parse --is-shallow-repository)" = true ] && echo "SHALLOW: history is truncated, results below are not trustworthy - git fetch --unshallow"
 git log --since=2.weeks --no-merges --name-only --pretty=format: | sort -u | grep -v '^$'
 ```
+
+On a shallow clone the query returns almost nothing and the skill then verifies no pages
+and stamps **Last verified** anyway - a silent false clean, and the one failure here that
+looks exactly like success. Stop and deepen the clone rather than reading an empty result
+as "nothing changed".
 
 `--no-merges` avoids double-counting: a merge commit's files already appear via the
 commits it brought in. The exception is a merge of work older than the window, whose
@@ -189,6 +202,13 @@ what needs confirming.
 Set **Last verified** to today's date. That field is what this skill's own
 "more than two weeks" trigger reads; without it there's nothing to compare against,
 and the trigger can never fire.
+
+**Only stamp it after sections 3-5 actually ran.** A section-1-only pass - the one
+"When to run" allows after a conventions edit - verifies the KB against its conventions,
+not against the code. Stamping it claims something that was not checked, and the next
+session reads the date as proof the pages were verified. Same for a run that stopped at
+section 2 for want of a repository, or one whose changed-file query came back empty
+because the clone was shallow: no mapping, no verification, no stamp.
 
 ## 7. Report
 
