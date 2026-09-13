@@ -5,7 +5,8 @@
 > so your mileage may vary.
 
 Claude Code skills - a persistent cross-project knowledge base, guidelines for how work
-gets carried out, and guidelines for how the result reads - plus a custom status line.
+gets carried out, and guidelines for how the result reads - plus a custom status line and
+an MCP server for the UpNote notes app.
 
 ## Contents
 
@@ -22,6 +23,7 @@ gets carried out, and guidelines for how the result reads - plus a custom status
 - [Skill invocation log](#skill-invocation-log)
 - [Experience entry check](#experience-entry-check)
 - [Knowledge base auto-commit](#knowledge-base-auto-commit)
+- [UpNote MCP server](#upnote-mcp-server)
 - [License](#license)
 
 ## Installation
@@ -61,6 +63,7 @@ ln -sfn "$REPO"/kb-autocommit.sh ~/.claude/kb-autocommit.sh
 ln -sfn "$REPO"/knowledge/CLAUDE.md ~/.claude/knowledge/CLAUDE.md
 ln -sfn "$REPO"/knowledge/raw/README.md ~/.claude/knowledge/raw/README.md
 ln -sfn "$REPO"/knowledge/presentation ~/.claude/knowledge/presentation
+mkdir -p ~/.claude/mcp-servers && ln -sfn "$REPO"/mcp-servers/upnote-mcp ~/.claude/mcp-servers/upnote-mcp
 ```
 
 Editing a skill now edits the repo, and `git status` shows the change.
@@ -559,6 +562,13 @@ wait for the next session that happened to edit the knowledge base, which is exa
 session where nobody is thinking about the backup. A persistent failure is not, and nothing surfaces it. If that matters, the
 status line is the natural place to show an unpushed count - continuously visible beats a
 log nobody opens.
+
+## UpNote MCP server
+
+[`mcp-servers/upnote-mcp`](mcp-servers/upnote-mcp) connects Claude Code and Claude Desktop to the
+UpNote desktop app on macOS. Claude can search and read notes, create formatted notes, move
+notes to Trash and back, replace a note with an edited version, and open notes in the app.
+Setup, tools and limits are in [its README](mcp-servers/upnote-mcp/README.md).
 
 ## License
 
