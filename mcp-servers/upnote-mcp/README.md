@@ -13,8 +13,8 @@ by hand.
 - macOS, with UpNote installed from the Mac App Store. The server reads
   `~/Library/Containers/com.getupnote.desktop/Data/Library/Application Support/UpNote/upnote.sqlite3`.
   Set `UPNOTE_DB` to point it elsewhere.
-- [uv](https://docs.astral.sh/uv/). The server declares its one dependency, the MCP Python SDK,
-  inside `server.py`, and uv installs it on first run.
+- [uv](https://docs.astral.sh/uv/) and Python 3.12 or newer. The server declares its one
+  dependency, the MCP Python SDK, inside `server.py`, and uv installs it on first run.
 - UpNote running, for any tool that changes a note or opens the app.
 
 ## Install
@@ -64,6 +64,33 @@ started with, so start a new one after changing the server.
 Notes in Trash are left out of searches and lists unless `include_trashed` is set. No tool
 deletes a note permanently.
 
+## Examples
+
+Ask in plain language. Claude picks the tools.
+
+- "What's my latest note?"
+- "Find my notes about JSON Patch and summarize them."
+- "Which notebooks have the most notes?"
+- "Create a note in Get Started with a checklist for tomorrow."
+- "Move the note titled Old draft to Trash." Claude should confirm which note first.
+- "In my Plans note, change Triage to In progress." Claude previews the replacement and shows
+  any warnings before making it.
+- "Open my Recipes notebook in UpNote."
+
+## Formatting
+
+`create_note` and `replace_note` take Markdown. Each of these was checked in UpNote after
+creating a note with it:
+
+- Headings, bold, italic, strikethrough, links, and inline code
+- Bullet lists nested to any depth, numbered lists, and checkboxes written as `- [ ]` and `- [x]`
+- Quotes, dividers, tables, and code blocks with a language, such as `json` or `bash`
+- A green highlight written as `==text==`
+- Raw HTML for underline with `<u>`, a yellow highlight with
+  `<span class="shine-highlight-yellow">`, and UpNote's collapsible sections
+
+UpNote drops `<mark>`. The note title becomes the note's heading, so the body shouldn't repeat it.
+
 ## How changes are made
 
 - **Reads** use a read-only SQLite connection. An authorizer refuses everything except reading,
@@ -100,6 +127,19 @@ and Version History stay with the original.
 - A search left active in UpNote stays active when `open_in_upnote` shows a notebook or tag, and
   no link clears it.
 - Search matches substrings in the title and plain text. It is not a ranked index.
+
+## Troubleshooting
+
+- **Check the connection.** In Claude Code, `claude mcp get upnote` should report the server as
+  connected. Claude Desktop logs each server to
+  `~/Library/Logs/Claude/mcp-server-upnote.log`, and a working start logs
+  "Server started and connected successfully".
+- **"Cannot open the UpNote database read-only".** macOS may block one app from reading another
+  app's data. Allow the Claude app under System Settings, Privacy & Security.
+- **Claude Desktop can't start the server.** The app doesn't use your shell's `PATH`, so the
+  `command` in its config has to be uv's absolute path. `command -v uv` prints it.
+- **A change reports it wasn't confirmed.** The tool waited ten seconds without seeing UpNote
+  save it. Check the note before trying again, so nothing gets created twice.
 
 ## Test
 
