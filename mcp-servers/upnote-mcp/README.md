@@ -60,6 +60,7 @@ started with, so start a new one after changing the server.
 | `restore_note` | Moves a note out of Trash |
 | `replace_note` | Edits a note by creating a new version and trashing the original, after a preview |
 | `open_in_upnote` | Shows a note, notebook, tag or search in the app |
+| `check_upnote_setup` | Reports the database path, UpNote's data version, any missing columns, and note counts |
 
 Notes in Trash are left out of searches and lists unless `include_trashed` is set. No tool
 deletes a note permanently.
@@ -91,6 +92,9 @@ creating a note with it:
 
 UpNote drops `<mark>`. The note title becomes the note's heading, so the body shouldn't repeat it.
 
+Tags can't be set this way. The create link has no tag option, and a `#hashtag` in the body stays
+plain text, so tags have to be added in UpNote.
+
 ## How changes are made
 
 - **Reads** use a read-only SQLite connection. An authorizer refuses everything except reading,
@@ -101,6 +105,10 @@ UpNote drops `<mark>`. The note title becomes the note's heading, so the body sh
 - **Trash and restore** send `note/moveToTrash` and `note/restore`. Neither is in UpNote's
   documentation, but both are in the app's link handler. The tool checks the note in the
   database first, so UpNote only ever receives ids that exist.
+- **The database format is checked on every connection.** If an UpNote update removes a table or
+  column the server reads, tools fail with the missing column named instead of returning wrong
+  results. `check_upnote_setup` also warns when UpNote's data version, read from `config.json`
+  next to the database, isn't the tested version 17.
 - **Every change is confirmed.** The tool polls the database until UpNote has saved the change,
   or says so if nothing changed within ten seconds.
 
@@ -112,8 +120,8 @@ which has to pass back the revision number the preview returned.
 
 The preview refuses when something would be lost for good: attachments or images, links from
 other notes, a web share link, a template, or a note already in Trash. It warns, and the
-replacement needs those warnings accepted, when the note is pinned or bookmarked, sits in more
-than one notebook, has been saved 20 or more times, has collapsed or complex sections, or was
+replacement needs those warnings accepted, when the note is pinned or bookmarked, has tags, sits
+in more than one notebook, has been saved 20 or more times, has collapsed or complex sections, or was
 edited in the last ten minutes.
 
 The original goes to Trash only after the new version is confirmed in the same notebook, and
@@ -130,6 +138,8 @@ and Version History stay with the original.
 
 ## Troubleshooting
 
+- **Start with `check_upnote_setup`.** Ask Claude to run it. It shows which database the server
+  reads, UpNote's data version, and any columns an UpNote update removed.
 - **Check the connection.** In Claude Code, `claude mcp get upnote` should report the server as
   connected. Claude Desktop logs each server to
   `~/Library/Logs/Claude/mcp-server-upnote.log`, and a working start logs

@@ -36,9 +36,15 @@ async def main():
         async with ClientSession(rd, wr) as s:
             await s.initialize()
             tools = {t.name: t for t in (await s.list_tools()).tools}
-            check("eleven tools", sorted(tools) == sorted(["search_notes","list_notes","get_note","list_notebooks","list_tags","run_select","create_note","move_note_to_trash","restore_note","replace_note","open_in_upnote"]), ",".join(sorted(tools)))
+            check("twelve tools", sorted(tools) == sorted(["search_notes","list_notes","get_note","list_notebooks","list_tags","run_select","create_note","move_note_to_trash","restore_note","replace_note","open_in_upnote","check_upnote_setup"]), ",".join(sorted(tools)))
             check("read tools marked read-only", all(tools[n].annotations.read_only_hint for n in tools if n not in ("create_note", "move_note_to_trash", "restore_note", "replace_note")))
             check("create_note not read-only", tools["create_note"].annotations.read_only_hint is False)
+
+            err, d, _ = await call(s, "check_upnote_setup")
+            check("setup check reports ok with no missing columns", not err and d["ok"] and d["missing_columns"] == {}, str(d)[:160])
+            check("setup check data version is a tested one", not err and d["data_version"] in d["tested_data_versions"], str(d.get("data_version")))
+            live_now = ref.execute("select count(*) from notes where deleted=0 and trashed=0").fetchone()[0]
+            check("setup check note count matches DB", not err and d["counts"]["notes"] == live_now, f"{d['counts']['notes']} vs {live_now}")
 
             err, d, _ = await call(s, "list_notebooks")
             nb_n = ref.execute("select count(*) from notebooks where deleted=0").fetchone()[0]

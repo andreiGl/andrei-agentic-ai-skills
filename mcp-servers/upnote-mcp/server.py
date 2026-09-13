@@ -39,11 +39,27 @@ DB_PATH = Path(
 # How long create_note and the Trash tools wait for UpNote to save a change to its database.
 CONFIRM_SECONDS = 10.0
 
+# Tables and columns the server reads. Checked on every connection, so an UpNote update that
+# drops or renames one fails with the column named instead of returning wrong results.
+REQUIRED_COLUMNS = {
+    "notes": {
+        "id", "title", "text", "html", "tagLinks", "noteLinks", "fileIds", "createdAt", "updatedAt",
+        "deleted", "trashed", "pinned", "bookmarked", "revision", "shared", "shareId", "isTemplate",
+    },
+    "notebooks": {"id", "title", "parent", "deleted"},
+    "lists": {"id", "content"},
+    "tags": {"title", "deleted"},
+}
+
+# UpNote's data version, read from config.json beside the database, that this server was tested with.
+TESTED_DATA_VERSIONS = {17}
+
 INSTRUCTIONS = """\
 The user's UpNote notes on this Mac. Use search_notes or list_notes to find notes,
 then get_note for the full text. Notebooks are given as paths like "Parent / Child".
 Notes in Trash are hidden unless include_trashed is true. create_note adds a new note
 through the UpNote app; format its body as that tool's text parameter describes.
+If tools fail or results look wrong, check_upnote_setup reports what the server can and can't read.
 move_note_to_trash and restore_note move a note into or out of UpNote's Trash.
 open_in_upnote shows a note, notebook, tag or search in the app; use it only when the user
 asks to see something there.
@@ -77,6 +93,24 @@ def _fold(value: Any) -> str:
     return str(value).casefold() if value is not None else ""
 
 
+def _missing_columns(conn: sqlite3.Connection) -> dict[str, list[str]]:
+    """Required columns absent from the database, by table. A missing table lists all its columns."""
+    missing = {}
+    for table, columns in REQUIRED_COLUMNS.items():
+        present = {row[1] for row in conn.execute(f"PRAGMA table_info('{table}')")}
+        if lacking := sorted(columns - present):
+            missing[table] = lacking
+    return missing
+
+
+def _data_version() -> int | None:
+    """UpNote's data version from config.json next to the database, or None if unreadable."""
+    try:
+        return int(json.loads((DB_PATH.parent / "config.json").read_text())["dataVersion"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def _connect() -> sqlite3.Connection:
     if not DB_PATH.exists():
         raise ToolError(f"UpNote database not found at {DB_PATH}. Set UPNOTE_DB to its path.")
@@ -85,6 +119,7 @@ def _connect() -> sqlite3.Connection:
         conn = sqlite3.connect(f"file:{quote(str(DB_PATH))}?mode=ro", uri=True, timeout=5.0)
         conn.execute("PRAGMA query_only = 1")
         conn.execute("SELECT 1 FROM notes LIMIT 1")
+        missing = _missing_columns(conn)
     except sqlite3.Error as e:
         if conn is not None:
             conn.close()
@@ -92,6 +127,14 @@ def _connect() -> sqlite3.Connection:
             f"Cannot open the UpNote database read-only: {e}. If macOS blocked access, allow the "
             "Claude app to access data from other apps in System Settings > Privacy & Security."
         ) from e
+    if missing:
+        conn.close()
+        raise ToolError(
+            "UpNote's database no longer has columns this server reads: "
+            + "; ".join(f"{table}: {', '.join(cols)}" for table, cols in missing.items())
+            + f". UpNote may have changed its format (data version {_data_version()}). "
+            "Update the server before relying on its results."
+        )
     conn.row_factory = sqlite3.Row
     conn.create_function("fold", 1, _fold, deterministic=True)
     conn.set_authorizer(_authorizer)
@@ -412,6 +455,8 @@ not plain paragraphs. The title becomes the note's heading, so don't repeat it.
   ```json, ```bash, ```java, ```yaml or ```markdown. UpNote stores it as the block's language.
 - <span class="shine-highlight-yellow">text</span> marks who or what is blocking; ==text== is a green highlight.
 - Links as [text](url); bare URLs also become links. Checkboxes: - [ ] and - [x]. Markdown tables work.
+- Tags can't be set: the create link has no tag option, and a #hashtag in the body stays plain text.
+  Tell the user to add tags in UpNote.
 - --- between major parts, > for quotes.
 Don't use <mark>; UpNote drops it."""
 
@@ -570,6 +615,56 @@ def restore_note(note_id: NoteId) -> dict[str, Any]:
     return _set_trashed(note_id, False)
 
 
+# ---------------------------------------------------------------- setup check
+
+@server.tool(annotations=READ)
+def check_upnote_setup() -> dict[str, Any]:
+    """Report whether the server can read UpNote correctly: database path, UpNote's data version,
+    missing columns, and basic counts. Use it when other tools fail or their results look wrong."""
+    version = _data_version()
+    result: dict[str, Any] = {
+        "database": str(DB_PATH),
+        "database_found": DB_PATH.exists(),
+        "data_version": version,
+        "tested_data_versions": sorted(TESTED_DATA_VERSIONS),
+        "missing_columns": {},
+        "warnings": [],
+    }
+    if version is None:
+        result["warnings"].append("UpNote's data version couldn't be read from config.json next to the database.")
+    elif version not in TESTED_DATA_VERSIONS:
+        result["warnings"].append(
+            f"UpNote's data version is {version}, but this server was tested with {sorted(TESTED_DATA_VERSIONS)}. "
+            "Results may be wrong if the format changed."
+        )
+    if not DB_PATH.exists():
+        result["ok"] = False
+        return result
+    try:
+        with closing(sqlite3.connect(f"file:{quote(str(DB_PATH))}?mode=ro", uri=True, timeout=5.0)) as conn:
+            conn.execute("PRAGMA query_only = 1")
+            result["missing_columns"] = _missing_columns(conn)
+            if not result["missing_columns"]:
+                one = lambda sql: conn.execute(sql).fetchone()[0]
+                notebooks = one("SELECT count(*) FROM notebooks WHERE deleted = 0")
+                membership = one("SELECT count(*) FROM lists WHERE id LIKE 'notebooks\\_%' ESCAPE '\\'")
+                result["counts"] = {
+                    "notes": one("SELECT count(*) FROM notes WHERE deleted = 0 AND trashed = 0"),
+                    "notes_in_trash": one("SELECT count(*) FROM notes WHERE deleted = 0 AND trashed = 1"),
+                    "notebooks": notebooks,
+                    "notebook_membership_lists": membership,
+                }
+                if notebooks and not membership:
+                    result["warnings"].append(
+                        "Notebooks exist, but no notebook contents were found in the lists table, "
+                        "so notebook filters and counts will be empty."
+                    )
+    except sqlite3.Error as e:
+        result["error"] = str(e)
+    result["ok"] = result["database_found"] and not result["missing_columns"] and "error" not in result
+    return result
+
+
 # ---------------------------------------------------------------- open tool
 
 @server.tool(annotations=SHOW)
@@ -628,7 +723,7 @@ RECENT_EDIT_MINUTES = 10
 def _replace_checks(conn: sqlite3.Connection, note_id: str):
     """Return the note, notebooks, its notebook ids, blockers, and warnings for a replace."""
     r = conn.execute(
-        "SELECT id, title, html, revision, updatedAt, trashed, pinned, bookmarked, shared, shareId, isTemplate, fileIds "
+        "SELECT id, title, html, revision, updatedAt, trashed, pinned, bookmarked, shared, shareId, isTemplate, fileIds, tagLinks "
         "FROM notes WHERE id = ? AND deleted = 0",
         (note_id,),
     ).fetchone()
@@ -663,6 +758,8 @@ def _replace_checks(conn: sqlite3.Connection, note_id: str):
         warnings.append("It is pinned. Pin the new version by hand.")
     if r["bookmarked"] or (bookmarks and note_id in _json_list(bookmarks["content"])):
         warnings.append("It is bookmarked. Bookmark the new version by hand.")
+    if tags := _json_list(r["tagLinks"]):
+        warnings.append(f"It has tags ({', '.join(tags)}). The new version can't carry tags; add them back by hand.")
     if len(notebook_ids) > 1:
         others = ", ".join(nbs[i]["path"] for i in notebook_ids[1:])
         warnings.append(f"It is in several notebooks. The new version goes into {nbs[notebook_ids[0]]['path']} only; add it to {others} by hand.")
