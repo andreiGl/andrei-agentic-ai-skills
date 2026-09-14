@@ -5,8 +5,8 @@
 > so your mileage may vary.
 
 Claude Code skills - a persistent cross-project knowledge base, guidelines for how work
-gets carried out, and guidelines for how the result reads - plus a custom status line and
-an MCP server for the UpNote notes app.
+gets carried out, and guidelines for how the result reads - plus session save/restore,
+a custom status line, and an MCP server for the UpNote notes app.
 
 ## Contents
 
@@ -17,6 +17,7 @@ an MCP server for the UpNote notes app.
 - [Skills](#skills)
   - [Working and writing](#working-and-writing)
   - [Knowledge base](#knowledge-base)
+  - [Session persistence](#session-persistence)
   - [Where triggers live](#where-triggers-live)
 - [How the knowledge base works](#how-the-knowledge-base-works)
 - [Status line](#status-line)
@@ -124,6 +125,19 @@ Five skills that maintain a knowledge base carrying context across sessions.
 
 Each skill's `## When to run` section states when it fires. This table stays out of that
 on purpose - see below.
+
+### Session persistence
+
+Two skills for moving a set of live sessions across an IDE or machine restart.
+
+| Skill | What it does |
+| :--- | :--- |
+| [`save-sessions`](skills/save-sessions) | Snapshots recently-active session IDs (custom title -> summary -> last prompt) to `~/.claude/saved-sessions.json`, merging into earlier saves |
+| [`resume-sessions`](skills/resume-sessions) | Bulk-resumes saved sessions, one tmux window each, from a single terminal tab; detects still-live sessions via `ps` and skips them |
+
+Both have a script next to the SKILL.md, and the SKILL.md says to run the script first -
+the manual procedure is the fallback. They need `tmux` on the resume side (it degrades to
+printed commands without it) and read session transcripts under `~/.claude/projects/`.
 
 ### Where triggers live
 
