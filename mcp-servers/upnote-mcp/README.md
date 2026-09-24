@@ -128,6 +128,9 @@ The original goes to Trash only after the new version is confirmed in the same n
 only if nobody changed the original in the meantime. The new version gets a new id, so pinning
 and Version History stay with the original.
 
+Hand-written raw HTML, such as a collapsible section copied from the note's own `get_note` html,
+survives the round-trip: UpNote re-parses it as native formatting (2026-09-24, UpNote 9.22.2).
+
 ## Limits
 
 - macOS only, and by default only the App Store build's database location.
