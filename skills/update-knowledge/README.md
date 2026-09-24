@@ -23,7 +23,7 @@ sessions and that signal disappears. Quiet sessions get three lines, not a full 
 ## Also
 
 Source material handed to you during the session - a pasted doc, an exported guide -
-gets saved verbatim to `raw/` before extraction. The extract is a summary; the source
+gets saved word-for-word to `raw/` before extraction. The extract is a summary; the source
 is the evidence.
 
 Distillation and trimming belong to [`synthesize-knowledge`](../synthesize-knowledge),

@@ -135,7 +135,7 @@ genuinely worth reading alongside it.
 
 ## Processing new source material
 
-1. Save the source verbatim in `raw/` as `YYYY-MM-DD-<topic>.<ext>`.
+1. Save the source word-for-word in `raw/` as `YYYY-MM-DD-<topic>.<ext>`.
 2. Apply the Category A gate. Most material won't survive it - that's expected.
 3. What survives goes into `pages/<project>/`, one concept per page. Merge into an
    existing page when the material belongs there.
