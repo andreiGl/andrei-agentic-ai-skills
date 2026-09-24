@@ -89,7 +89,7 @@ something real before writing it; an invented one is worse than `—`.
 ### Source material handed to you this session
 
 If the task involved a pasted document, exported guide, or anything else you didn't
-read out of the repo, save it verbatim to
+read out of the repo, save it word-for-word to
 `~/.claude/knowledge/raw/YYYY-MM-DD-<topic>.<ext>` before extracting from it, and mark
 it processed per `~/.claude/knowledge/raw/README.md`. The extract is a summary; the
 source is the evidence.
