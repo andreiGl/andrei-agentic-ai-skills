@@ -74,10 +74,39 @@ LINKED = '<h3>See <b>this</b> part</h3><div>body</div>'
 plan = srv._plan_section(LINKED, "See this part")
 check("inline markup in the heading survives", "<h3>See <b>this</b> part</h3>" in plan["html"])
 
+# 5b. an end marker ends the range and is removed with it
+MARKED = ('<div>before</div><h6>start collapse</h6><blockquote><div>body text</div></blockquote>'
+          '<h6>end collapse</h6><div>after</div>')
+plan = srv._plan_section(MARKED, "start collapse", until="end collapse", title="Explanation")
+check("end marker ends the range", plan["blocks_moved"] == 1, str(plan["blocks_moved"]))
+check("  both markers are gone", "start collapse" not in plan["html"] and "end collapse" not in plan["html"])
+check("  title overrides the heading text", "<h3>Explanation</h3>" in plan["html"] and plan["section_title"] == "Explanation")
+check("  marked content moved inside", '<div class="shine-section-content-inner"><blockquote><div>body text</div></blockquote></div>' in plan["html"])
+check("  text outside the markers is untouched",
+      plan["html"].startswith("<div>before</div>") and plan["html"].endswith("<div>after</div>"))
+
+# 5c. an end marker inside an existing section nests there
+MARKED_NESTED = SECTION("Outer", '<div>lead</div><h6>start collapse</h6><div>middle</div><h6>end collapse</h6><div>tail</div>', False)
+plan = srv._plan_section(MARKED_NESTED, "start collapse", until="end collapse", title="Inner")
+check("marked range nests inside its section", plan["inside_section"] == "Outer", str(plan["inside_section"]))
+check("  two sections result", plan["html"].count("shine-collapsible-section") == 2)
+check("  content after the end marker stays in the outer section", plan["html"].rstrip().endswith("</div>") and "<div>tail</div>" in plan["html"])
+
 # 6. refusals
 refuses("refuses a heading that isn't there", TOP, "Nope", "No heading in the note reads")
 refuses("refuses a heading with nothing under it", '<div>x</div><h3>Empty</h3>', "Empty", "would be empty")
 refuses("refuses a heading that is already a section title", SECTION("Outer", "<div>x</div>", False), "Outer", "already a collapsible section's title")
+def refuses_kw(name, source, phrase, **kw):
+    try:
+        srv._plan_section(source, **kw)
+        check(name, False, "no error raised")
+    except srv.ToolError as e:
+        check(name, phrase in str(e), str(e)[:110])
+
+refuses_kw("refuses an end marker that isn't there", MARKED, "end of the range is unclear",
+           heading="start collapse", until="no such marker")
+refuses_kw("refuses markers with nothing between them", '<h6>start collapse</h6><h6>end collapse</h6><div>x</div>',
+           "so the section would be empty", heading="start collapse", until="end collapse")
 refuses("refuses an ambiguous heading", '<h3>Dup</h3><div>a</div><h3>Dup</h3><div>b</div>', "Dup", "headings read")
 
 # 7. the result parses back into the same shape

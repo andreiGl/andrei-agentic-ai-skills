@@ -995,8 +995,13 @@ def _section_html(title_html: str, content_html: str, collapsed: bool) -> str:
     )
 
 
-def _plan_section(source: str, heading: str, collapsed: bool = False) -> dict[str, Any]:
-    """Work out the section a heading and the content under it would make."""
+def _plan_section(source: str, heading: str, collapsed: bool = False, title: str | None = None,
+                  until: str | None = None) -> dict[str, Any]:
+    """Work out the section a heading and the content under it would make.
+
+    `until` names a marker element that ends the range and is removed with it, for content
+    marked off by hand. `title` replaces the heading's text as the section's title.
+    """
     tree = _NoteHtml(source)
     wanted = _fold(heading.strip())
     found = [n for n in _walk(tree.root) if n.tag in _HEADINGS and _fold(_node_text(source, n)) == wanted]
@@ -1015,22 +1020,43 @@ def _plan_section(source: str, heading: str, collapsed: bool = False) -> dict[st
     node = found[0]
     level = int(node.tag[1])
     siblings = node.parent.children
+    after = siblings[siblings.index(node) + 1:]
     taken = []
-    for sibling in siblings[siblings.index(node) + 1:]:
-        if sibling.tag in _HEADINGS and int(sibling.tag[1]) <= level:
-            break
-        taken.append(sibling)
+    end_marker = None
+    if until:
+        wanted_end = _fold(until.strip())
+        for sibling in after:
+            if _fold(_node_text(source, sibling)) == wanted_end:
+                end_marker = sibling
+                break
+            taken.append(sibling)
+        if end_marker is None:
+            raise ToolError(
+                f"No element reading {until!r} follows {heading!r} in the same section, so the end of the "
+                "range is unclear."
+            )
+    else:
+        for sibling in after:
+            if sibling.tag in _HEADINGS and int(sibling.tag[1]) <= level:
+                break
+            taken.append(sibling)
     if not taken:
-        raise ToolError(f"Nothing follows {heading!r} before the next heading, so the section would be empty.")
+        raise ToolError(
+            f"Nothing sits between {heading!r} and "
+            + (f"{until!r}" if until else "the next heading")
+            + ", so the section would be empty."
+        )
 
     content = source[node.end:taken[-1].end]
+    range_end = (end_marker.end if end_marker is not None else taken[-1].end)
+    title_html = html_lib.escape(title.strip()) if title else source[node.inner_start:node.inner_end]
     rebuilt = (
         source[:node.start]
-        + _section_html(source[node.inner_start:node.inner_end], content, collapsed)
-        + source[taken[-1].end:]
+        + _section_html(title_html, content, collapsed)
+        + source[range_end:]
     )
     return {
-        "section_title": _node_text(source, node),
+        "section_title": title.strip() if title else _node_text(source, node),
         "inside_section": _enclosing_section(source, node),
         "blocks_moved": len(taken),
         "first_blocks": [(_node_text(source, t) or f"<{t.tag}>")[:60] for t in taken[:5]],
@@ -1041,7 +1067,9 @@ def _plan_section(source: str, heading: str, collapsed: bool = False) -> dict[st
 @server.tool(annotations=REPLACE)
 def make_section(
     note_id: NoteId,
-    heading: Annotated[str, Field(description="Text of the heading that becomes the new section's title.")],
+    heading: Annotated[str, Field(description="Text of the heading where the section starts. It becomes the section's title unless title is given, and is removed from the body.")],
+    until: Annotated[str | None, Field(description="Text of a line or heading that ends the range, such as a hand-written end marker. It is removed with the range. Omit to run to the next heading of the same or higher level.")] = None,
+    title: Annotated[str | None, Field(description="Title for the new section. Omit to use the heading's own text.")] = None,
     collapsed: Annotated[bool, Field(description="Start the new section closed.")] = False,
     expected_revision: Annotated[int | None, Field(description="Omit to preview. To apply, pass the revision the preview returned.")] = None,
     acknowledge_warnings: Annotated[bool, Field(description="Set true only after the user has seen and accepted the preview's warnings.")] = False,
@@ -1049,8 +1077,9 @@ def make_section(
     """Turn a heading and the content under it into a collapsible section, where the heading already sits.
     A heading inside an existing section becomes a section nested in it, which UpNote renders but its editor
     cannot create. The section holds everything from the heading to the next heading of the same or higher
-    level, or to the end of its container. Two steps like replace_note: call without expected_revision to
-    preview what would move, then again with it. The note is rebuilt through replace_note, so the result has
+    level, or to the end of its container. Pass until to end the range at a marker line instead, such as
+    content marked by hand with start and end lines; both markers are removed. Two steps like
+    replace_note: call without expected_revision to preview what would move, then again with it. The note is rebuilt through replace_note, so the result has
     a new id and the original goes to Trash."""
     note_id = note_id.strip()
     with closing(_connect()) as conn:
@@ -1063,7 +1092,7 @@ def make_section(
             "The note's own heading holds more than its title, so rebuilding it here would duplicate that "
             "heading. Use replace_note and write the body by hand."
         )
-    plan = _plan_section(body, heading, collapsed)
+    plan = _plan_section(body, heading, collapsed, title=title, until=until)
 
     if expected_revision is None:
         preview = replace_note(note_id=note_id, text="unused")
