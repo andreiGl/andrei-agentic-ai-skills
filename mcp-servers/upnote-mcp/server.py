@@ -19,6 +19,7 @@ import sqlite3
 import subprocess
 import time
 from contextlib import closing
+from html.parser import HTMLParser
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -882,6 +883,203 @@ def replace_note(
         result["follow_up"] = warnings
     if not trash.get("confirmed"):
         result["message"] = "The new version exists, but the original wasn't confirmed in Trash. Check it with get_note."
+    return result
+
+
+# ---------------------------------------------------------------- building sections
+
+_VOID_TAGS = {"br", "hr", "img", "input", "meta", "link", "source", "col", "wbr"}
+_HEADINGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
+
+
+class _Node:
+    """One element of a note's HTML, with the offsets of its source text."""
+
+    __slots__ = ("tag", "classes", "start", "inner_start", "inner_end", "end", "parent", "children")
+
+    def __init__(self, tag: str, classes: tuple[str, ...], start: int, inner_start: int, parent):
+        self.tag, self.classes, self.start = tag, classes, start
+        self.inner_start = self.inner_end = self.end = inner_start
+        self.parent, self.children = parent, []
+
+
+class _NoteHtml(HTMLParser):
+    """Element tree over a note's HTML that remembers where each element sits in the text.
+
+    Offsets let a rewrite copy every untouched byte through unchanged, which matters because
+    UpNote's own markup carries classes and attributes this server should not reformat.
+    """
+
+    def __init__(self, source: str):
+        super().__init__(convert_charrefs=False)
+        self.source = source
+        self._line_starts = [0]
+        for line in source.splitlines(keepends=True):
+            self._line_starts.append(self._line_starts[-1] + len(line))
+        self.root = _Node("#root", (), 0, 0, None)
+        self.root.inner_end = self.root.end = len(source)
+        self._stack = [self.root]
+        self.feed(source)
+        self.close()
+
+    def _offset(self) -> int:
+        line, col = self.getpos()
+        return self._line_starts[line - 1] + col
+
+    def _open(self, tag: str, attrs) -> _Node:
+        start = self._offset()
+        classes = tuple(dict(attrs).get("class", "").split())
+        node = _Node(tag, classes, start, start + len(self.get_starttag_text() or ""), self._stack[-1])
+        self._stack[-1].children.append(node)
+        return node
+
+    def handle_starttag(self, tag, attrs):
+        node = self._open(tag, attrs)
+        if tag not in _VOID_TAGS:
+            self._stack.append(node)
+
+    def handle_startendtag(self, tag, attrs):
+        self._open(tag, attrs)
+
+    def handle_endtag(self, tag):
+        for i in range(len(self._stack) - 1, 0, -1):
+            if self._stack[i].tag == tag:
+                node = self._stack[i]
+                node.inner_end = self._offset()
+                closing_end = self.source.find(">", node.inner_end)
+                node.end = closing_end + 1 if closing_end >= 0 else len(self.source)
+                del self._stack[i:]
+                return
+
+
+def _walk(node: _Node):
+    for kid in node.children:
+        yield kid
+        yield from _walk(kid)
+
+
+def _node_text(source: str, node: _Node) -> str:
+    plain = re.sub(r"<[^>]+>", " ", source[node.inner_start:node.inner_end])
+    return re.sub(r"\s+", " ", html_lib.unescape(plain).replace("\xa0", " ")).strip()
+
+
+def _is_section_title(node: _Node) -> bool:
+    parent = node.parent
+    while parent is not None:
+        if any(c.startswith("shine-section-title") for c in parent.classes):
+            return True
+        parent = parent.parent
+    return False
+
+
+def _enclosing_section(source: str, node: _Node) -> str | None:
+    """Title of the collapsible section this node sits in, or None at the top level."""
+    parent = node.parent
+    while parent is not None:
+        if "shine-collapsible-section" in parent.classes:
+            title = next((k for k in _walk(parent) if k.tag in _HEADINGS and _is_section_title(k)), None)
+            return _node_text(source, title) if title else ""
+        parent = parent.parent
+    return None
+
+
+def _section_html(title_html: str, content_html: str, collapsed: bool) -> str:
+    """UpNote's own collapsible-section markup, the shape its editor writes."""
+    cls = "shine-collapsible-section" + (" shine-section-collapsed" if collapsed else "")
+    return (
+        f'<div class="{cls}"><div class="shine-section-title-wrapper">'
+        '<div class="shine-section-title shine-placeholder" data-upnote-placeholder-key="title">'
+        f'<div class="shine-section-title-inner"><h3>{title_html}</h3></div></div></div>'
+        '<div class="shine-section-content shine-placeholder" data-upnote-placeholder-key="content">'
+        f'<div class="shine-section-content-inner">{content_html}</div></div></div>'
+    )
+
+
+def _plan_section(source: str, heading: str, collapsed: bool = False) -> dict[str, Any]:
+    """Work out the section a heading and the content under it would make."""
+    tree = _NoteHtml(source)
+    wanted = _fold(heading.strip())
+    found = [n for n in _walk(tree.root) if n.tag in _HEADINGS and _fold(_node_text(source, n)) == wanted]
+    already_titles = [n for n in found if _is_section_title(n)]
+    found = [n for n in found if not _is_section_title(n)]
+    if not found:
+        if already_titles:
+            raise ToolError(f"{heading!r} is already a collapsible section's title.")
+        raise ToolError(
+            f"No heading in the note reads {heading!r}. Read the note with get_note and format=\"html\" "
+            "to see its headings."
+        )
+    if len(found) > 1:
+        raise ToolError(f"{len(found)} headings read {heading!r}. Make them distinct, or use replace_note instead.")
+
+    node = found[0]
+    level = int(node.tag[1])
+    siblings = node.parent.children
+    taken = []
+    for sibling in siblings[siblings.index(node) + 1:]:
+        if sibling.tag in _HEADINGS and int(sibling.tag[1]) <= level:
+            break
+        taken.append(sibling)
+    if not taken:
+        raise ToolError(f"Nothing follows {heading!r} before the next heading, so the section would be empty.")
+
+    content = source[node.end:taken[-1].end]
+    rebuilt = (
+        source[:node.start]
+        + _section_html(source[node.inner_start:node.inner_end], content, collapsed)
+        + source[taken[-1].end:]
+    )
+    return {
+        "section_title": _node_text(source, node),
+        "inside_section": _enclosing_section(source, node),
+        "blocks_moved": len(taken),
+        "first_blocks": [(_node_text(source, t) or f"<{t.tag}>")[:60] for t in taken[:5]],
+        "html": rebuilt,
+    }
+
+
+@server.tool(annotations=REPLACE)
+def make_section(
+    note_id: NoteId,
+    heading: Annotated[str, Field(description="Text of the heading that becomes the new section's title.")],
+    collapsed: Annotated[bool, Field(description="Start the new section closed.")] = False,
+    expected_revision: Annotated[int | None, Field(description="Omit to preview. To apply, pass the revision the preview returned.")] = None,
+    acknowledge_warnings: Annotated[bool, Field(description="Set true only after the user has seen and accepted the preview's warnings.")] = False,
+) -> dict[str, Any]:
+    """Turn a heading and the content under it into a collapsible section, where the heading already sits.
+    A heading inside an existing section becomes a section nested in it, which UpNote renders but its editor
+    cannot create. The section holds everything from the heading to the next heading of the same or higher
+    level, or to the end of its container. Two steps like replace_note: call without expected_revision to
+    preview what would move, then again with it. The note is rebuilt through replace_note, so the result has
+    a new id and the original goes to Trash."""
+    note_id = note_id.strip()
+    with closing(_connect()) as conn:
+        row = conn.execute("SELECT title, html FROM notes WHERE id = ? AND deleted = 0", (note_id,)).fetchone()
+    if row is None:
+        raise ToolError(f"No note with id {note_id!r}. Find ids with search_notes or list_notes.")
+    body = _strip_title_heading(row["html"] or "", row["title"] or "")
+    if body.lstrip().lower().startswith("<h2"):
+        raise ToolError(
+            "The note's own heading holds more than its title, so rebuilding it here would duplicate that "
+            "heading. Use replace_note and write the body by hand."
+        )
+    plan = _plan_section(body, heading, collapsed)
+
+    if expected_revision is None:
+        preview = replace_note(note_id=note_id, text="unused")
+        preview.update({k: plan[k] for k in ("section_title", "inside_section", "blocks_moved", "first_blocks")})
+        preview["next_step"] = (
+            "Show the warnings and what would move to the user, then call again with expected_revision"
+            + (" and acknowledge_warnings=true." if preview["warnings"] else ".")
+        )
+        return preview
+
+    result = replace_note(
+        note_id=note_id, text=plan["html"], expected_revision=expected_revision,
+        acknowledge_warnings=acknowledge_warnings,
+    )
+    if result.get("done"):
+        result.update({k: plan[k] for k in ("section_title", "inside_section", "blocks_moved")})
     return result
 
 

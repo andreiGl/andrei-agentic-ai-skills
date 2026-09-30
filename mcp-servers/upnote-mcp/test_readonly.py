@@ -36,8 +36,8 @@ async def main():
         async with ClientSession(rd, wr) as s:
             await s.initialize()
             tools = {t.name: t for t in (await s.list_tools()).tools}
-            check("twelve tools", sorted(tools) == sorted(["search_notes","list_notes","get_note","list_notebooks","list_tags","run_select","create_note","move_note_to_trash","restore_note","replace_note","open_in_upnote","check_upnote_setup"]), ",".join(sorted(tools)))
-            check("read tools marked read-only", all(tools[n].annotations.read_only_hint for n in tools if n not in ("create_note", "move_note_to_trash", "restore_note", "replace_note")))
+            check("thirteen tools", sorted(tools) == sorted(["search_notes","list_notes","get_note","list_notebooks","list_tags","run_select","create_note","move_note_to_trash","restore_note","replace_note","open_in_upnote","check_upnote_setup","make_section"]), ",".join(sorted(tools)))
+            check("read tools marked read-only", all(tools[n].annotations.read_only_hint for n in tools if n not in ("create_note", "move_note_to_trash", "restore_note", "replace_note", "make_section")))
             check("create_note not read-only", tools["create_note"].annotations.read_only_hint is False)
 
             err, d, _ = await call(s, "check_upnote_setup")
