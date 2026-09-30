@@ -59,6 +59,7 @@ started with, so start a new one after changing the server.
 | `move_note_to_trash` | Moves a note to Trash |
 | `restore_note` | Moves a note out of Trash |
 | `replace_note` | Edits a note by creating a new version and trashing the original, after a preview |
+| `make_section` | Turns a heading and the content under it into a collapsible section, nested where the heading sits |
 | `open_in_upnote` | Shows a note, notebook, tag or search in the app |
 | `check_upnote_setup` | Reports the database path, UpNote's data version, any missing columns, and note counts |
 
@@ -131,6 +132,19 @@ and Version History stay with the original.
 Hand-written raw HTML, such as a collapsible section copied from the note's own `get_note` html,
 survives the round-trip: UpNote re-parses it as native formatting (2026-09-24, UpNote 9.22.2).
 
+## Nested sections
+
+UpNote's editor can't put a collapsible section inside another one, but it renders and syncs them
+correctly, and keeps them when you edit the note by hand. `make_section` builds them: name a heading
+inside an existing section, and the heading with the content under it becomes a section nested there.
+The section holds everything to the next heading of the same or higher level, or to the end of its
+container, and `collapsed=true` makes it start closed.
+
+It previews first, the same as `replace_note`, and rebuilds the note the same way, so the result has a
+new id. Everything outside the wrapped range is copied through byte for byte. It refuses a heading it
+can't find, one that appears twice, one that is already a section's title, one with nothing under it,
+and any note whose own title heading holds extra content, since rebuilding that would duplicate it.
+
 ## Limits
 
 - macOS only, and by default only the App Store build's database location.
@@ -155,6 +169,13 @@ survives the round-trip: UpNote re-parses it as native formatting (2026-09-24, U
   save it. Check the note before trying again, so nothing gets created twice.
 
 ## Test
+
+`test_make_section.py` checks the section-building logic against synthetic note markup. It touches
+neither UpNote nor your notes:
+
+```bash
+uv run --script test_make_section.py
+```
 
 `test_readonly.py` compares every read tool with direct queries on your own library and confirms
 that `run_select` refuses writes. It changes nothing. Run it from this folder:
