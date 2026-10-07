@@ -21,6 +21,8 @@ Run when any of these holds:
 - `learnings.md` shows the same area, bug class, or failure mode in **3+ entries**
 - `learnings.md` has grown past **20 entries**, whether or not a pattern is visible -
   at that length it stops being scannable, which is its only job
+- **Last synthesized** in the INDEX.md `## KB status` block is more than about two
+  months old - the periodic backstop for a low-volume base whose counts rarely fire
 - You realize mid-session that you've solved this exact problem before
 
 The archive directory is what makes the first trigger resettable: distilling moves

@@ -18,21 +18,25 @@ KB = Path(os.environ.get("KB_ROOT", Path.home() / ".claude" / "knowledge"))
 
 SYNTH_EXPERIENCE_THRESHOLD = 5
 SYNTH_LEARNINGS_THRESHOLD = 20
+SYNTH_MAX_AGE_DAYS = 61      # ~2 months
 CHECK_MAX_AGE_DAYS = 14      # two weeks
 
 
-def last_verified():
-    """Read Last verified from the INDEX.md KB status block."""
+def status_dates():
+    """Read Last verified / Last synthesized from the INDEX.md KB status block."""
     try:
         text = (KB / "INDEX.md").read_text()
     except OSError:
-        return None
-    verified = None
+        return None, None
+    verified = synthesized = None
     for line in text.splitlines():
         match = re.match(r"\*\*Last verified:\*\* (\S+)", line)
         if match:
             verified = match.group(1)
-    return verified
+        match = re.match(r"\*\*Last synthesized:\*\* (\S+)", line)
+        if match:
+            synthesized = match.group(1)
+    return verified, synthesized
 
 
 def days_since(value):
@@ -66,7 +70,8 @@ def main():
     if exp_count == 0 and learn_count == 0:
         return
 
-    verified = last_verified()
+    verified, synthesized = status_dates()
+    synth_age = days_since(synthesized)
     check_age = days_since(verified)
 
     synth_reasons = []
@@ -78,6 +83,12 @@ def main():
         synth_reasons.append(
             f"learnings.md holds {learn_count} entries (threshold {SYNTH_LEARNINGS_THRESHOLD})"
         )
+    if synth_age is None:
+        synth_reasons.append(
+            f"INDEX.md Last synthesized is {synthesized or 'missing'}"
+        )
+    elif synth_age > SYNTH_MAX_AGE_DAYS:
+        synth_reasons.append(f"last synthesized {synthesized} ({synth_age} days ago)")
 
     if synth_reasons:
         print(

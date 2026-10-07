@@ -491,10 +491,11 @@ both skills' triggers and prints one context line when either is due. Plain stdo
 the first thing the session reads. Silence means nothing is due.
 
 Triggers, in priority order - `synthesize-knowledge` fires first: its count triggers
-(`experiences/` entries directly in the directory, archive/ excluded; `learnings.md` length).
-If neither fires, `check-knowledge` fires on its INDEX.md `Last verified` age trigger. The
-numeric thresholds live in the two skills' own "when to run" sections and nowhere else -
-this hook mirrors them in code, so if one changes there, change it here in the same change.
+(`experiences/` entries directly in the directory, archive/ excluded; `learnings.md` length)
+and its INDEX.md `Last synthesized` age trigger. If none fire, `check-knowledge` fires on its
+INDEX.md `Last verified` age trigger. The numeric thresholds live in the two skills' own
+"when to run" sections and nowhere else - this hook mirrors them in code, so if one changes
+there, change it here in the same change.
 
 The script stays silent when `experiences/` does not exist (no knowledge checkout on this
 machine) and when the knowledge base is empty - a fresh install whose template dates read

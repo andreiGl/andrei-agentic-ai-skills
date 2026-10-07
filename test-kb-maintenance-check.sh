@@ -38,10 +38,11 @@ set_dates never never
 : > "$KB_ROOT/learnings.md"
 expect_silent
 
-# First entry with template dates: below every synthesize count, so only
-# check-knowledge (Last verified never) is due.
+# First entry with template dates: synthesize due (its age trigger has no date),
+# and the age trigger is the one that fires.
 echo "# first" > "$KB_ROOT/experiences/e1.md"
-expect_line 'check-knowledge'
+expect_line 'synthesize-knowledge'
+expect_line 'Last synthesized is never'
 
 # Fresh dates, five experience entries: synthesize due on the count trigger.
 set_dates 2026-10-07 2026-10-07
@@ -54,13 +55,13 @@ for i in $(seq 1 21); do printf '\n## e%d\n**Rule:** x\n' "$i" >> "$KB_ROOT/lear
 expect_line 'learnings.md holds 21 entries'
 
 # Reset counts to one entry / one learnings entry; synthesis old, verification
-# current: silent. synthesize-knowledge has no age trigger, only counts.
+# current: synthesize due on the age trigger alone (counts below thresholds).
 for i in $(seq 3 7); do rm -f "$KB_ROOT/experiences/e$i.md"; done
 grep -v '^## ' "$KB_ROOT/learnings.md" > "$KB_ROOT/learnings.md.tmp"
 printf '\n## 2026-09-01 - one entry\n' >> "$KB_ROOT/learnings.md.tmp"
 mv "$KB_ROOT/learnings.md.tmp" "$KB_ROOT/learnings.md"
 set_dates 2026-10-07 2026-07-01
-expect_silent
+expect_line 'last synthesized 2026-07-01'
 
 # Everything current: silent.
 set_dates 2026-10-07 2026-10-07
