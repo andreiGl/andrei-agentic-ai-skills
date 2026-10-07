@@ -165,8 +165,31 @@ and any note whose own title heading holds extra content, since rebuilding that 
   connected. Claude Desktop logs each server to
   `~/Library/Logs/Claude/mcp-server-upnote.log`, and a working start logs
   "Server started and connected successfully".
-- **"Cannot open the UpNote database read-only".** macOS may block one app from reading another
-  app's data. Allow the Claude app under System Settings, Privacy & Security.
+- **"Cannot open the UpNote database read-only".** macOS blocks reading another app's data
+  without Full Disk Access, and granting it to Claude is not enough: the Claude desktop app
+  starts MCP servers as their own responsible process, so macOS checks the binary in `command`.
+  The desktop app may serve the tools even in a Claude Code session, so fix its config too. Use
+  the launcher in the next section.
+
+## Full Disk Access
+
+A grant on uv or Python doesn't last. Homebrew signs them ad hoc, so macOS ties the grant to one
+build and drops it on the next `brew upgrade`. `launcher.c` builds a small binary that starts
+`uv run --script server.py` and waits for it. It never changes, so its grant holds. Its command is
+fixed at build time, so the grant can't be used to run anything else.
+
+```bash
+clang -O2 -o ~/.claude/mcp-servers/upnote-mcp-launcher ~/.claude/mcp-servers/upnote-mcp/launcher.c
+codesign -s - -i ca.glotov.upnote-mcp-launcher -f ~/.claude/mcp-servers/upnote-mcp-launcher
+claude mcp remove --scope user upnote
+claude mcp add --scope user upnote -- ~/.claude/mcp-servers/upnote-mcp-launcher
+```
+
+In `claude_desktop_config.json`, set the server's `command` to the launcher's absolute path and
+drop `args`. Then add `~/.claude/mcp-servers/upnote-mcp-launcher` under System Settings, Privacy & Security,
+Full Disk Access, and restart Claude. Rebuilding the launcher changes its signature, so grant it
+again after a rebuild. It runs whatever `server.py` holds, so the grant extends to any edit of
+that file.
 - **Claude Desktop can't start the server.** The app doesn't use your shell's `PATH`, so the
   `command` in its config has to be uv's absolute path. `command -v uv` prints it.
 - **A change reports it wasn't confirmed.** The tool waited ten seconds without seeing UpNote
