@@ -23,6 +23,7 @@ a custom status line, and an MCP server for the UpNote notes app.
 - [Status line](#status-line)
 - [Skill invocation log](#skill-invocation-log)
 - [Experience entry check](#experience-entry-check)
+- [KB maintenance check](#kb-maintenance-check)
 - [Knowledge base auto-commit](#knowledge-base-auto-commit)
 - [UpNote MCP server](#upnote-mcp-server)
 - [License](#license)
@@ -60,6 +61,7 @@ ln -sfn "$REPO"/statusline-command.sh ~/.claude/statusline-command.sh
 ln -sfn "$REPO"/skill-invocation-log.sh ~/.claude/skill-invocation-log.sh
 ln -sfn "$REPO"/kb-session-end.sh ~/.claude/kb-session-end.sh
 ln -sfn "$REPO"/kb-session-start.sh ~/.claude/kb-session-start.sh
+ln -sfn "$REPO"/kb-maintenance-check.py ~/.claude/kb-maintenance-check.py
 ln -sfn "$REPO"/kb-autocommit.sh ~/.claude/kb-autocommit.sh
 ln -sfn "$REPO"/knowledge/CLAUDE.md ~/.claude/knowledge/CLAUDE.md
 ln -sfn "$REPO"/knowledge/raw/README.md ~/.claude/knowledge/raw/README.md
@@ -474,6 +476,63 @@ since a distilled entry moved there is not a new entry.
 One known false positive: `mv` preserves mtime, so a session whose only work was a
 `synthesize-knowledge` run creates nothing newer under `experiences/` and will be flagged
 despite having done the right thing.
+
+
+## KB maintenance check
+
+The experience entry check catches a session that did work and recorded nothing. It says
+nothing about the other half of the lifecycle: the periodic passes that distill accumulated
+entries and re-verify pages against the code. `synthesize-knowledge` and `check-knowledge`
+both carry "when to run" triggers, but nothing evaluates them unless a session thinks to -
+and a count of 57 entries against a threshold of 5 is what happens when none does.
+[`kb-maintenance-check.py`](kb-maintenance-check.py) is a `SessionStart` hook that evaluates
+both skills' triggers and prints one context line when either is due. Plain stdout from a
+`SessionStart` hook lands in the transcript as context Claude can see, so the note becomes
+the first thing the session reads. Silence means nothing is due.
+
+Triggers, in priority order - `synthesize-knowledge` fires first: its count triggers
+(`experiences/` entries directly in the directory, archive/ excluded; `learnings.md` length)
+and its INDEX.md `Last synthesized` age trigger. If none fire, `check-knowledge` fires on its
+INDEX.md `Last verified` age trigger. The numeric thresholds live in the two skills' own
+"when to run" sections and nowhere else - this hook mirrors them in code, so if one changes
+there, change it here in the same change.
+
+The script stays silent when `experiences/` does not exist (no knowledge checkout on this
+machine) and when the knowledge base is empty - a fresh install whose template dates read
+`never` has nothing to maintain until the first entry lands, and nagging an empty base on
+every start would train the noise to be ignored. Requires `python3`.
+
+### Install
+
+```bash
+REPO=~/myProjects/andrei-agentic-ai-skills
+ln -sfn "$REPO"/kb-maintenance-check.py ~/.claude/kb-maintenance-check.py
+```
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "python3 ~/.claude/kb-maintenance-check.py", "timeout": 10 }] }
+    ]
+  }
+}
+```
+
+Merge the array with whatever is already configured rather than replacing it, and restart
+Claude Code after changing hook registrations.
+
+### Tests
+
+```bash
+sh -n kb-maintenance-check.py 2>/dev/null || python3 -m py_compile kb-maintenance-check.py
+sh test-kb-maintenance-check.sh
+```
+
+[`test-kb-maintenance-check.sh`](test-kb-maintenance-check.sh) runs the script against a temp
+directory via `KB_ROOT`, covering the absent checkout, the empty base with template dates, the
+first entry with `never` dates, the three synthesize triggers, the check trigger, and the
+everything-current silence.
 
 
 ## Knowledge base auto-commit
