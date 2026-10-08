@@ -82,7 +82,7 @@ page header from `~/.claude/knowledge/CLAUDE.md`, with `Project: shared`,
 - Add a row for `patterns.md` if it isn't listed
 - Set **Last synthesized** to today's date
 
-The date is what this skill's first trigger reads. Skip it and the next session can't
+The date is what this skill's age trigger reads. Skip it and the next session can't
 tell whether synthesis has ever run.
 
 ## 6. Archive what you distilled
