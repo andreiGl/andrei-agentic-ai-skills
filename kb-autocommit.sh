@@ -110,6 +110,28 @@ if command -v jq >/dev/null 2>&1; then
     [ -n "${cwd:-}" ] && project=$(basename "$cwd")
 fi
 
+# Something staged by hand is someone's work in progress, not this hook's to commit.
+if [ -n "$(git diff --cached --name-only 2>/dev/null)" ]; then
+    fail "files already staged in $KB_ROOT - left for you to commit, nothing pushed"
+    exit 0
+fi
+
+# Credential-looking files never leave the machine, whether they are new, changed,
+# or sitting in a commit that has not been pushed yet. The whole run stops rather
+# than holding them back, because an unpushed commit cannot be held back.
+sensitive=$(
+    {
+        git ls-files -z -m -o --exclude-standard 2>/dev/null
+        git log -z --format= --name-only '@{u}..HEAD' 2>/dev/null
+    } | tr '\0' '\n' | sort -u \
+      | grep -Ei '(^|/)[^/]*(credentials|secret)[^/]*$|\.(pem|key|p12|pfx)$|(^|/)\.env($|\.)' \
+      | paste -sd' ' -
+)
+if [ -n "$sensitive" ]; then
+    fail "credential-looking file(s) in the knowledge base: $sensitive - nothing committed or pushed"
+    exit 0
+fi
+
 git add -A 2>/dev/null || { fail "git add failed"; exit 0; }
 
 # Unstage anything marked internal-only. Checked on the first line only: the

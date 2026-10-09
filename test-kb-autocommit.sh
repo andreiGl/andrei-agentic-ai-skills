@@ -139,6 +139,34 @@ check "missing payload logged" 'grep -q "no-payload" "$STATE/experience-decision
 printf '{"session_id":"a/b","transcript_path":"%s"}' "$KB_ROOT/INDEX.md" | sh "$ROOT/kb-session-end.sh"
 check "bad session id logged at session end" 'grep -q "bad-session-id" "$STATE/experience-decisions.log"'
 
+# Credential-looking files stop the run: new ones, and ones in commits not yet pushed,
+# even when a later commit deleted them again.
+pushed=$(remote_head)
+echo "token" > "$KB_ROOT/aws-credentials.md"
+echo "- fifth" >> "$KB_ROOT/gotchas.md"
+autocommit
+check "untracked credential file stops the run" 'grep -q "credential-looking" "$STATE/autocommit-notice"'
+check "nothing pushed with a credential file present" '[ "$(remote_head)" = "$pushed" ]'
+check "nothing committed with a credential file present" '[ -n "$(git -C "$KB_ROOT" status --porcelain gotchas.md)" ]'
+rm -f "$KB_ROOT/aws-credentials.md" "$STATE/autocommit-notice"
+echo "KEY=1" > "$KB_ROOT/.env"
+git -C "$KB_ROOT" add .env && git -C "$KB_ROOT" commit -qm "add env"
+git -C "$KB_ROOT" rm -q .env && git -C "$KB_ROOT" commit -qm "remove env"
+autocommit
+check "credential file in an unpushed commit stops the push" 'grep -q ".env" "$STATE/autocommit-notice" && [ "$(remote_head)" = "$pushed" ]'
+git -C "$KB_ROOT" reset -q --hard "$pushed"
+rm -f "$STATE/autocommit-notice"
+
+# A file staged by hand is left alone.
+echo "- staged by hand" >> "$KB_ROOT/gotchas.md"
+git -C "$KB_ROOT" add gotchas.md
+autocommit
+check "pre-staged work is not committed" '[ "$(git -C "$KB_ROOT" rev-parse HEAD)" = "$pushed" ] && grep -q "already staged" "$STATE/autocommit-notice"'
+git -C "$KB_ROOT" reset -q
+rm -f "$STATE/autocommit-notice"
+autocommit
+check "normal run works again afterwards" '[ "$(remote_head)" = "$(git -C "$KB_ROOT" rev-parse HEAD)" ] && [ "$(remote_head)" != "$pushed" ]'
+
 if [ "$fails" -eq 0 ]; then
     echo "All kb-autocommit checks passed."
 else
