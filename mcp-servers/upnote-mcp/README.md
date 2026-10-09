@@ -14,7 +14,9 @@ by hand.
   `~/Library/Containers/com.getupnote.desktop/Data/Library/Application Support/UpNote/upnote.sqlite3`.
   Set `UPNOTE_DB` to point it elsewhere.
 - [uv](https://docs.astral.sh/uv/) and Python 3.12 or newer. The server declares its one
-  dependency, the MCP Python SDK, inside `server.py`, and uv installs it on first run.
+  dependency, the MCP Python SDK, inside `server.py`, and uv installs it on first run. The
+  launcher under [Full Disk Access](#full-disk-access) skips uv and needs
+  [python.org's Python](https://www.python.org/downloads/macos/) 3.12 or newer instead.
 - UpNote running, for any tool that changes a note or opens the app.
 
 ## Install
@@ -173,12 +175,20 @@ and any note whose own title heading holds extra content, since rebuilding that 
 
 ## Full Disk Access
 
-A grant on uv or Python doesn't last. Homebrew signs them ad hoc, so macOS ties the grant to one
-build and drops it on the next `brew upgrade`. `launcher.c` builds a small binary that starts
-`uv run --script server.py` and waits for it. It never changes, so its grant holds. Its command is
+A grant on uv or Homebrew's Python doesn't last. Homebrew signs them ad hoc, so macOS ties the
+grant to one build and drops it on the next `brew upgrade`. `launcher.c` builds a small binary
+that starts `server.py` and waits for it. It never changes, so its grant holds. Its command is
 fixed at build time, so the grant can't be used to run anything else.
 
+The launcher doesn't use uv. With uv in the chain, macOS recorded a separate "access data from
+UpNote" decision against each Homebrew uv build, switched off and locked, and the server failed
+with "unable to open database file" until `tccutil reset SystemPolicyAppData` and a Claude
+restart. So the launcher runs a venv built from python.org's Python, which is signed by the
+Python Software Foundation rather than ad hoc, and which Homebrew never upgrades.
+
 ```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12 -m venv ~/.claude/mcp-servers/upnote-mcp-venv
+~/.claude/mcp-servers/upnote-mcp-venv/bin/python -m pip install 'mcp==2.2.0'
 clang -O2 -o ~/.claude/mcp-servers/upnote-mcp-launcher ~/.claude/mcp-servers/upnote-mcp/launcher.c
 codesign -s - -i ca.glotov.upnote-mcp-launcher -f ~/.claude/mcp-servers/upnote-mcp-launcher
 claude mcp remove --scope user upnote
@@ -189,7 +199,7 @@ In `claude_desktop_config.json`, set the server's `command` to the launcher's ab
 drop `args`. Then add `~/.claude/mcp-servers/upnote-mcp-launcher` under System Settings, Privacy & Security,
 Full Disk Access, and restart Claude. Rebuilding the launcher changes its signature, so grant it
 again after a rebuild. It runs whatever `server.py` holds, so the grant extends to any edit of
-that file.
+that file. Keep the `mcp` version in the venv in step with the one `server.py` declares.
 - **Claude Desktop can't start the server.** The app doesn't use your shell's `PATH`, so the
   `command` in its config has to be uv's absolute path. `command -v uv` prints it.
 - **A change reports it wasn't confirmed.** The tool waited ten seconds without seeing UpNote

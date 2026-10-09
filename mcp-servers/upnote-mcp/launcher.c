@@ -6,7 +6,13 @@
  * container. Homebrew's uv and Python are ad-hoc signed, so a grant on them is
  * tied to one exact build and is lost on every brew upgrade. This launcher
  * never changes, so a grant on it holds. It must stay alive as the parent:
- * exec'ing uv would make uv the binary macOS checks again.
+ * exec'ing the interpreter would make it the binary macOS checks again.
+ *
+ * uv is not in the chain at all. Even with this launcher as the parent, macOS
+ * recorded an "access data from UpNote" decision against each Homebrew uv build
+ * (2026-10-09), locked to Off, and every uv upgrade added another. The server
+ * runs instead on a venv built from python.org's Python, which is signed by the
+ * Python Software Foundation and which Homebrew never touches.
  *
  * The command is fixed at build time rather than taken from argv, so the
  * grant cannot be borrowed to run anything else.
@@ -20,9 +26,8 @@
 #include <string.h>
 #include <sys/wait.h>
 
-#ifndef UV_PATH
-#define UV_PATH "/opt/homebrew/bin/uv"
-#endif
+/* Relative to $HOME. Built per README.md, "Full Disk Access". */
+#define VENV_PYTHON "/.claude/mcp-servers/upnote-mcp-venv/bin/python"
 
 extern char **environ;
 
@@ -39,13 +44,15 @@ int main(void) {
         fprintf(stderr, "upnote-mcp-launcher: HOME is not set\n");
         return 1;
     }
-    char script[4096];
+    char python[4096], script[4096];
+    snprintf(python, sizeof python, "%s%s", home, VENV_PYTHON);
     snprintf(script, sizeof script, "%s/.claude/mcp-servers/upnote-mcp/server.py", home);
 
-    char *args[] = {UV_PATH, "run", "--script", script, NULL};
-    int err = posix_spawn(&child, UV_PATH, NULL, NULL, args, environ);
+    /* -I: no PYTHON* variables, no user site-packages, so only the venv runs. */
+    char *args[] = {python, "-I", script, NULL};
+    int err = posix_spawn(&child, python, NULL, NULL, args, environ);
     if (err) {
-        fprintf(stderr, "upnote-mcp-launcher: cannot start %s: %s\n", UV_PATH, strerror(err));
+        fprintf(stderr, "upnote-mcp-launcher: cannot start %s: %s\n", python, strerror(err));
         return 1;
     }
 
