@@ -120,16 +120,16 @@ while IFS= read -r row; do
   if [ "$first" -eq 1 ]; then
     # Plain shell window + send-keys: a window whose start command exits
     # instantly closes at once (and can kill a single-window tmux server).
-    tmux new-session -d -s "$TMUX_NAME" -n "$name" -c "$cwd"
+    win_index=$(tmux new-session -d -s "$TMUX_NAME" -n "$name" -c "$cwd" -P -F '#{window_index}')
     first=0
   else
-    tmux new-window -d -t "$TMUX_NAME" -n "$name" -c "$cwd"
+    win_index=$(tmux new-window -d -t "$TMUX_NAME" -n "$name" -c "$cwd" -P -F '#{window_index}')
   fi
   # A surviving window from an earlier restore can carry the same name; tmux
   # refuses name-based targets when two windows share one name, and set -e
   # would abort the whole restore mid-loop. Target the freshly created window
-  # by its index instead, which is always unambiguous.
-  win_index=$(tmux list-windows -t "$TMUX_NAME" | tail -1 | cut -d: -f1)
+  # by the index tmux reports for it. The last listed window is not reliable:
+  # new-window takes the lowest free index, so after a gap it lands mid-list.
   tmux send-keys -t "$TMUX_NAME:$win_index" "claude --resume $(printf '%q' "$id")" Enter
 done <<EOF
 $kept_rows
