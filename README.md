@@ -27,6 +27,8 @@ a custom status line, and an MCP server for the UpNote notes app.
 - [Knowledge base auto-commit](#knowledge-base-auto-commit)
 - [UpNote MCP server](#upnote-mcp-server)
 - [License](#license)
+- [KB actions band (plugin)](#kb-actions-band-plugin)
+- [Session hooks](#session-hooks)
 
 ## Installation
 
@@ -684,3 +686,35 @@ Then in `~/.claude/settings.json`:
 ```
 
 Requires `jq` and `git` on `$PATH`.
+
+## KB actions band (plugin)
+
+`hooks/kb-actions/` is a Claude Code function-hook plugin ("mod"): a due-only band
+above the prompt that lists what the knowledge base owes, each item a button that
+queues the fixing skill. Nothing shows when nothing is due.
+
+```
+KB: !! 24 tools, no entry yet - run update-knowledge   ~ 3 KB uncommitted - commit
+```
+
+Actions mirror the maintenance thresholds (5 experiences, 20 learnings, 61-day
+synthesis, 14-day verification) and read both KB layouts - nested `knowledge/INDEX.md`
+and flat `INDEX.md`. Urgency rides on a colored marker (`!!` red, `~` amber) beside
+each plain button; pressing queues the skill's prompt as your next turn.
+
+Install as a plugin (works on Claude Code 2.1.275+):
+
+```
+/plugin install andrei-personal --marketplace andreiGl/andrei-agentic-ai-skills
+```
+
+## Session hooks
+
+Scripts under `hooks/` that register in `~/.claude/settings.json`:
+
+| Script | Event | What it does |
+| :--- | :--- | :--- |
+| [`pre-compact-snapshot.sh`](hooks/pre-compact-snapshot.sh) | PreCompact | Snapshots the transcript and extracts in-flight state before compaction rewrites context |
+| [`compact-restore-note.sh`](hooks/compact-restore-note.sh) | SessionStart (compact) | Injects the snapshot pointer into the post-compact session |
+| [`notify-popup.sh`](hooks/notify-popup.sh) | Notification | macOS popup naming the session that needs attention; optional toast |
+| [`toast/`](hooks/toast) | - | Source for a Claude-styled toast binary; build with `swiftc -o Toast Toast.swift` |
