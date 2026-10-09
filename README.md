@@ -355,12 +355,23 @@ does land in the transcript as context Claude can see.
 
 > Do not register the end script on `Stop`: that event fires after every turn.
 
-Owed means two things held. The transcript carried at least `KB_EXPERIENCE_MIN_TOOL_USES`
-`tool_use` blocks, and no file directly under `experiences/` was written after the session
-began. The window comes from a marker stamped per session and compared with `find -newer`,
-which keeps both scripts free of `stat` and its incompatible BSD and GNU flags. A `resume` or
-`compact` start leaves the marker alone, so the window tracks the stretch of work rather than
-the process. No marker means no window, and the check makes no claim rather than guessing.
+Owed means two things held. Since the session's marker was written, the transcript gained at
+least `KB_EXPERIENCE_MIN_TOOL_USES` `tool_use` blocks, and no new entry appeared directly under
+`experiences/`. The marker records the tool-use count at the start and the names of the
+entries that already existed. A new entry is a name the marker did not list and that this
+session's transcript mentions. Comparing names means editing an old entry doesn't count as
+writing one. Requiring the transcript to mention it means an entry another session wrote
+meanwhile doesn't clear this one.
+
+A `resume` or `compact` start keeps an existing marker, so work across several resumes adds
+up. When the marker is gone because an earlier end of the same session removed it, the start
+writes a new one. Before that, every later end of a long, resumed session went unchecked, and
+`no-marker` was the most common verdict in the log. A session that wrote an entry is listed in
+`banked-sessions` and is never flagged again when it ends after another resume.
+
+A threshold that isn't a plain number of up to nine digits falls back to 20, so a typo can't
+switch the check off. Markers written before this change hold no names, and for those the
+check falls back to comparing file times.
 
 ### Runtime state
 
@@ -369,6 +380,7 @@ State lives outside the KB checkout, so the guard never writes to a versioned fi
 ```text
 ~/.claude/kb-session/
 ├── markers/<session-id>.start
+├── banked-sessions
 ├── experience-debt
 ├── experience-debt.log
 └── experience-decisions.log
@@ -412,15 +424,20 @@ very large transcript can outlast the default.
 Every evaluation appends one tab-separated row to `experience-decisions.log`:
 
 ```text
-timestamp<TAB>project<TAB>raw-tool-use-count<TAB>verdict
+timestamp<TAB>project<TAB>tool-uses-since-marker<TAB>verdict
 ```
 
 | Verdict | Meaning |
 | :--- | :--- |
-| `below-threshold` | The session did not reach the local cutoff. |
+| `below-threshold` | The session did not reach the local cutoff. The marker stays, so later work adds to it. |
 | `no-marker` | The session began before the start hook was active, or has no usable marker. |
-| `entry-written` | A file directly under `experiences/` is newer than the session marker. |
+| `entry-written` | A new entry name appeared and the transcript mentions it. |
+| `already-banked` | The session wrote an entry earlier and ended again after a resume. |
 | `flagged` | A qualifying session ended without such an entry, and a reminder was queued. |
+| `no-payload` | The hook got no transcript or session id. |
+| `bad-session-id` | The session id had characters other than letters, digits, `-` and `_`. |
+
+The start of the next session shows at most ten queued reminders, with a count of the rest.
 
 Skipped sessions are recorded too, so the skipping is visible rather than silent.
 
@@ -470,14 +487,17 @@ sh test-experience-entry-guard.sh
 ```
 
 [`test-experience-entry-guard.sh`](test-experience-entry-guard.sh) runs both scripts against a
-temp directory via the environment overrides, covering a below-threshold session, a qualifying
-session with no entry, an archive-only entry, a direct entry, and marker preservation across
-`resume`. A file under `experiences/archive/` deliberately does not satisfy the requirement,
-since a distilled entry moved there is not a new entry.
+temp directory via the environment overrides. It covers a below-threshold session, a
+qualifying session with no entry, an archive-only entry, and a direct entry. It also covers
+marker preservation across `resume`, an edited old entry, another session's entry, a new
+marker after an earlier end, work adding up across resumes, a session that already wrote an
+entry, bad threshold values, an old-format marker, and the ten-line cap. A file under
+`experiences/archive/` deliberately does not satisfy the requirement, since a distilled entry
+moved there is not a new entry.
 
-One known false positive: `mv` preserves mtime, so a session whose only work was a
-`synthesize-knowledge` run creates nothing newer under `experiences/` and will be flagged
-despite having done the right thing.
+One known false positive: a session whose only work was a `synthesize-knowledge` run moves
+entries out of `experiences/` and adds no new name there, so it will be flagged despite having
+done the right thing.
 
 
 ## KB maintenance check
@@ -569,6 +589,15 @@ this setup answers yes for its own approved remote, which is equally conformant.
 
 The check reads the first line only. A whole-file grep matches the marker where it appears
 in prose - this README does it twice - and would hold back files nobody meant to mark.
+
+Two more cases stop the run with a notice instead of committing:
+
+- A file name that looks like a credential: containing `credentials` or `secret`, ending in
+  `.pem`, `.key`, `.p12` or `.pfx`, or a `.env` file. New, changed, and committed-but-unpushed
+  files are all checked, including ones a later commit deleted, because a push publishes every
+  commit. Nothing is committed or pushed until the file is gone.
+- Files already staged by hand. That's someone's work in progress, so the hook leaves it for
+  them to commit.
 
 ### Install
 
