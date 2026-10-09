@@ -8,9 +8,9 @@ description: Generic, domain- and language-agnostic guidelines for carrying out 
 How to carry out a task. These apply to code and to everything else - research, analysis,
 review, planning, argument. Where a rule needs a concrete example, both kinds are given.
 
-For the wording of the result - comments, commit messages, docs, reports, chat replies -
-see the **writing-guidelines** skill. This file covers the work; that one covers how it
-reads.
+For the wording of the result - comments, commit messages, docs, reports, posts, chat
+replies - see the **writing-guidelines** skill. This file covers the work; that one covers
+how it reads.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use
 judgment.
@@ -156,6 +156,6 @@ Running the tests has a counterpart outside code, and this is it.
 
 ## 9. Write for a Human Reader
 
-Comments, docstrings/Javadoc, commit messages, PR and Jira text, plans, reports, and chat
-replies all follow the rules in `~/.claude/skills/writing-guidelines/SKILL.md`. Read it before
-writing prose.
+Comments, docstrings/Javadoc, commit messages, PR and Jira text, plans, reports, posts, and
+chat replies all follow the writing-guidelines skill. Invoke it with the Skill tool before
+writing prose - naming its file path does not put the rules in context.
