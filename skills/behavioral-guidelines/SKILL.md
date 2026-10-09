@@ -8,9 +8,9 @@ description: Generic, domain- and language-agnostic guidelines for carrying out 
 How to carry out a task. These apply to code and to everything else - research, analysis,
 review, planning, argument. Where a rule needs a concrete example, both kinds are given.
 
-For the wording of the result - comments, commit messages, docs, reports, posts, chat
-replies - see the **writing-guidelines** skill. This file covers the work; that one covers
-how it reads.
+For the wording of the result - comments, commit messages, docs, reports, chat replies -
+see the **writing-guidelines** skill. This file covers the work; that one covers how it
+reads.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use
 judgment.
@@ -125,6 +125,12 @@ Running the tests has a counterpart outside code, and this is it.
 - Cite what you read, not what you searched for. If a search summary handed you a number,
   open the source before using it. Summaries paraphrase, round, and drop qualifiers, and
   the dropped qualifier is usually the one that decides the argument.
+- Search results, snippets, and summaries point to possible evidence. They are not
+  evidence by themselves - open the primary source before presenting a claim as fact.
+- Label a claim `verified` when a source read during the task directly supports it;
+  `inference` when it follows from verified facts but is not stated directly; `unverified`
+  when direct confirmation, complete context, or source access is missing. Follow Fail
+  Loud when verification is incomplete or skipped.
 - Carry each number's date and origin with it. "1,200 premature deaths (Health Canada,
   published 2022, analysis year 2015)" survives scrutiny. "About 1,200 deaths" does not,
   and collapses the moment someone asks how old the data is.
@@ -134,8 +140,8 @@ Running the tests has a counterpart outside code, and this is it.
 - Before calling someone else's number wrong, reproduce it from the edition they cited. A
   superseded figure is not a fabricated one, and an analysis already published has to be
   described by the inputs it actually used.
-- Keep verified, inferred, and assumed distinct, and mark which is which in the
-  deliverable rather than only in your head.
+- Keep the source and observation date when they affect a figure, external behavior, or
+  decision.
 - Check the figures that support your conclusion at least as hard as the ones that don't.
   A number that fits too neatly is the one to open the PDF for.
 - When the other side is right, say so plainly and early. A concession you volunteer costs
@@ -147,3 +153,9 @@ Running the tests has a counterpart outside code, and this is it.
   systematic cause. When the artifact can be inspected, inspect it. `strings` on a binary,
   an xattr, a config value: seconds to check, and it replaces an argument with a fact.
 - Don't stack inference on inference. Two uncertain steps make one worthless conclusion.
+
+## 9. Write for a Human Reader
+
+Comments, docstrings/Javadoc, commit messages, PR and Jira text, plans, reports, and chat
+replies all follow the rules in `~/.claude/skills/writing-guidelines/SKILL.md`. Read it before
+writing prose.
