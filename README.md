@@ -630,16 +630,46 @@ and the failure it prevents is not one you would notice afterwards.
 
 ### When it fails
 
-`SessionEnd` output reaches nobody, so the script cannot report anything. It appends to
-`~/.claude/kb-session/autocommit.log` instead, one line per run, recording the pushed SHA
-or a `PUSH FAILED` line with the number of commits sitting locally.
+`SessionEnd` output reaches nobody, so the script cannot report anything itself. It appends
+to `~/.claude/kb-session/autocommit.log`, one line per run, recording the pushed SHA or what
+went wrong. Every failure - a failed or timed-out push, a refused remote, a failed commit -
+also writes `~/.claude/kb-session/autocommit-notice`, and
+[`kb-session-start.sh`](kb-session-start.sh) prints that into the next session as
+"Knowledge base backup needs attention", copies it to the log, and clears it.
+
+Only a successful push clears a notice. A later run with nothing to do leaves it, so a
+failure is always shown once even if the next run happens to be quiet. If the state
+directory itself cannot be written, the script writes `~/.claude/kb-autocommit-notice`
+instead; the start hook prints that one every session until the directory works again.
 
 A failed push is self-healing in the ordinary case, because a run whose tree is clean still
 attempts the push when local commits are ahead of the remote. Without that the backlog would
 wait for the next session that happened to edit the knowledge base, which is exactly the
-session where nobody is thinking about the backup. A persistent failure is not, and nothing surfaces it. If that matters, the
-status line is the natural place to show an unpushed count - continuously visible beats a
-log nobody opens.
+session where nobody is thinking about the backup.
+
+The push is capped at 15 seconds in total (`KB_AUTOCOMMIT_NETWORK_TIMEOUT`) on top of the
+stall check. The cap has to stay under the hook's 30 second timeout: a push killed by Claude
+Code instead never reaches the log or the notice.
+
+### Two sessions ending together
+
+A lock directory, `~/.claude/kb-session/autocommit.lock`, keeps two runs from committing the
+same files or racing each other's push. The second run logs that it was skipped and leaves no
+notice, because the first one is doing the backup. A lock older than 120 seconds
+(`KB_AUTOCOMMIT_STALE_LOCK_SECONDS`) was left by a killed run and is taken over. A zero or
+non-numeric value for either setting stops the run with a notice rather than guessing.
+
+### Test
+
+```bash
+sh test-kb-autocommit.sh
+```
+
+[`test-kb-autocommit.sh`](test-kb-autocommit.sh) runs the script against a throwaway
+knowledge base with a local bare remote: commit and push, the internal-only hold-back, live
+and stale locks, bad settings, a hung push, a failed push and its recovery, the start hook
+printing and clearing notices, the fallback notice, and the session-id checks in both
+session hooks.
 
 ## UpNote MCP server
 

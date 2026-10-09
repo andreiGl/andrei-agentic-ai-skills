@@ -6,16 +6,98 @@
 # convention says such material does not leave the machine, and a private remote
 # is still off the machine.
 #
-# SessionEnd output reaches nobody, so failures are logged rather than reported.
+# SessionEnd output reaches nobody, so failures are logged, and each failure also
+# leaves a notice that kb-session-start.sh prints into the next session. Only a
+# successful push clears a notice; a run with nothing to do leaves it for the next
+# start to surface.
 set -u
 
 KB_ROOT="${KB_ROOT:-$HOME/.claude/knowledge}"
 STATE_ROOT="${KB_SESSION_STATE_ROOT:-$HOME/.claude/kb-session}"
 LOG="$STATE_ROOT/autocommit.log"
+NOTICE="$STATE_ROOT/autocommit-notice"
+# Used only when STATE_ROOT itself cannot be written, so it has to live elsewhere.
+FALLBACK_NOTICE="${KB_AUTOCOMMIT_FALLBACK_NOTICE:-$HOME/.claude/kb-autocommit-notice}"
+LOCK="$STATE_ROOT/autocommit.lock"
+# A live run cannot outlast the hook's 30s timeout in settings.json, so a lock this
+# old was left by a run that was killed.
+STALE_LOCK_SECONDS="${KB_AUTOCOMMIT_STALE_LOCK_SECONDS:-120}"
+# Must stay under that 30s timeout: a push killed from outside never reaches the log.
+NETWORK_TIMEOUT="${KB_AUTOCOMMIT_NETWORK_TIMEOUT:-15}"
+
+stamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+note() { printf '%s\t%s\n' "$stamp" "$1" >> "$LOG"; }
+fail() {
+    note "$1"
+    printf '%s\t%s\n' "$stamp" "$1" > "$NOTICE" 2>/dev/null || true
+}
 
 [ -d "$KB_ROOT/.git" ] || exit 0
 command -v git >/dev/null 2>&1 || exit 0
+
+if ! mkdir -p "$STATE_ROOT" 2>/dev/null || ! touch "$LOG" 2>/dev/null; then
+    printf '%s\t%s\n' "$stamp" "state directory $STATE_ROOT not writable - nothing committed" \
+        >> "$FALLBACK_NOTICE" 2>/dev/null
+    exit 0
+fi
+
+# Checked one at a time: zero is as wrong as garbage for both. A zero stale age
+# would take over every live lock, and a zero timeout would fail every push.
+for setting in "$STALE_LOCK_SECONDS" "$NETWORK_TIMEOUT"; do
+    case "$setting" in
+        ''|*[!0-9]*|0|00*) fail "invalid stale-lock or network timeout setting - nothing committed"; exit 0 ;;
+    esac
+done
+
+# The lock is a directory because mkdir is atomic: two sessions ending together
+# would otherwise commit the same files twice or race each other's push.
+acquire_lock() {
+    if mkdir "$LOCK" 2>/dev/null; then
+        printf '%s\n' "$$" > "$LOCK/pid"
+        date +%s > "$LOCK/created"
+        return 0
+    fi
+    created=$(cat "$LOCK/created" 2>/dev/null || echo 0)
+    case "$created" in ''|*[!0-9]*) created=0 ;; esac
+    [ $(( $(date +%s) - created )) -ge "$STALE_LOCK_SECONDS" ] || return 1
+    stale="$STATE_ROOT/autocommit.lock.stale.$$"
+    if mv "$LOCK" "$stale" 2>/dev/null && rm -rf "$stale" && mkdir "$LOCK" 2>/dev/null; then
+        printf '%s\n' "$$" > "$LOCK/pid"
+        date +%s > "$LOCK/created"
+        note "recovered stale lock"
+        return 0
+    fi
+    return 2
+}
+acquire_lock
+case $? in
+    0) ;;
+    1) note "another run holds the lock - skipped"; exit 0 ;;
+    *) fail "could not recover a stale lock at $LOCK - nothing committed"; exit 0 ;;
+esac
+# Set only after the lock is ours, so an early exit never removes another run's lock.
+trap 'rm -rf "$LOCK"' EXIT
+trap 'exit 1' HUP INT TERM
+
 cd "$KB_ROOT" 2>/dev/null || exit 0
+
+# macOS has no timeout(1). Runs the command in the background and kills it once the
+# limit passes, so a stalled push fails here, where it gets logged.
+run_network() {
+    "$@" &
+    pid=$!
+    waited=0
+    while kill -0 "$pid" 2>/dev/null; do
+        if [ "$waited" -ge "$NETWORK_TIMEOUT" ]; then
+            kill "$pid" 2>/dev/null
+            wait "$pid" 2>/dev/null
+            return 124
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+    wait "$pid"
+}
 
 # A hook that blocks on a credential prompt hangs session exit.
 GIT_TERMINAL_PROMPT=0
@@ -28,11 +110,7 @@ if command -v jq >/dev/null 2>&1; then
     [ -n "${cwd:-}" ] && project=$(basename "$cwd")
 fi
 
-mkdir -p "$STATE_ROOT" 2>/dev/null || exit 0
-stamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-note() { printf '%s\t%s\n' "$stamp" "$1" >> "$LOG"; }
-
-git add -A 2>/dev/null || { note "git add failed"; exit 0; }
+git add -A 2>/dev/null || { fail "git add failed"; exit 0; }
 
 # Unstage anything marked internal-only. Checked on the first line only: the
 # marker appears in prose elsewhere in this KB and a whole-file grep matches it.
@@ -88,7 +166,7 @@ if ! git diff --cached --quiet 2>/dev/null; then
             -m "Held back as internal-only:$held" 2>/dev/null
     else
         git commit -q -m "$subject" -m "$body" -m "$stat" 2>/dev/null
-    fi || { note "commit failed"; exit 0; }
+    fi || { fail "commit failed"; exit 0; }
 fi
 
 # Carry on to the push even when this session recorded nothing. An earlier run may
@@ -114,14 +192,14 @@ if [ -z "$expected" ] && [ -f "$pin" ]; then
 fi
 
 if [ -z "${url:-}" ]; then
-    note "no origin remote - commit kept local"
+    fail "no origin remote - commit kept local"
     exit 0
 fi
 if [ -z "${expected:-}" ]; then
     printf '%s\n' "$url" > "$pin" 2>/dev/null || true
     note "pinned origin for future runs"
 elif [ "$url" != "$expected" ]; then
-    note "REMOTE MISMATCH - refused to push, commit kept local. Compare git remote -v against $pin"
+    fail "REMOTE MISMATCH - refused to push, commit kept local. Compare git remote -v against $pin"
     exit 0
 fi
 
@@ -133,10 +211,16 @@ fi
 #
 # http.lowSpeed* catches a stall rather than capping total time, which suits a repository
 # this small: a real transfer finishes in about a second, so anything slow is stuck.
-# HTTPS remotes only; an SSH remote would need a different bound.
-if git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 push -q 2>/dev/null; then
+# HTTPS remotes only; an SSH remote would need a different bound. run_network caps
+# the total time on top of that, for a connection that never starts at all.
+run_network git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 push -q 2>/dev/null
+status=$?
+if [ "$status" -eq 0 ]; then
     note "pushed $(git rev-parse --short HEAD)"
+    rm -f "$NOTICE"
+elif [ "$status" -eq 124 ]; then
+    fail "PUSH TIMED OUT after ${NETWORK_TIMEOUT}s - $(git rev-list --count @{u}..HEAD 2>/dev/null || echo '?') commit(s) local only"
 else
-    note "PUSH FAILED - $(git rev-list --count @{u}..HEAD 2>/dev/null || echo '?') commit(s) local only"
+    fail "PUSH FAILED - $(git rev-list --count @{u}..HEAD 2>/dev/null || echo '?') commit(s) local only"
 fi
 exit 0
