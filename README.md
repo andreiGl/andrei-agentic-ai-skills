@@ -495,7 +495,10 @@ Triggers, in priority order - `synthesize-knowledge` fires first: its count trig
 and its INDEX.md `Last synthesized` age trigger. If none fire, `check-knowledge` fires on its
 INDEX.md `Last verified` age trigger. The numeric thresholds live in the two skills' own
 "when to run" sections and nowhere else - this hook mirrors them in code, so if one changes
-there, change it here in the same change.
+there, change it here in the same change. INDEX.md is read from `knowledge/INDEX.md` first,
+falling back to the KB root (either layout). Only a plain `YYYY-MM-DD` stamp parses; a
+datetime stamp is reported as missing and a future-dated one as a typo. The template
+`never` stamp nags on this install (the work install exempts it - a deliberate split).
 
 The script stays silent when `experiences/` does not exist (no knowledge checkout on this
 machine) and when the knowledge base is empty - a fresh install whose template dates read
@@ -531,8 +534,8 @@ sh test-kb-maintenance-check.sh
 
 [`test-kb-maintenance-check.sh`](test-kb-maintenance-check.sh) runs the script against a temp
 directory via `KB_ROOT`, covering the absent checkout, the empty base with template dates, the
-first entry with `never` dates, the three synthesize triggers, the check trigger, and the
-everything-current silence.
+first entry with `never` dates, a datetime stamp read as missing, the three synthesize
+triggers, the check trigger, and the everything-current silence.
 
 
 ## Knowledge base auto-commit

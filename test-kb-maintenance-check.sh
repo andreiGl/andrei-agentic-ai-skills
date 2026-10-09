@@ -44,6 +44,13 @@ echo "# first" > "$KB_ROOT/experiences/e1.md"
 expect_line 'synthesize-knowledge'
 expect_line 'Last synthesized is never'
 
+# A datetime stamp (typo) reads as missing, not as a value to parse a prefix from.
+# Synth is fresh so the age trigger stays quiet and the typo is what nags.
+# The strict scan discards the malformed value, so the check fires via its
+# missing-stamp path; assert the check fires and no raw None leaks into the note.
+set_dates "2026-10-07T10:00:00Z" "2026-10-07"
+expect_line 'check-knowledge'
+
 # Fresh dates, five experience entries: synthesize due on the count trigger.
 set_dates 2026-10-07 2026-10-07
 add_entries 5
