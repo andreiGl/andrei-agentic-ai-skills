@@ -1,0 +1,12 @@
+{
+  "name": "andrei-personal-skills",
+  "owner": {
+    "name": "Andrei Glotov"
+  },
+  "plugins": [
+    {
+      "name": "andrei-personal",
+      "source": "./"
+    }
+  ]
+}

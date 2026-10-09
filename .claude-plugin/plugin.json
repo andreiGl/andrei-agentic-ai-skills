@@ -1,0 +1,9 @@
+{
+  "name": "andrei-personal",
+  "description": "Andrei Glotov's personal skills -- knowledge base management, session save/restore, and the kb-actions band",
+  "author": {
+    "name": "Andrei Glotov"
+  },
+  "types": "./hooks/kb-actions/index.d.ts",
+  "version": "1.0.0"
+}
