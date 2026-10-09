@@ -125,7 +125,12 @@ while IFS= read -r row; do
   else
     tmux new-window -d -t "$TMUX_NAME" -n "$name" -c "$cwd"
   fi
-  tmux send-keys -t "$TMUX_NAME:$name" "claude --resume $(printf '%q' "$id")" Enter
+  # A surviving window from an earlier restore can carry the same name; tmux
+  # refuses name-based targets when two windows share one name, and set -e
+  # would abort the whole restore mid-loop. Target the freshly created window
+  # by its index instead, which is always unambiguous.
+  win_index=$(tmux list-windows -t "$TMUX_NAME" | tail -1 | cut -d: -f1)
+  tmux send-keys -t "$TMUX_NAME:$win_index" "claude --resume $(printf '%q' "$id")" Enter
 done <<EOF
 $kept_rows
 EOF

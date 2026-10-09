@@ -119,7 +119,10 @@ def is_subagent(sid):
     return False
 
 merged = sessions + [
-    e for e in existing
+    # A kept (not re-captured) entry is not the current session; its stale
+    # current:true flag would make resume-sessions skip it (the filter drops
+    # every current:true).
+    {**e, "current": False} for e in existing
     if e.get("sessionId") not in captured
     and not is_subagent(e["sessionId"])  # drop stragglers an older save captured
 ]
