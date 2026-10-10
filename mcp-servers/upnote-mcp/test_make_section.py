@@ -179,5 +179,24 @@ check("after an append, the tags come back after the new content",
       srv._with_tags(srv._appended(f"<div>x</div>\n<div>{RVL}</div>", "- new"), ["RV"]) ==
       f"<div>x</div>\n\n- new\n\n<div>{RVL}</div>")
 
+# 12. removing tags
+same_("a removed tag's block goes", srv._drop_tags(f"<div>x</div><div>{RVL}</div>", ["rv"]), "<div>x</div>")
+same_("  a block keeps the tags not removed", srv._drop_tags(f"<div>{RVL} {UPL}</div>", ["#RV"]), f"<div>{UPL}</div>")
+same_("  UpNote's trailing <br> + link goes", srv._drop_tags(f"<div>x</div><br>{RVL}", ["RV"]), "<div>x</div>")
+same_("  a link inside a sentence becomes plain text", srv._drop_tags(f"<div>ask {RVL} first</div>", ["RV"]), "<div>ask RV first</div>")
+same_("  other tags' links stay", srv._drop_tags(f"<div>ask {UPL} first</div>", ["RV"]), f"<div>ask {UPL} first</div>")
+same_("  nothing to remove, no change", srv._drop_tags(f"<div>{RVL}</div>", []), f"<div>{RVL}</div>")
+
+# 13. dates for the list and search filters
+import datetime as _dt
+local = lambda *a: _dt.datetime(*a).astimezone().timestamp() * 1000
+check("a date is local midnight", srv._date_ms("2026-10-03", "updated_after") == local(2026, 10, 3))
+check("  a date and time", srv._date_ms("2026-10-03T14:30", "updated_after") == local(2026, 10, 3, 14, 30))
+check("  a zone is honoured", srv._date_ms("2026-10-03T00:00+00:00", "x") == _dt.datetime(2026, 10, 3, tzinfo=_dt.timezone.utc).timestamp() * 1000)
+try:
+    srv._date_ms("last week", "created_after"); check("  nonsense is refused", False, "no error")
+except srv.ToolError as e:
+    check("  nonsense is refused", "created_after must be a date" in str(e), str(e))
+
 print("FAILURES:", fails)
 sys.exit(1 if fails else 0)

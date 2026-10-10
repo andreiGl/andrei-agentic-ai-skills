@@ -36,8 +36,8 @@ async def main():
         async with ClientSession(rd, wr) as s:
             await s.initialize()
             tools = {t.name: t for t in (await s.list_tools()).tools}
-            check("fourteen tools", sorted(tools) == sorted(["search_notes","list_notes","get_note","list_notebooks","list_tags","run_select","create_note","move_note_to_trash","restore_note","replace_note","open_in_upnote","check_upnote_setup","make_section","append_to_note"]), ",".join(sorted(tools)))
-            check("read tools marked read-only", all(tools[n].annotations.read_only_hint for n in tools if n not in ("create_note", "move_note_to_trash", "restore_note", "replace_note", "make_section", "append_to_note")))
+            check("fifteen tools", sorted(tools) == sorted(["search_notes","list_notes","get_note","list_notebooks","list_tags","run_select","create_note","move_note_to_trash","restore_note","replace_note","open_in_upnote","check_upnote_setup","make_section","append_to_note","move_note"]), ",".join(sorted(tools)))
+            check("read tools marked read-only", all(tools[n].annotations.read_only_hint for n in tools if n not in ("create_note", "move_note_to_trash", "restore_note", "replace_note", "make_section", "append_to_note", "move_note")))
             check("create_note not read-only", tools["create_note"].annotations.read_only_hint is False)
 
             err, d, _ = await call(s, "check_upnote_setup")
@@ -111,6 +111,29 @@ async def main():
             check("unknown note id is an error", err, text[:60])
             err, _, text = await call(s, "search_notes", query="   ")
             check("empty query is an error", err, text[:60])
+            # date filters against the same counts taken directly
+            import datetime as _dt
+            day = (_dt.date.today() - _dt.timedelta(days=30)).isoformat()
+            ms = _dt.datetime.fromisoformat(day).astimezone().timestamp() * 1000
+            want = ref.execute("SELECT count(*) FROM notes WHERE deleted=0 AND trashed=0 AND updatedAt >= ?", (ms,)).fetchone()[0]
+            err, d, text = await call(s, "list_notes", updated_after=day, limit=1)
+            check("updated_after matches DB", not err and d["total"] == want, f"{d.get('total')} vs {want}")
+            want = ref.execute("SELECT count(*) FROM notes WHERE deleted=0 AND trashed=0 AND createdAt < ?", (ms,)).fetchone()[0]
+            err, d, text = await call(s, "list_notes", created_before=day, limit=1)
+            check("created_before matches DB", not err and d["total"] == want, f"{d.get('total')} vs {want}")
+            err, _, text = await call(s, "list_notes", created_after="yesterday")
+            check("a date that isn't one is an error", err and "must be a date" in text, text[:80])
+
+            # attachment names come from the files table, without download links
+            row = ref.execute("SELECT n.id, n.fileIds FROM notes n WHERE n.deleted=0 AND n.trashed=0 AND EXISTS "
+                              "(SELECT 1 FROM json_each(n.fileIds) j JOIN files f ON f.id = j.value) LIMIT 1").fetchone()
+            if row:
+                ids = json.loads(row[1])
+                names = dict(ref.execute(f"SELECT id, name FROM files WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall())
+                err, d, _ = await call(s, "get_note", note_id=row[0])
+                got = d.get("attachments", [])
+                check("get_note lists attachment names", not err and [a["name"] for a in got] == [names.get(i) for i in ids], str(got)[:120])
+                check("  without download links", "http" not in json.dumps(got))
             started = time.monotonic()
             err, _, text = await call(s, "run_select", sql="WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c) SELECT count(*) FROM c")
             took = time.monotonic() - started

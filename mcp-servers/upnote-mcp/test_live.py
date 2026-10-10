@@ -34,6 +34,7 @@ DB = os.environ.get("UPNOTE_DB") or os.path.expanduser(
 RUN = time.strftime("%H%M%S")
 TITLE = f"ZZ live test {RUN} (safe to delete)"
 TAG = "zz-live-test"
+TAG2 = "zz-live-test-2"
 
 fails = 0
 def check(name, ok, detail=""):
@@ -54,12 +55,12 @@ def body(html):
 def tag_links(html):
     return re.findall(r'data-upnote-tag="([^"]*)"', html)
 
-def common_checks(step, html, tags):
-    check(f"{step}: tag kept", TAG in tags, str(tags))
+def common_checks(step, html, tags, also=(TAG2,)):
+    check(f"{step}: tag kept", TAG in tags and all(t in tags for t in also), str(tags))
     check(f"{step}: no empty bullet", "<li>\n</li>" not in html)
     check(f"{step}: no empty <div> from a line break", "<div>\n</div>" not in html)
     links = tag_links(html)
-    check(f"{step}: one tag link, and nothing after it but closing tags", links == [f"#{TAG}"] and
+    check(f"{step}: one link per tag, and nothing after them but closing tags", links == [f"#{TAG}"] + [f"#{t}" for t in also] and
           re.search(r'data-upnote-tag="[^"]*"[^>]*>[^<]*</a>(?:\s|</div>)*$', html) is not None,
           f"{links} … {html[-80:]!r}")
 
@@ -87,7 +88,7 @@ async def main():
             await s.initialize()
             try:
                 # 1. create: nested list, tag, a soft line break between two inline styles
-                err, d, text = await call(s, "create_note", title=TITLE, tags=[TAG], text=(
+                err, d, text = await call(s, "create_note", title=TITLE, tags=[TAG, TAG2], text=(
                     "### Details\n\nDetail text\n\n"
                     "### Part one\n\nLine with **bold**\n*italic* on the next line\n\n"
                     "- a\n  - nested with `code`\n- b"))
@@ -124,11 +125,25 @@ async def main():
                       re.search(r"shine-collapsible-section.*<h3>Details</h3>.*Detail text.*</div></div></div>\s*<h3>Part one", html, re.S) is not None,
                       html[:300])
 
-                # 4. replace with plain Markdown that has no tag in it
-                note = await rebuild(s, "replace", "replace_note", note_id=note, text="### Rewritten\n\n- x\n  - y\n- z"); created.append(note)
+                # 4. replace with plain Markdown that has no tag in it, removing the second tag
+                note = await rebuild(s, "replace", "replace_note", note_id=note, text="### Rewritten\n\n- x\n  - y\n- z",
+                                     remove_tags=[TAG2]); created.append(note)
                 html, plain, tags, _ = stored(note)
-                common_checks("replace", html, tags)
+                common_checks("replace", html, tags, also=())
+                check("replace: second tag removed", TAG2 not in tags and f"#{TAG2}" not in html, str(tags))
                 check("replace: new content", "Rewritten" in plain and "Detail text" not in plain)
+
+                # 4b. move to another notebook, then check it sits only there, unchanged
+                err, d, _ = await call(s, "list_notebooks")
+                titles = [nb["title"].casefold() for nb in d["notebooks"]]
+                target = next(nb for nb in d["notebooks"] if titles.count(nb["title"].casefold()) == 1)
+                before = body(stored(note)[0])
+                note = await rebuild(s, "move", "move_note", note_id=note, notebook=target["id"]); created.append(note)
+                html, plain, tags, _ = stored(note)
+                common_checks("move", html, tags, also=())
+                err, d, _ = await call(s, "get_note", note_id=note)
+                check("move: in the target notebook", not err and d["notebooks"] == [target["path"]], str(d.get("notebooks")))
+                check("move: content unchanged", body(html) == srv._tighten_html(before), body(html)[:160])
 
                 # 5. trash and restore
                 err, d, text = await call(s, "move_note_to_trash", note_id=note)

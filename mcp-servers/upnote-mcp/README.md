@@ -56,17 +56,18 @@ with, so start a new one after changing the server.
 
 | Tool | What it does |
 | :--- | :--- |
-| `search_notes` | Finds notes containing all the given words in the title or body, case-insensitive in any language |
-| `list_notes` | Lists notes by last update or creation date, newest first, optionally within a notebook or tag |
-| `get_note` | Returns one note's text or HTML, in parts for long notes |
+| `search_notes` | Finds notes containing all the given words in the title or body, case-insensitive in any language, optionally within a notebook, tag or date range |
+| `list_notes` | Lists notes by last update or creation date, newest first, optionally within a notebook, tag or date range |
+| `get_note` | Returns one note's text or HTML, in parts for long notes, with its attachments' names |
 | `list_notebooks` | Lists notebooks with their paths and note counts |
 | `list_tags` | Lists tags with note counts |
 | `run_select` | Runs one read-only SQL query, for questions the other tools don't cover, and stops it after ten seconds |
 | `create_note` | Creates a note, optionally in a notebook and with tags, and returns its id once UpNote has saved it |
 | `move_note_to_trash` | Moves a note to Trash |
 | `restore_note` | Moves a note out of Trash |
-| `replace_note` | Edits a note by creating a new version and trashing the original, after a preview |
+| `replace_note` | Edits a note by creating a new version and trashing the original, after a preview; can also move it or remove tags |
 | `append_to_note` | Adds content to the end of a note, copying what's already there, the same way as `replace_note` |
+| `move_note` | Moves a note to another notebook by rebuilding it there unchanged, the same way as `replace_note` |
 | `make_section` | Turns a heading, or a range between two markers, into a collapsible section, nested where it sits |
 | `open_in_upnote` | Shows a note, notebook, tag or search in the app |
 | `check_upnote_setup` | Reports the database path, UpNote's data version, any missing columns, note counts, and which program started the server |
@@ -86,6 +87,8 @@ Ask in plain language. Claude picks the tools.
 - "In my Plans note, change Triage to In progress." Claude previews the replacement and shows
   any warnings before making it.
 - "Add a follow-up item to my Plans note." Claude appends it and keeps the rest of the note.
+- "What did I change this week?" Claude lists notes with `updated_after`.
+- "Move my Plans note to Archive." Claude previews the move, then rebuilds the note there.
 - "Open my Recipes notebook in UpNote."
 
 ## Formatting
@@ -145,13 +148,18 @@ characters, or was edited in the last ten minutes.
 
 The new version keeps the original's tags. UpNote stores a tag as a hashtag link inside the note,
 so the server adds one at the end for each tag the new text doesn't already carry, and waits until
-UpNote has recorded them. To drop a tag, remove it in UpNote afterwards. Pin and bookmark can't be
+UpNote has recorded them. To drop a tag, name it in `remove_tags`: its links are taken out, and
+one inside a sentence becomes plain text. Pin and bookmark can't be
 carried over: no link sets them (tested 2026-10-10; UpNote answers "This link is not supported."
 for routes such as `note/pin`), so the preview warns about them.
 
-The original goes to Trash only after the new version is confirmed in the same notebook with the
+The original goes to Trash only after the new version is confirmed in its notebook with the
 same tags, and only if nobody changed the original in the meantime. The new version gets a new
 id, so Version History stays with the original.
+
+`notebook` puts the new version in another notebook, and `move_note` does only that: it rebuilds
+the note unchanged in the notebook you name. UpNote has no link that moves a note, so a move costs
+what a replace does: a new id, and pin and bookmark set again by hand.
 
 Hand-written raw HTML, such as a collapsible section copied from the note's own `get_note` html,
 survives the round-trip: UpNote re-parses it as native formatting (2026-09-24, UpNote 9.22.2).

@@ -54,6 +54,7 @@ REQUIRED_COLUMNS = {
     "notebooks": {"id", "title", "parent", "deleted"},
     "lists": {"id", "content"},
     "tags": {"title", "deleted"},
+    "files": {"id", "name"},
 }
 
 # UpNote's data version, read from config.json beside the database, that this server was tested with.
@@ -78,8 +79,9 @@ open_in_upnote shows a note, notebook, tag or search in the app; use it only whe
 asks to see something there.
 UpNote can't change a note in place. To edit one, use replace_note: it previews first, then
 creates the new version and moves the original to Trash. To add to the end of a note, use
-append_to_note, which works the same way but copies the existing content itself. Notes can't
-be moved between notebooks or deleted permanently."""
+append_to_note, which works the same way but copies the existing content itself. move_note
+moves a note to another notebook the same way. replace_note keeps the original's tags unless
+remove_tags names them. Notes can't be deleted permanently."""
 
 READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
 CREATE = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
@@ -251,11 +253,27 @@ def _tag_key(tag: str) -> str:
 _NOTE_COLUMNS = "id, title, text, tagLinks, createdAt, updatedAt, trashed, pinned, bookmarked"
 
 
-def _filtered_notes(conn, nbs, members, notebook: str | None, tag: str | None, include_trashed: bool) -> list[sqlite3.Row]:
+def _date_ms(value: str, name: str) -> float:
+    """A date, or a date and time, in local time unless it names a zone, as Unix milliseconds."""
+    try:
+        moment = datetime.fromisoformat(value.strip())
+    except ValueError:
+        raise ToolError(f"{name} must be a date such as 2026-10-03, or a date and time such as 2026-10-03T14:30.") from None
+    return moment.astimezone().timestamp() * 1000
+
+
+def _filtered_notes(conn, nbs, members, notebook: str | None, tag: str | None, include_trashed: bool,
+                    dates: dict[str, str | None] | None = None) -> list[sqlite3.Row]:
     sql = f"SELECT {_NOTE_COLUMNS} FROM notes WHERE deleted = 0"
     if not include_trashed:
         sql += " AND trashed = 0"
-    rows = conn.execute(sql).fetchall()
+    params: list[float] = []
+    for name, value in (dates or {}).items():
+        if value:
+            column = "updatedAt" if name.startswith("updated") else "createdAt"
+            sql += f" AND {column} {'>=' if name.endswith('after') else '<'} ?"
+            params.append(_date_ms(value, name))
+    rows = conn.execute(sql, params).fetchall()
     if notebook:
         allowed = _with_descendants(nbs, _resolve_notebook(nbs, notebook))
         rows = [r for r in rows if any(nb_id in allowed for nb_id in members.get(r["id"], []))]
@@ -301,6 +319,10 @@ NotebookRef = Annotated[
     Field(description='Notebook title, path such as "Parent / Child", or id. Sub-notebooks are included.'),
 ]
 TagRef = Annotated[str | None, Field(description="Tag title, with or without #.")]
+DateRef = Annotated[str | None, Field(description=(
+    "A date such as 2026-10-03, or a date and time such as 2026-10-03T14:30, in local time. "
+    "_after includes that moment; _before excludes it, so updated_before=2026-10-05 ends at the start of October 5."
+))]
 
 
 @server.tool(annotations=READ)
@@ -309,6 +331,10 @@ def search_notes(
     notebook: NotebookRef = None,
     tag: TagRef = None,
     include_trashed: bool = False,
+    updated_after: DateRef = None,
+    updated_before: DateRef = None,
+    created_after: DateRef = None,
+    created_before: DateRef = None,
     limit: Annotated[int, Field(ge=1, le=100)] = 20,
 ) -> dict[str, Any]:
     """Find notes containing all the given words. Title matches rank first, then the most recently updated."""
@@ -318,7 +344,10 @@ def search_notes(
     with closing(_connect()) as conn:
         nbs = _notebooks(conn)
         members = _membership(conn, nbs)
-        rows = _filtered_notes(conn, nbs, members, notebook, tag, include_trashed)
+        rows = _filtered_notes(conn, nbs, members, notebook, tag, include_trashed, {
+            "updated_after": updated_after, "updated_before": updated_before,
+            "created_after": created_after, "created_before": created_before,
+        })
     hits = []
     for r in rows:
         title, body = _fold(r["title"]), _fold(r["text"])
@@ -337,14 +366,21 @@ def list_notes(
     notebook: NotebookRef = None,
     tag: TagRef = None,
     include_trashed: bool = False,
+    updated_after: DateRef = None,
+    updated_before: DateRef = None,
+    created_after: DateRef = None,
+    created_before: DateRef = None,
     limit: Annotated[int, Field(ge=1, le=100)] = 20,
     offset: Annotated[int, Field(ge=0)] = 0,
 ) -> dict[str, Any]:
-    """List notes newest first, optionally within a notebook or tag. Each note comes with a short excerpt."""
+    """List notes newest first, optionally within a notebook or tag, or a date range. Each note comes with a short excerpt."""
     with closing(_connect()) as conn:
         nbs = _notebooks(conn)
         members = _membership(conn, nbs)
-        rows = _filtered_notes(conn, nbs, members, notebook, tag, include_trashed)
+        rows = _filtered_notes(conn, nbs, members, notebook, tag, include_trashed, {
+            "updated_after": updated_after, "updated_before": updated_before,
+            "created_after": created_after, "created_before": created_before,
+        })
     key = "createdAt" if sort == "created" else "updatedAt"
     rows.sort(key=lambda r: r[key] or 0, reverse=True)
     return {
@@ -378,7 +414,17 @@ def get_note(
         note["next_offset"] = offset + max_chars
     if linked := _json_list(r["noteLinks"]):
         note["linked_note_ids"] = linked
-    note["attachment_count"] = len(_json_list(r["fileIds"]))
+    file_ids = _json_list(r["fileIds"])
+    note["attachment_count"] = len(file_ids)
+    if file_ids:
+        with closing(_connect()) as conn:
+            names = {f["id"]: f["name"] for f in conn.execute(
+                f"SELECT id, name FROM files WHERE id IN ({','.join('?' * len(file_ids))})", file_ids)}
+        # The files table also holds each file's download link, which carries an access token, so
+        # it isn't passed on. A file UpNote ships with, such as its sample image, has no row there.
+        note["attachments"] = [
+            {"name": names.get(i), "type": i.rsplit("__", 1)[1] if "__" in i else None} for i in file_ids
+        ]
     return note
 
 
@@ -1022,12 +1068,6 @@ def _replace_checks(conn: sqlite3.Connection, note_id: str):
         blockers.append("It is shared by web link, and the link belongs to the original note.")
     if r["isTemplate"]:
         blockers.append("It is a template, and the new version would be an ordinary note.")
-    if notebook_ids and (others := _same_title_notebooks(nbs, notebook_ids[0])):
-        blockers.append(
-            f"Its notebook {nbs[notebook_ids[0]]['path']} shares its title with {', '.join(others)}, and the "
-            "create link names a notebook by title only, so the new version could land in the wrong one. "
-            "Rename one of them in UpNote first."
-        )
 
     # Warnings: recoverable by hand, or worth checking afterwards.
     bookmarks = conn.execute("SELECT content FROM lists WHERE id = 'bookmarkedNotes'").fetchone()
@@ -1035,9 +1075,6 @@ def _replace_checks(conn: sqlite3.Connection, note_id: str):
         warnings.append("It is pinned. Pin the new version by hand.")
     if r["bookmarked"] or (bookmarks and note_id in _json_list(bookmarks["content"])):
         warnings.append("It is bookmarked. Bookmark the new version by hand.")
-    if len(notebook_ids) > 1:
-        others = ", ".join(nbs[i]["path"] for i in notebook_ids[1:])
-        warnings.append(f"It is in several notebooks. The new version goes into {nbs[notebook_ids[0]]['path']} only; add it to {others} by hand.")
     if (r["revision"] or 0) >= LONG_HISTORY_REVISIONS:
         warnings.append(f"It has been saved {r['revision']} times. Its Version History will most likely stay with the original in Trash.")
     if "shine-section-collapsed" in body:
@@ -1094,6 +1131,14 @@ def replace_note(
         "automatically. New content follows the same rules as create_note's text."
     ))],
     title: Annotated[str | None, Field(description="New title. Omit to keep the current one.")] = None,
+    notebook: Annotated[str | None, Field(description=(
+        'Put the new version in this notebook instead: title, path such as "Parent / Child", or id. '
+        "Omit to keep the note where it is."
+    ))] = None,
+    remove_tags: Annotated[list[str] | None, Field(description=(
+        "Tags to take off the note, with or without #. Every other tag of the original is kept, "
+        "whether or not the new text carries it."
+    ))] = None,
     expected_revision: Annotated[int | None, Field(description="Omit to preview. To replace, pass the revision the preview returned.")] = None,
     acknowledge_warnings: Annotated[bool, Field(description="Set true only after the user has seen and accepted the preview's warnings.")] = False,
     markdown: bool = True,
@@ -1107,6 +1152,31 @@ def replace_note(
     with closing(_connect()) as conn:
         r, nbs, notebook_ids, blockers, warnings = _replace_checks(conn, note_id)
         tags = _tag_titles(conn, _json_list(r["tagLinks"]))
+
+    target = notebook_ids[0] if notebook_ids else None
+    if notebook:
+        target = _resolve_notebook(nbs, notebook)
+        if notebook_ids[:1] == [target]:
+            raise ToolError(f"{r['title']!r} is already in {nbs[target]['path']}.")
+    if target and (others := _same_title_notebooks(nbs, target)):
+        blockers.append(
+            f"Notebook {nbs[target]['path']} shares its title with {', '.join(others)}, and the create link "
+            "names a notebook by title only, so the new version could land in the wrong one. Rename one of them "
+            "in UpNote first."
+        )
+    if len(notebook_ids) > 1:
+        others = ", ".join(nbs[i]["path"] for i in notebook_ids if i != target)
+        warnings.append(f"It is in several notebooks. The new version goes into {nbs[target]['path']} only; add it to {others} by hand.")
+
+    removed: list[str] = []
+    if remove_tags:
+        have = {_tag_key(t): t for t in tags}
+        if unknown := [t for t in remove_tags if _tag_key(t) not in have]:
+            raise ToolError(f"The note has no tag {', '.join(unknown)}. Its tags: {', '.join(tags) or 'none'}.")
+        dropping = {_tag_key(t) for t in remove_tags}
+        removed = [t for t in tags if _tag_key(t) in dropping]
+        tags = [t for t in tags if _tag_key(t) not in dropping]
+
     if blockers:
         raise ToolError(f"Can't replace {r['title']!r}. " + " ".join(blockers))
     if expected_revision is None:
@@ -1115,8 +1185,10 @@ def replace_note(
             "note_id": note_id,
             "title": r["title"],
             "revision": r["revision"],
-            "notebook": nbs[notebook_ids[0]]["path"] if notebook_ids else None,
+            "notebook": nbs[target]["path"] if target else None,
+            **({"moving_from": nbs[notebook_ids[0]]["path"] if notebook_ids else None} if notebook else {}),
             "tags_kept": tags,
+            **({"tags_removed": removed} if removed else {}),
             "warnings": warnings,
             "next_step": "Show any warnings to the user, then call again with expected_revision"
             + (" and acknowledge_warnings=true." if warnings else "."),
@@ -1134,13 +1206,13 @@ def replace_note(
     if not new_title and not body.strip():
         raise ToolError("Give a title or some text.")
     # Line breaks between blocks would come back as empty <div>s; see _tighten_html.
-    body = _with_tags(_tighten_html(body), tags)
-    notebook_title = nbs[notebook_ids[0]]["title"] if notebook_ids else None
+    body = _with_tags(_tighten_html(_drop_tags(body, removed)), tags)
+    notebook_title = nbs[target]["title"] if target else None
 
     since_ms = time.time() * 1000 - 2000
     existing = _recent_note_ids(since_ms)
     _open_link(_create_url(new_title, body, notebook_title, markdown))
-    notebook_path = nbs[notebook_ids[0]]["path"] if notebook_ids else None
+    notebook_path = nbs[target]["path"] if target else None
     new_note = _find_created_note(since_ms, new_title, notebook_path, existing)
     if new_note is None:
         return {
@@ -1162,6 +1234,15 @@ def replace_note(
             ),
         }
 
+    if still := [t for t in removed if _tag_key(t) in {_tag_key(x) for x in new_note["tags"]}]:
+        return {
+            "done": False,
+            "new_note": new_note,
+            "message": (
+                f"The new version still has the tags {', '.join(still)}, so the original was left in place. "
+                "Remove them in UpNote, then move one of the two notes to Trash with move_note_to_trash."
+            ),
+        }
     if lacking := _wait_for_tags(new_note, tags):
         return {
             "done": False,
@@ -1195,7 +1276,9 @@ def replace_note(
     if tags:
         result["tags_kept"] = tags
     if notebook_path is not None:
-        result["in_original_notebook"] = True
+        result["notebook"] = notebook_path
+    if removed:
+        result["tags_removed"] = removed
     if warnings:
         result["follow_up"] = warnings
     if not trash.get("confirmed"):
@@ -1467,6 +1550,28 @@ _TAG_ONLY_BLOCK = re.compile(rf"\s*<(div|p)>{_TAG_FILLER}{_TAG_LINK}{_TAG_FILLER
 _TRAILING_TAG_LINKS = re.compile(rf"\s*(?:<br\s*/?>\s*)+{_TAG_LINK}{_TAG_FILLER}(?=(?:\s*</div>)*\s*$)", re.I)
 
 
+def _drop_tags(body: str, tags: list[str]) -> str:
+    """The body without the links of these tags. A block left holding no tag link goes too; a link
+    inside a sentence becomes the tag's name as plain text, which UpNote doesn't read as a tag."""
+    if not tags:
+        return body
+    dropping = {_tag_key(t) for t in tags}
+
+    def dropped(link: str) -> bool:
+        m = re.search(r'data-upnote-tag="([^"]*)"', link)
+        return bool(m) and _tag_key(html_lib.unescape(m.group(1))) in dropping
+
+    def thin(m: re.Match, rebuild) -> str:
+        links = re.findall(_TAG_LINK, m.group(0), re.I)
+        kept = [link for link in links if not dropped(link)]
+        return m.group(0) if len(kept) == len(links) else (rebuild(m, kept) if kept else "")
+
+    body = _TAG_ONLY_BLOCK.sub(lambda m: thin(m, lambda m, kept: f"<{m.group(1)}>{' '.join(kept)}</{m.group(1)}>"), body)
+    body = _TRAILING_TAG_LINKS.sub(lambda m: thin(m, lambda m, kept: "<br>" + " ".join(kept)), body)
+    return re.sub(_TAG_LINK, lambda m: html_lib.escape(html_lib.unescape(re.sub(r"<[^>]+>", "", m.group(0))).lstrip("#"))
+                  if dropped(m.group(0)) else m.group(0), body, flags=re.I)
+
+
 def _without_tag_blocks(body: str) -> str:
     """The body without blocks that hold only tag links. A hashtag inside a sentence stays."""
     return _TRAILING_TAG_LINKS.sub("", _TAG_ONLY_BLOCK.sub("", body))
@@ -1508,6 +1613,34 @@ def append_to_note(
 
     return replace_note(
         note_id=note_id, text=_appended(body, text), expected_revision=expected_revision,
+        acknowledge_warnings=acknowledge_warnings,
+    )
+
+
+# ---------------------------------------------------------------- moving
+
+@server.tool(annotations=REPLACE)
+def move_note(
+    note_id: NoteId,
+    notebook: Annotated[str, Field(description='Notebook to move it to: title, path such as "Parent / Child", or id.')],
+    expected_revision: Annotated[int | None, Field(description="Omit to preview. To apply, pass the revision the preview returned.")] = None,
+    acknowledge_warnings: Annotated[bool, Field(description="Set true only after the user has seen and accepted the preview's warnings.")] = False,
+) -> dict[str, Any]:
+    """Move a note to another notebook. UpNote has no link that moves a note, so the server rebuilds it, unchanged,
+    in the new notebook through replace_note: the result has a new id, keeps the tags, and the original goes to
+    Trash. Pin and bookmark don't carry over. Two steps like replace_note: preview without expected_revision,
+    then call again with it."""
+    note_id = note_id.strip()
+    body = _current_body(note_id)
+    if expected_revision is None:
+        preview = replace_note(note_id=note_id, text="unused", notebook=notebook)
+        preview["next_step"] = (
+            "Show any warnings to the user, then call again with expected_revision"
+            + (" and acknowledge_warnings=true." if preview["warnings"] else ".")
+        )
+        return preview
+    return replace_note(
+        note_id=note_id, text=body, notebook=notebook, expected_revision=expected_revision,
         acknowledge_warnings=acknowledge_warnings,
     )
 
