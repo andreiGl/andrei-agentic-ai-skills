@@ -198,5 +198,26 @@ try:
 except srv.ToolError as e:
     check("  nonsense is refused", "created_after must be a date" in str(e), str(e))
 
+# 14. review fixes, 2026-10-10
+check("a Markdown code fence keeps its line breaks",
+      srv._tighten_html("x\n\n```html\n<ul>\n<li>x</li>\n</ul>\n```\n<div>a</div>\n<div>b</div>") ==
+      "x\n\n```html\n<ul>\n<li>x</li>\n</ul>\n```\n<div>a</div><div>b</div>")
+check("  an unclosed fence runs to the end", srv._tighten_html("~~~\n<div>\n<div>x</div>") == "~~~\n<div>\n<div>x</div>")
+check("  <pre> is still protected", srv._tighten_html("<pre><div>\n<div></pre>") == "<pre><div>\n<div></pre>")
+same_("a title heading that differs by a non-breaking space is removed",
+      srv._strip_title_heading("<h2>AWS S3\xa0with Java</h2><div>x</div>", "AWS S3 with Java"), "<div>x</div>")
+same_("a note with no <h2> loses the first line that repeats its title",
+      srv._strip_title_heading("<div>x1 = x2</div><div>rest</div>", "x1 = x2"), "<div>rest</div>")
+same_("  also inside UpNote's wrapper div",
+      srv._strip_title_heading("<div><div>Title</div><div>rest</div></div>", "Title"), "<div><div>rest</div></div>")
+same_("  a first line that isn't the title stays",
+      srv._strip_title_heading("<div>Other</div><div>rest</div>", "Title"), "<div>Other</div><div>rest</div>")
+same_("a removed tag quoted as text stops matching",
+      srv._drop_tags('<div>&lt;a data-upnote-tag="#RV"&gt;</div>', ["rv"]), '<div>&lt;a data-upnote-tag=&quot;#RV&quot;&gt;</div>')
+same_("  a kept tag's link is left alone", srv._drop_tags(f"<div>{UPL}</div>", ["rv"]), f"<div>{UPL}</div>")
+same_("lines a rebuild must keep: all but the title", srv._kept_lines("T\na\n\nb\n#rv"), ["a", "b", "#rv"])
+same_("  minus named lines, compared loosely", srv._kept_lines("T\nStart  Here\nx\nend", "start here", "END"), ["x"])
+check("  spacing and case don't matter", srv._line_key("A\xa0 b ") == srv._line_key("a b"))
+
 print("FAILURES:", fails)
 sys.exit(1 if fails else 0)

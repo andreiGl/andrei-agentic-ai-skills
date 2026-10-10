@@ -61,7 +61,7 @@ with, so start a new one after changing the server.
 | `get_note` | Returns one note's text or HTML, in parts for long notes, with its attachments' names |
 | `list_notebooks` | Lists notebooks with their paths and note counts |
 | `list_tags` | Lists tags with note counts |
-| `run_select` | Runs one read-only SQL query, for questions the other tools don't cover, and stops it after ten seconds |
+| `run_select` | Runs one read-only SQL query, for questions the other tools don't cover. It stops a query after ten seconds, refuses values over 50 MB, and reads attachment download links as NULL |
 | `create_note` | Creates a note, optionally in a notebook and with tags, and returns its id once UpNote has saved it |
 | `move_note_to_trash` | Moves a note to Trash |
 | `restore_note` | Moves a note out of Trash |
@@ -108,9 +108,10 @@ UpNote drops `<mark>`. The note title becomes the note's heading, so the body sh
 UpNote's own Markdown conversion adds an empty bullet after every nested list, whatever the
 indent. So before sending, the server rewrites each list that has nesting as HTML in the shape
 UpNote's editor uses, with the items' formatting converted too: bold, italic, code, links, bare
-URLs, strikethrough, `==green==`, checkboxes, and inline HTML such as `<u>`. Flat lists, and lists
-in code blocks or HTML, are sent as written. A list whose items hold a code block, a quote or a
-table is also sent as written, so it keeps the empty bullet.
+URLs, `<https://…>` links, strikethrough, `==green==`, checkboxes, and inline HTML such as `<u>`.
+A numbered list keeps its starting number. Flat lists, and lists in code blocks, HTML or HTML
+comments, are sent as written. So is a list whose items hold a code block, a quote, a table, or
+a paragraph after a blank line, and it keeps the empty bullet.
 
 Tags go in `create_note`'s `tags` parameter. The server adds each one as a hashtag link at the
 end of the note, which is how UpNote stores tags, and waits until UpNote has recorded them. A
@@ -154,8 +155,15 @@ carried over: no link sets them (tested 2026-10-10; UpNote answers "This link is
 for routes such as `note/pin`), so the preview warns about them.
 
 The original goes to Trash only after the new version is confirmed in its notebook with the
-same tags, and only if nobody changed the original in the meantime. The new version gets a new
-id, so Version History stays with the original.
+same tags, and only if nobody changed the original in the meantime. For the tools that keep the
+content, `append_to_note`, `move_note` and `make_section`, every line of the original's text must
+also be in the new version. If anything fails after the new version exists, the tool says so and
+leaves both notes for you to compare. The new version gets a new id, so Version History stays
+with the original.
+
+Line breaks between HTML tags are removed only outside `<pre>` blocks and Markdown code fences,
+so a code example keeps its layout. A note made outside UpNote's create link may have no title
+heading, its title being its first line; that line isn't repeated under the new version's title.
 
 `notebook` puts the new version in another notebook, and `move_note` does only that: it rebuilds
 the note unchanged in the notebook you name. UpNote has no link that moves a note, so a move costs
@@ -196,7 +204,8 @@ from the heading to that marker, both markers being removed. `title` names the s
 itself is only a marker.
 
 It previews first, the same as `replace_note`, and rebuilds the note the same way, so the result has a
-new id. Everything outside the wrapped range is copied through byte for byte. It refuses a heading it
+new id. Everything outside the wrapped range is copied through unchanged, apart from the line breaks
+between block tags that every rebuild removes. It refuses a heading it
 can't find, one that appears twice, one that is already a section's title, one with nothing under it,
 an `until` marker it can't find after the heading, and any note whose own title heading holds extra
 content, since rebuilding that would duplicate it.
@@ -260,7 +269,8 @@ grant extends to any edit of that file.
 
 The tests run on the server's venv. `test_make_section.py` checks the section-building logic,
 and the HTML clean-up `append_to_note` does, against synthetic note markup, and
-`test_nested_lists.py` checks the nested-list rewrite. Neither touches UpNote or your notes:
+`test_nested_lists.py` checks the nested-list rewrite. Neither touches UpNote or your notes.
+Run all four tests from this folder:
 
 ```bash
 ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_make_section.py
@@ -268,18 +278,23 @@ and the HTML clean-up `append_to_note` does, against synthetic note markup, and
 ```
 
 `test_readonly.py` compares every read tool except `open_in_upnote`, which changes what the app
-shows, with direct queries on your own library, and confirms that `run_select` refuses writes. It changes nothing. Run it from this folder:
+shows, with direct queries on your own library: filters, sorting, paging and counts. It also
+confirms that `run_select` refuses writes, and that the rebuild tools refuse a stale revision, an
+unknown tag, an empty append and a move to the same notebook, all before anything is sent. It
+changes nothing:
 
 ```bash
 ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_readonly.py
 ```
 
-`test_live.py` checks the tools that change notes: create, append, `make_section`, replace,
-trash and restore. It works on notes it creates, titled "ZZ live test" with the time, and checks
-after each step what UpNote stored: tags kept and last, no empty bullets or empty `<div>`s, and
-the existing content unchanged. At the end it moves every note it created to Trash, so they stay
-there, synced to your other devices, until you empty Trash. It needs UpNote running, takes about
-a minute, and only runs with `--live`. Run it after an UpNote update:
+`test_live.py` checks the tools that change notes: create, append, `make_section`, replace with
+a tag removed, move, trash and restore. It works on notes it creates, titled "ZZ live test" with
+the time, and checks after each step what UpNote stored: tags kept and last, no empty bullets or
+empty `<div>`s, the existing content unchanged, and a fenced code example intact. It also checks
+that a stale revision and unaccepted warnings are refused. At the end it moves every note it
+created to Trash, where they stay, synced to your other devices, until you empty Trash. The moved
+note briefly sits in one of your notebooks and stays listed there in Trash. It needs UpNote
+running, takes about ten seconds, and only runs with `--live`. Run it after an UpNote update:
 
 ```bash
 ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_live.py --live

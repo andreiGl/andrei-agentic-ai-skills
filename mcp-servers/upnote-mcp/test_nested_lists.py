@@ -97,5 +97,24 @@ same("a heading right after a list ends it", "- a\n  - b\n### Next",
 check("the create link carries the HTML", "%3Cul%3E%3Cli%3Ea%3C%2Fli%3E%3Cul%3E" in srv._create_url("t", "- a\n  - b", None, True))
 check("with markdown off the text is sent as given", "-%20a%0A%20%20-%20b" in srv._create_url("t", "- a\n  - b", None, False))
 
+# 6. review fixes, 2026-10-10
+same("a code span inside link text", "- a\n  - [`code`](http://x.com)",
+     '<ul><li>a</li><ul><li><a href="http://x.com"><code>code</code></a></li></ul></ul>')
+same("an escape inside link text", "- a\n  - [a\\]b](http://u)", '<ul><li>a</li><ul><li><a href="http://u">a]b</a></li></ul></ul>')
+same("an autolink in angle brackets", "- a\n  - see <https://x.com/a> ok",
+     '<ul><li>a</li><ul><li>see <a href="https://x.com/a">https://x.com/a</a> ok</li></ul></ul>')
+same("a NUL character is dropped, not looped on", "- a\n  - x\x00y", "<ul><li>a</li><ul><li>xy</li></ul></ul>")
+same("a numbered list keeps its start", "3. a\n   - b\n4. c", '<ol start="3"><li>a</li><ul><li>b</li></ul><li>c</li></ol>')
+same("* * * stays a horizontal rule", "* * *\n\n- a\n  - b", "* * *\n\n<ul><li>a</li><ul><li>b</li></ul></ul>")
+same("a rule right after a list ends it", "- a\n  - b\n- - -", "<ul><li>a</li><ul><li>b</li></ul></ul>\n\n- - -")
+same("Windows line endings", "- a\r\n  - b\r\n---\r\n", "<ul><li>a</li><ul><li>b</li></ul></ul>\n\n---\n")
+same("* and + markers", "* a\n  + b", "<ul><li>a</li><ul><li>b</li></ul></ul>")
+same("1) markers", "1) a\n   - b", "<ol><li>a</li><ul><li>b</li></ul></ol>")
+unchanged("a list in an HTML comment", "<!--\n- a\n  - b\n-->")
+unchanged("a fence closed only by a bare fence line", "```\ncode\n```js\n- a\n  - b\n```")
+unchanged("a paragraph after a blank line inside the list", "- a\n  - b\n\n  para in a\n- c")
+unchanged("an item holding a table", "- a\n  | x | y |\n  - b")
+unchanged("an item holding a div", "- a\n  <div>x</div>\n  - b")
+
 print("FAILURES:", fails)
 sys.exit(1 if fails else 0)

@@ -2,17 +2,20 @@
 """Live check of the tools that change notes, against your real UpNote library.
 
 Starts server.py from this folder over stdio, as Claude does, and runs create_note,
-append_to_note, make_section, replace_note, move_note_to_trash and restore_note on notes it
-creates, titled "ZZ live test <time> (safe to delete)". After each step it reads what UpNote
-stored. Every note it created is moved to Trash at the end, even when a check fails.
+append_to_note, make_section, replace_note (with remove_tags), move_note, move_note_to_trash and
+restore_note on notes it creates, titled "ZZ live test <time> (safe to delete)". After each step
+it reads what UpNote stored. It also checks that a stale revision and unaccepted warnings are
+refused before anything is sent. Every note it created is moved to Trash at the end, even when a
+check fails.
 
 What it leaves behind: the test notes in Trash, synced to your other devices like any note,
-until you empty Trash. It tags them zz-live-test, a tag UpNote drops again once its notes are
-in Trash. It needs UpNote running, and takes about a minute.
+until you empty Trash. The moved note stays listed under the notebook it was moved to, in Trash.
+It tags the notes zz-live-test and zz-live-test-2, tags UpNote drops again once their notes are
+in Trash. It needs UpNote running, and takes about ten seconds.
 
 Run it with --live; without that it only prints this. Exits non-zero if any check fails.
 """
-import asyncio, os, re, sqlite3, sys, time
+import asyncio, json, os, re, sqlite3, sys, time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -45,7 +48,9 @@ def check(name, ok, detail=""):
 def stored(note_id):
     conn = sqlite3.connect(f"file:{quote(DB)}?mode=ro", uri=True)
     try:
-        return conn.execute("SELECT html, text, tagLinks, trashed FROM notes WHERE id = ?", (note_id,)).fetchone()
+        html, text, tags, trashed = conn.execute(
+            "SELECT html, text, tagLinks, trashed FROM notes WHERE id = ?", (note_id,)).fetchone()
+        return html, text, [str(t).lower() for t in json.loads(tags or "[]")], trashed
     finally:
         conn.close()
 
@@ -56,7 +61,7 @@ def tag_links(html):
     return re.findall(r'data-upnote-tag="([^"]*)"', html)
 
 def common_checks(step, html, tags, also=(TAG2,)):
-    check(f"{step}: tag kept", TAG in tags and all(t in tags for t in also), str(tags))
+    check(f"{step}: tags kept, nothing else", sorted(tags) == sorted([TAG, *also]), str(tags))
     check(f"{step}: no empty bullet", "<li>\n</li>" not in html)
     check(f"{step}: no empty <div> from a line break", "<div>\n</div>" not in html)
     links = tag_links(html)
@@ -91,7 +96,8 @@ async def main():
                 err, d, text = await call(s, "create_note", title=TITLE, tags=[TAG, TAG2], text=(
                     "### Details\n\nDetail text\n\n"
                     "### Part one\n\nLine with **bold**\n*italic* on the next line\n\n"
-                    "- a\n  - nested with `code`\n- b"))
+                    "- a\n  - nested with `code`\n  - [`run.sh`](https://example.com/run) link with code\n- b\n\n"
+                    "3. three\n   - under three\n4. four"))
                 check("create: confirmed", not err and d.get("confirmed"), text[:120])
                 if err:
                     raise SystemExit(1)
@@ -99,8 +105,21 @@ async def main():
                 html, plain, tags, _ = stored(note)
                 common_checks("create", html, tags)
                 check("create: nested list in the editor's shape", "<ul><li>a</li><ul><li>nested with <code" in html, html[-300:])
+                check("create: link with code in its text", '<a href="https://example.com/run"><code' in html, html[-400:])
+                print(f"INFO create: numbered list start stored as {'start=3' if 'start=\"3\"' in html else 'no start'}")
                 soft_break = "</b>\n<i>" in html
                 print(f"INFO create: the soft line break is stored as {'</b>\\n<i>' if soft_break else 'something else'}")
+
+                # 1b. the safety gates refuse before anything is sent
+                err, p, _ = await call(s, "append_to_note", note_id=note, text="- never")
+                err, _, text = await call(s, "append_to_note", note_id=note, text="- never", expected_revision=p["revision"] - 1)
+                check("gate: a stale revision is refused", err and "changed since the preview" in text, text[:100])
+                if p["warnings"]:
+                    err, _, text = await call(s, "append_to_note", note_id=note, text="- never", expected_revision=p["revision"])
+                    check("gate: unaccepted warnings are refused", err and "haven't been accepted" in text, text[:100])
+                err, d, _ = await call(s, "run_select", sql="SELECT count(*) AS n FROM notes WHERE deleted = 0 AND title = '"
+                                       + TITLE.replace("'", "''") + "'")
+                check("gate: nothing was created", not err and d["rows"][0]["n"] == 1, str(d))
 
                 # 2. two appends: existing content kept, tags stay last, the soft break keeps its space
                 for n, line in enumerate(["- appended one", "- appended two"], 1):
@@ -126,12 +145,13 @@ async def main():
                       html[:300])
 
                 # 4. replace with plain Markdown that has no tag in it, removing the second tag
-                note = await rebuild(s, "replace", "replace_note", note_id=note, text="### Rewritten\n\n- x\n  - y\n- z",
-                                     remove_tags=[TAG2]); created.append(note)
+                note = await rebuild(s, "replace", "replace_note", note_id=note, remove_tags=[TAG2], text=(
+                    "### Rewritten\n\n- x\n  - y\n- z\n\n```html\n<ul>\n<li>sample</li>\n</ul>\n```")); created.append(note)
                 html, plain, tags, _ = stored(note)
                 common_checks("replace", html, tags, also=())
                 check("replace: second tag removed", TAG2 not in tags and f"#{TAG2}" not in html, str(tags))
                 check("replace: new content", "Rewritten" in plain and "Detail text" not in plain)
+                check("replace: a fenced HTML example keeps its line breaks", "&lt;ul&gt;\n&lt;li&gt;sample" in html, html[-300:])
 
                 # 4b. move to another notebook, then check it sits only there, unchanged
                 err, d, _ = await call(s, "list_notebooks")
@@ -151,11 +171,16 @@ async def main():
                 err, d, text = await call(s, "restore_note", note_id=note)
                 check("restore: confirmed", not err and d.get("confirmed") and stored(note)[3] == 0, text[:120])
             finally:
-                # Every note this run created goes to Trash, whatever happened above.
+                # Every note this run created goes to Trash, whatever happened above: the ids it saw,
+                # and anything else with this run's title, in case a step failed before reporting one.
                 err, d, _ = await call(s, "run_select", sql=(
                     "SELECT id FROM notes WHERE deleted = 0 AND trashed = 0 AND title = '" + TITLE.replace("'", "''") + "'"))
-                for row in d.get("rows", []) if not err else []:
-                    await call(s, "move_note_to_trash", note_id=row["id"])
+                leftover = {row["id"] for row in d.get("rows", [])} if not err else set()
+                leftover |= {i for i in created if stored(i)[3] == 0}
+                for i in leftover:
+                    err, _, text = await call(s, "move_note_to_trash", note_id=i)
+                    if err:
+                        print(f"FAIL cleanup: couldn't trash {i}: {text[:100]}")
                 err, d, _ = await call(s, "run_select", sql=(
                     "SELECT count(*) AS n FROM notes WHERE deleted = 0 AND trashed = 0 AND title = '" + TITLE.replace("'", "''") + "'"))
                 check("cleanup: every test note is in Trash", not err and d["rows"][0]["n"] == 0, str(d))

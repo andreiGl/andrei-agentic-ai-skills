@@ -10,8 +10,8 @@ with a direct read-only query on the database. Also sends writes through run_sel
 every one to be refused. Changes nothing. Exits non-zero if any check fails.
 """
 import asyncio, importlib.util, json, os, sqlite3, sys, time
-from pathlib import Path
 from urllib.parse import quote
+from pathlib import Path
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -38,7 +38,10 @@ async def main():
             tools = {t.name: t for t in (await s.list_tools()).tools}
             check("fifteen tools", sorted(tools) == sorted(["search_notes","list_notes","get_note","list_notebooks","list_tags","run_select","create_note","move_note_to_trash","restore_note","replace_note","open_in_upnote","check_upnote_setup","make_section","append_to_note","move_note"]), ",".join(sorted(tools)))
             check("read tools marked read-only", all(tools[n].annotations.read_only_hint for n in tools if n not in ("create_note", "move_note_to_trash", "restore_note", "replace_note", "make_section", "append_to_note", "move_note")))
-            check("create_note not read-only", tools["create_note"].annotations.read_only_hint is False)
+            check("every tool that changes notes is marked as such",
+                  all(tools[n].annotations.read_only_hint is False for n in ("create_note", "move_note_to_trash", "restore_note", "replace_note", "make_section", "append_to_note", "move_note")))
+            check("  and the ones that trash a note as destructive", all(tools[n].annotations.destructive_hint for n in
+                  ("move_note_to_trash", "replace_note", "make_section", "append_to_note", "move_note")))
 
             err, d, _ = await call(s, "check_upnote_setup")
             check("setup check reports ok with no missing columns", not err and d["ok"] and d["missing_columns"] == {}, str(d)[:160])
@@ -69,8 +72,26 @@ async def main():
             live_t = ref.execute("select count(*) from notes where deleted=0").fetchone()[0]
             check("include_trashed adds trashed notes", d2["total"] == live_t, f"{d2['total']} vs {live_t}")
 
-            err, d, _ = await call(s, "list_notes", notebook=biggest["path"], limit=100)
-            check("notebook filter covers at least its direct notes", not err and d["total"] >= biggest["note_count"], f"{d['total']} >= {biggest['note_count']}")
+            # notebook filter: a notebook's own notes plus its sub-notebooks', counted directly
+            nbrows = ref.execute("select id, parent from notebooks where deleted=0").fetchall()
+            def subtree(root):
+                found, grew = {root}, True
+                while grew:
+                    grew = False
+                    for i, par in nbrows:
+                        if par in found and i not in found:
+                            found.add(i); grew = True
+                return found
+            nb_by_path = {nb["path"]: nb for nb in (await call(s, "list_notebooks"))[1]["notebooks"]}
+            parent_nb = next((nb for nb in nb_by_path.values() if any(c["parent_id"] == nb["id"] for c in nb_by_path.values())), biggest)
+            for label, nb in (("biggest notebook", biggest), ("notebook with sub-notebooks", parent_nb)):
+                ids = subtree(nb["id"])
+                want = ref.execute(
+                    "select count(distinct n.id) from lists l, json_each(l.content) j join notes n on n.id=j.value "
+                    f"where l.id in ({','.join('?' * len(ids))}) and n.deleted=0 and n.trashed=0",
+                    ["notebooks_" + i for i in ids]).fetchone()[0]
+                err, d, _ = await call(s, "list_notes", notebook=nb["path"], limit=1)
+                check(f"notebook filter matches DB, {label}", not err and d["total"] == want, f"{d.get('total')} vs {want}")
             err, d, _ = await call(s, "list_notes", tag="#" + top_tag.lstrip("#"), limit=1)
             exp_tag = sum(1 for (raw,) in ref.execute("select tagLinks from notes where deleted=0 and trashed=0") if any(str(t).lstrip('#').casefold()==top_tag.lstrip('#').casefold() for t in json.loads(raw or '[]')))
             check("tag filter with # matches DB", not err and d["total"] == exp_tag, f"{d['total']} vs {exp_tag}")
@@ -134,6 +155,68 @@ async def main():
                 got = d.get("attachments", [])
                 check("get_note lists attachment names", not err and [a["name"] for a in got] == [names.get(i) for i in ids], str(got)[:120])
                 check("  without download links", "http" not in json.dumps(got))
+            # the other two date filters, and paging and sorting
+            want = ref.execute("SELECT count(*) FROM notes WHERE deleted=0 AND trashed=0 AND updatedAt < ?", (ms,)).fetchone()[0]
+            err, d, _ = await call(s, "list_notes", updated_before=day, limit=1)
+            check("updated_before matches DB", not err and d["total"] == want, f"{d.get('total')} vs {want}")
+            want = ref.execute("SELECT count(*) FROM notes WHERE deleted=0 AND trashed=0 AND createdAt >= ?", (ms,)).fetchone()[0]
+            err, d, _ = await call(s, "list_notes", created_after=day, limit=1)
+            check("created_after matches DB", not err and d["total"] == want, f"{d.get('total')} vs {want}")
+            err, d, _ = await call(s, "search_notes", query="the", updated_after=day, limit=100)
+            want = sum(1 for (t, x) in ref.execute("SELECT title, text FROM notes WHERE deleted=0 AND trashed=0 AND updatedAt >= ?", (ms,))
+                       if "the" in (t or "").casefold() or "the" in (x or "").casefold())
+            check("search honours a date filter", not err and d["total_matches"] == want, f"{d.get('total_matches')} vs {want}")
+            order = [r[0] for r in ref.execute("SELECT id FROM notes WHERE deleted=0 AND trashed=0 ORDER BY createdAt DESC LIMIT 3")]
+            err, d, _ = await call(s, "list_notes", sort="created", limit=3)
+            check("sort=created matches DB", not err and [n["id"] for n in d["notes"]] == order)
+            err, d, _ = await call(s, "list_notes", sort="created", limit=2, offset=1)
+            check("offset skips notes", not err and [n["id"] for n in d["notes"]] == order[1:3])
+
+            # tag counts, html format, attachment count, run_select limit and truncation
+            err, d, _ = await call(s, "list_tags")
+            counts = {}
+            for (raw,) in ref.execute("SELECT tagLinks FROM notes WHERE deleted=0 AND trashed=0"):
+                for t in set(json.loads(raw or "[]")):
+                    counts[str(t).lstrip("#").casefold()] = counts.get(str(t).lstrip("#").casefold(), 0) + 1
+            got = {t["tag"].lstrip("#").casefold(): t["note_count"] for t in d["tags"]}
+            check("list_tags counts match DB", all(got.get(k) == v for k, v in counts.items()), str([(k, got.get(k), v) for k, v in counts.items() if got.get(k) != v][:3]))
+            nid, html, fids = ref.execute("SELECT id, html, fileIds FROM notes WHERE deleted=0 AND trashed=0 AND length(html) > 200 LIMIT 1").fetchone()
+            err, d, _ = await call(s, "get_note", note_id=nid, format="html", max_chars=1000)
+            check("format=html returns the html", not err and d["content"] == html[:1000])
+            check("attachment_count matches fileIds", d["attachment_count"] == len(json.loads(fids or "[]")))
+            err, d, _ = await call(s, "run_select", sql="SELECT id FROM notes", limit=2)
+            check("run_select keeps to its limit and says it truncated", not err and len(d["rows"]) == 2 and d["truncated"] is True)
+            err, d, _ = await call(s, "run_select", sql="SELECT 1 AS a, 2 AS a")
+            check("run_select keeps both of two same-named columns", not err and d["rows"] == [{"a": 1, "a_2": 2}], str(d))
+            err, d, _ = await call(s, "run_select", sql="SELECT downloadURL FROM files WHERE downloadURL IS NULL LIMIT 1")
+            n_files = ref.execute("SELECT count(*) FROM files").fetchone()[0]
+            check("run_select reads download links as NULL", not err and (len(d["rows"]) == 1 or n_files == 0), str(d)[:80])
+            err, _, text = await call(s, "run_select", sql="SELECT length(hex(zeroblob(100000000)))")
+            check("run_select refuses a huge value", err and "too big" in text, text[:80])
+
+            # the rebuild tools' refusals, which all happen before anything is sent to UpNote
+            # the first note a replace would accept, found by previewing candidates
+            note, text = None, ""
+            for cand in ref.execute("SELECT id, revision FROM notes WHERE deleted=0 AND trashed=0 AND coalesce(isTemplate, 0) = 0 "
+                                    "AND coalesce(fileIds, '[]') = '[]' AND html NOT LIKE '%<img%' ORDER BY updatedAt LIMIT 20").fetchall():
+                err, d, text = await call(s, "replace_note", note_id=cand[0], text="x")
+                if not err:
+                    note = cand
+                    break
+            check("replace_note preview changes nothing and gives the revision",
+                  note is not None and d["stage"] == "preview" and d["revision"] == note[1], text[:100])
+            if note is None:
+                raise SystemExit("no note a replace would accept; can't test the refusals")
+            err, _, text = await call(s, "replace_note", note_id=note[0], text="x", expected_revision=note[1] - 1)
+            check("a stale revision is refused", err and "changed since the preview" in text, text[:100])
+            err, _, text = await call(s, "replace_note", note_id=note[0], text="x", remove_tags=["no-such-tag-9981"])
+            check("removing a tag the note hasn't got is refused", err and "has no tag" in text, text[:100])
+            err, _, text = await call(s, "append_to_note", note_id=note[0], text="  ")
+            check("an empty append is refused", err and "text is empty" in text, text[:80])
+            err, d, _ = await call(s, "get_note", note_id=note[0])
+            if d.get("notebooks"):
+                err, _, text = await call(s, "move_note", note_id=note[0], notebook=d["notebooks"][0])
+                check("moving a note to its own notebook is refused", err and "already in" in text, text[:100])
             started = time.monotonic()
             err, _, text = await call(s, "run_select", sql="WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c) SELECT count(*) FROM c")
             took = time.monotonic() - started
@@ -146,6 +229,28 @@ async def main():
     check("excerpt finds a word that casefold() lengthens", "Straße" in ex, ex)
     ex = srv._excerpt("ß" * 200 + " target word", [srv._fold("target")], 40)
     check("excerpt position maps back past lengthened letters", "target" in ex, ex)
+
+    # duplicate notebook titles, simulated in-process: refused before any link is sent
+    sent = []
+    srv._open_link = lambda url, background=True: sent.append(url)
+    real = srv._notebooks
+    def doubled(conn):
+        nbs = real(conn)
+        first = next(iter(nbs.values()))
+        nbs["dup-test-id"] = {"id": "dup-test-id", "title": first["title"].upper(), "parent": None, "path": "Other"}
+        return nbs
+    srv._notebooks = doubled
+    with srv.closing(srv._connect()) as conn:
+        first = next(iter(real(conn).values()))
+    try:
+        srv.create_note(title="never sent", notebook=first["id"]); check("create_note refuses a shared notebook title", False, "no error")
+    except srv.ToolError as e:
+        check("create_note refuses a shared notebook title", "by title only" in str(e) and not sent, str(e)[:80])
+    try:
+        srv.create_note(title="never sent", tags=["a b"]); check("create_note refuses a tag with a space", False, "no error")
+    except srv.ToolError as e:
+        check("create_note refuses a tag with a space", "spaces" in str(e) and not sent, str(e)[:80])
+    srv._notebooks = real
     print("FAILURES:", fails)
 asyncio.run(main())
 sys.exit(1 if fails else 0)

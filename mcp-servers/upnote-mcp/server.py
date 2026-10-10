@@ -3,7 +3,7 @@
 # requires-python = ">=3.12"
 # dependencies = ["mcp==2.2.0"]
 # ///
-"""MCP server for the local UpNote library: read notes, create notes.
+"""MCP server for the local UpNote library: read, create, edit, move and trash notes.
 
 The server never writes to UpNote's database. Every read opens the live database
 read-only, so it sees edits made a moment ago. New notes are created by the
@@ -13,6 +13,7 @@ sync like notes typed by hand.
 
 import html as html_lib
 import json
+import math
 import os
 import re
 import sqlite3
@@ -38,11 +39,12 @@ DB_PATH = Path(
     )
 ).expanduser()
 
-# How long create_note and the Trash tools wait for UpNote to save a change to its database.
+# How long a tool that changes notes waits for UpNote to save the change, its notebook and its tags.
 CONFIRM_SECONDS = 10.0
 
-# How long a run_select query may run before it is stopped.
+# How long a run_select query may run before it is stopped, and the largest value it may build.
 SELECT_SECONDS = 10.0
+SELECT_MAX_BYTES = 50_000_000
 
 # Tables and columns the server reads. Checked on every connection, so an UpNote update that
 # drops or renames one fails with the column named instead of returning wrong results.
@@ -54,7 +56,6 @@ REQUIRED_COLUMNS = {
     "notebooks": {"id", "title", "parent", "deleted"},
     "lists": {"id", "content"},
     "tags": {"title", "deleted"},
-    "files": {"id", "name"},
 }
 
 # UpNote's data version, read from config.json beside the database, that this server was tested with.
@@ -79,7 +80,8 @@ open_in_upnote shows a note, notebook, tag or search in the app; use it only whe
 asks to see something there.
 UpNote can't change a note in place. To edit one, use replace_note: it previews first, then
 creates the new version and moves the original to Trash. To add to the end of a note, use
-append_to_note, which works the same way but copies the existing content itself. move_note
+append_to_note, which works the same way but copies the existing content itself. make_section
+turns a heading and what's under it into a collapsible section, the same way. move_note
 moves a note to another notebook the same way. replace_note keeps the original's tags unless
 remove_tags names them. Notes can't be deleted permanently."""
 
@@ -100,8 +102,13 @@ server = MCPServer(name="upnote", instructions=INSTRUCTIONS)
 _ALLOWED_ACTIONS = {sqlite3.SQLITE_SELECT, sqlite3.SQLITE_READ, sqlite3.SQLITE_FUNCTION, sqlite3.SQLITE_RECURSIVE}
 
 
-def _authorizer(action: int, *_: Any) -> int:
-    return sqlite3.SQLITE_OK if action in _ALLOWED_ACTIONS else sqlite3.SQLITE_DENY
+def _authorizer(action: int, arg1: Any = None, arg2: Any = None, *_: Any) -> int:
+    if action not in _ALLOWED_ACTIONS:
+        return sqlite3.SQLITE_DENY
+    # An attachment's download link carries an access token; reading it gives NULL instead.
+    if action == sqlite3.SQLITE_READ and (arg1 or "").lower() == "files" and (arg2 or "").lower() == "downloadurl":
+        return sqlite3.SQLITE_IGNORE
+    return sqlite3.SQLITE_OK
 
 
 def _fold(value: Any) -> str:
@@ -137,8 +144,17 @@ def _parent_process() -> str | None:
     return out.stdout.strip() or None
 
 
+def _db_found() -> bool:
+    """Whether the database file exists. macOS can refuse even to look, which pathlib reports as an
+    error rather than as a missing file."""
+    try:
+        return DB_PATH.exists()
+    except OSError as e:
+        raise ToolError(f"Cannot look for the UpNote database at {DB_PATH}: {e}. {ACCESS_FIX}") from e
+
+
 def _connect() -> sqlite3.Connection:
-    if not DB_PATH.exists():
+    if not _db_found():
         raise ToolError(f"UpNote database not found at {DB_PATH}. Set UPNOTE_DB to its path.")
     conn = None
     try:
@@ -256,10 +272,9 @@ _NOTE_COLUMNS = "id, title, text, tagLinks, createdAt, updatedAt, trashed, pinne
 def _date_ms(value: str, name: str) -> float:
     """A date, or a date and time, in local time unless it names a zone, as Unix milliseconds."""
     try:
-        moment = datetime.fromisoformat(value.strip())
-    except ValueError:
+        return datetime.fromisoformat(value.strip()).astimezone().timestamp() * 1000
+    except (ValueError, OverflowError, OSError):
         raise ToolError(f"{name} must be a date such as 2026-10-03, or a date and time such as 2026-10-03T14:30.") from None
-    return moment.astimezone().timestamp() * 1000
 
 
 def _filtered_notes(conn, nbs, members, notebook: str | None, tag: str | None, include_trashed: bool,
@@ -418,8 +433,11 @@ def get_note(
     note["attachment_count"] = len(file_ids)
     if file_ids:
         with closing(_connect()) as conn:
-            names = {f["id"]: f["name"] for f in conn.execute(
-                f"SELECT id, name FROM files WHERE id IN ({','.join('?' * len(file_ids))})", file_ids)}
+            try:
+                names = {f["id"]: f["name"] for f in conn.execute(
+                    f"SELECT id, name FROM files WHERE id IN ({','.join('?' * len(file_ids))})", file_ids)}
+            except sqlite3.Error:
+                names = {}  # no files table in this database: names are unknown, nothing else is affected
         # The files table also holds each file's download link, which carries an access token, so
         # it isn't passed on. A file UpNote ships with, such as its sample image, has no row there.
         note["attachments"] = [
@@ -478,12 +496,14 @@ Useful tables and columns:
 - notebooks: id, title, parent (parent notebook id), deleted.
 - lists: a row with id 'notebooks_<notebook id>' holds that notebook's note ids as a JSON array in content.
   Join with: FROM lists l, json_each(l.content) j JOIN notes n ON n.id = j.value.
-- files: id, name, downloadURL.
+- files: id, name. downloadURL reads as NULL: it carries an access token.
 fold(x) lower-cases any language; SQLite's lower() and LIKE only fold ASCII.
 Dates: datetime(updatedAt / 1000, 'unixepoch', 'localtime')."""
 
 
 def _cell(value: Any) -> Any:
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)  # JSON has no Infinity or NaN
     if isinstance(value, bytes):
         return f"<{len(value)} bytes>"
     if isinstance(value, str) and len(value) > 2000:
@@ -502,9 +522,16 @@ def run_select(
         # its worker thread and a CPU core until the server restarts.
         deadline = time.monotonic() + SELECT_SECONDS
         conn.set_progress_handler(lambda: int(time.monotonic() > deadline), 10000)
+        # One function call such as hex(zeroblob(...)) can build a huge value before the handler runs.
+        conn.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, SELECT_MAX_BYTES)
         try:
             cur = conn.execute(sql)
-            columns = [c[0] for c in cur.description or []]
+            columns = []
+            for c in cur.description or []:
+                name, n = c[0], 2
+                while name in columns:  # an unaliased join can repeat a name; rows are keyed by it
+                    name, n = f"{c[0]}_{n}", n + 1
+                columns.append(name)
             rows = cur.fetchmany(limit + 1)
         except sqlite3.Error as e:
             if time.monotonic() > deadline:
@@ -556,6 +583,11 @@ Don't use <mark>; UpNote drops it."""
 
 _LIST_ITEM = re.compile(r"^( *)([-*+]|\d{1,9}[.)])( +|$)(.*)$")
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+# A line of three or more -, * or _ is a horizontal rule, even when it looks like a list item.
+_THEMATIC_BREAK = re.compile(r"^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$")
+# Inline tags kept as written inside a converted list item; anything else shaped like a tag is text.
+_INLINE_TAG = re.compile(
+    r"</?(?:a|b|i|u|s|em|strong|code|span|br|sub|sup|del|ins|small|kbd|font|strike)(?:\s[^<>]*)?/?>", re.I)
 _HTML_START = re.compile(r"^ {0,3}</?[a-zA-Z][a-zA-Z0-9-]*(?:\s|/?>|$)")
 _BLOCK_START = re.compile(r"^ {0,3}(?:#{1,6}(?:\s|$)|>|`{3}|~{3}|\||</?[a-zA-Z]|(?:[-*_] *){3,}$)")
 # Content inside an item the converter doesn't handle; such a list is left to UpNote.
@@ -586,9 +618,17 @@ def _bare_url(url: str, hold) -> str:
     return hold(f'<a href="{html_lib.escape(link)}">{html_lib.escape(link, quote=False)}</a>') + rest
 
 
-def _inline_html(text: str, links: bool = True) -> str:
-    """One list item's inline Markdown as the HTML UpNote itself produces for it."""
-    held: list[str] = []
+def _inline_html(text: str, links: bool = True, held: list[str] | None = None) -> str:
+    """One list item's inline Markdown as the HTML UpNote itself produces for it.
+
+    Code spans, escapes, tags and links are swapped for numbered placeholders while the rest is
+    converted. A link's text is converted by a nested call that shares the same placeholder list,
+    since the outer call may already have swapped a code span inside it.
+    """
+    outer = held is None
+    if outer:
+        held = []
+        text = text.replace("\x00", "")  # the placeholder marker; a NUL in a note is noise anyway
 
     def hold(s: str) -> str:
         held.append(s)
@@ -596,11 +636,14 @@ def _inline_html(text: str, links: bool = True) -> str:
 
     text = re.sub(r"(`+)(.+?)\1", lambda m: hold(f"<code>{html_lib.escape(m.group(2).strip(), quote=False)}</code>"), text)
     text = re.sub(r"\\([!-/:-@\[-`{-~])", lambda m: hold(html_lib.escape(m.group(1), quote=False)), text)
-    text = re.sub(r"</?[a-zA-Z][^<>]*>", lambda m: hold(m.group(0)), text)
+    if links:
+        text = re.sub(r"<(https?://[^\s<>]+)>", lambda m: hold(
+            f'<a href="{html_lib.escape(m.group(1))}">{html_lib.escape(m.group(1), quote=False)}</a>'), text)
+    text = _INLINE_TAG.sub(lambda m: hold(m.group(0)), text)
     if links:
         text = re.sub(
             r"\[([^\]]+)\]\(\s*<?((?:[^()\s<>]|\([^()\s]*\))+)>?(?:\s+\"[^\"]*\")?\s*\)",
-            lambda m: hold(f'<a href="{html_lib.escape(m.group(2))}">{_inline_html(m.group(1), links=False)}</a>'),
+            lambda m: hold(f'<a href="{html_lib.escape(m.group(2))}">{_inline_html(m.group(1), False, held)}</a>'),
             text,
         )
         text = re.sub(r"https?://[^\s<>\x00]+", lambda m: _bare_url(m.group(0), hold), text)
@@ -615,8 +658,9 @@ def _inline_html(text: str, links: bool = True) -> str:
         (r"==(?=\S)(.+?)(?<=\S)==", '<span class="shine-highlight">', "</span>"),
     ):
         text = re.sub(pattern, lambda m: open_tag + m.group(1) + close_tag, text)
-    while "\x00" in text:
-        text = re.sub(r"\x00(\d+)\x00", lambda m: held[int(m.group(1))], text)
+    if outer:
+        while re.search(r"\x00\d+\x00", text):
+            text = re.sub(r"\x00(\d+)\x00", lambda m: held[int(m.group(1))], text)
     return text
 
 
@@ -624,8 +668,10 @@ def _list_html(block: list[str]) -> str | None:
     """A Markdown list as UpNote's HTML, or None to leave it as Markdown: when nothing in it is
     nested, which UpNote converts cleanly, or when an item holds content this doesn't handle."""
     items: list[dict[str, Any]] = []
+    after_blank = False
     for line in block:
         if not line.strip():
+            after_blank = True
             continue
         m = _LIST_ITEM.match(line)
         if m:
@@ -634,13 +680,17 @@ def _list_html(block: list[str]) -> str | None:
                 "indent": indent,
                 "column": indent + len(marker) + (gap if 1 <= gap <= 4 else 1),
                 "kind": "ol" if marker[0].isdigit() else "ul",
+                "start": int(marker[:-1]) if marker[0].isdigit() else 1,
                 "text": m.group(4).strip(),
                 "children": [],
             })
-        elif not items or _UNSUPPORTED_IN_ITEM.match(line.strip()):
+        elif not items or after_blank or _UNSUPPORTED_IN_ITEM.match(line.strip()):
+            # A paragraph after a blank line belongs to whichever item its indent points at,
+            # which this doesn't model; such a list is left to UpNote.
             return None
         else:
             items[-1]["text"] += " " + line.strip()
+        after_blank = False
 
     top: list[dict[str, Any]] = []
     stack: list[dict[str, Any]] = []
@@ -659,7 +709,8 @@ def _list_html(block: list[str]) -> str | None:
                 if kind:
                     out.append(f"</{kind}>")
                 kind = item["kind"]
-                out.append(f"<{kind}>")
+                start = item["start"] if kind == "ol" and item["start"] != 1 else None
+                out.append(f'<{kind} start="{start}">' if start is not None else f"<{kind}>")
             text, checked = item["text"], ""
             if box := re.match(r"\[([ xX])\](?:\s+|$)(.*)", text):
                 checked = f' data-checked="{"false" if box.group(1) == " " else "true"}"'
@@ -676,17 +727,23 @@ def _list_html(block: list[str]) -> str | None:
 def _nested_lists_to_html(text: str) -> str:
     """Rewrite each Markdown list with nesting in UpNote's own list HTML, leaving everything else,
     including lists in code blocks and in HTML, exactly as it was."""
-    lines = text.split("\n")
+    lines = text.replace("\r\n", "\n").split("\n")
     out: list[str] = []
     fence = None
-    in_html = in_pre = False
+    in_html = in_pre = in_comment = False
     i = 0
     while i < len(lines):
         line = lines[i]
         lower = line.lower()
         if fence:
-            if line.strip().startswith(fence):
+            # Only a line of the same fence character, at least as long, closes a fence.
+            close = re.match(r"^ {0,3}(`{3,}|~{3,})[ \t]*$", line)
+            if close and close.group(1)[0] == fence[0] and len(close.group(1)) >= len(fence):
                 fence = None
+        elif in_comment:
+            in_comment = "-->" not in line
+        elif re.match(r"^ {0,3}<!--", line):
+            in_comment = "-->" not in line[line.find("<!--") + 4:]
         elif in_pre:
             in_pre = "</pre>" not in lower
         elif in_html and line.strip():
@@ -698,10 +755,13 @@ def _nested_lists_to_html(text: str) -> str:
             in_pre = "<pre" in lower and "</pre>" not in lower[lower.rfind("<pre"):]
         elif not line.strip():
             in_html = False
-        elif (m := _LIST_ITEM.match(_expand_indent(line))) and len(m.group(1)) <= 3:
+        elif (not _THEMATIC_BREAK.match(line) and (m := _LIST_ITEM.match(_expand_indent(line)))
+              and len(m.group(1)) <= 3):
             j = i + 1
             while j < len(lines):
                 nxt = _expand_indent(lines[j])
+                if _THEMATIC_BREAK.match(nxt) or _FENCE.match(nxt) and not nxt.startswith("  "):
+                    break
                 if _LIST_ITEM.match(nxt) or (nxt.strip() and nxt.startswith("  ")):
                     j += 1
                 elif not nxt.strip():
@@ -745,6 +805,11 @@ def _open_link(url: str, background: bool = True) -> None:
     """Hand an upnote:// link to the app without a shell, in the background unless asked otherwise."""
     try:
         subprocess.run(["open", *(["-g"] if background else []), url], check=True, capture_output=True, timeout=15)
+    except subprocess.TimeoutExpired as e:
+        raise ToolError(
+            "Handing the link to UpNote timed out, but UpNote may still have received it. Check whether the "
+            "change happened before trying again, so nothing is done twice."
+        ) from e
     except (OSError, subprocess.SubprocessError) as e:
         raise ToolError(f"Could not hand the link to UpNote: {e}") from e
 
@@ -798,17 +863,21 @@ def create_note(
         "Tags for the note, with or without #, such as [\"work\", \"java\"]. An existing tag is matched whatever "
         "its case; a new one is created. No spaces. They appear as hashtags at the end of the note."
     ))] = None,
-    markdown: bool = True,
+    markdown: Annotated[bool, Field(description="The text is Markdown, raw HTML allowed. Leave true.")] = True,
 ) -> dict[str, Any]:
     """Create a new note in UpNote. The app creates it, so it syncs normally. Returns the new note's id once UpNote has saved it."""
     if not title.strip() and not text.strip():
         raise ToolError("Give a title or some text.")
-    wanted_tags = [t.strip().lstrip("#") for t in tags or [] if t.strip().lstrip("#")]
-    if bad := [t for t in wanted_tags if re.search(r"[\s#]", t)]:
-        raise ToolError(f"Tags can't contain spaces or #: {', '.join(repr(t) for t in bad)}.")
+    wanted_tags = [t.strip().lstrip("#") for t in tags or []]
+    if bad := [t for t in wanted_tags if not t or re.search(r"[\s#]", t)]:
+        raise ToolError(f"Tags can't be empty or contain spaces or #: {', '.join(repr(t) for t in bad)}.")
     if wanted_tags:
         with closing(_connect()) as conn:
-            wanted_tags = list(dict.fromkeys(_tag_titles(conn, wanted_tags)))
+            # One per tag whatever the case, since UpNote keeps tags lower-cased.
+            unique: dict[str, str] = {}
+            for t in _tag_titles(conn, wanted_tags):
+                unique.setdefault(_tag_key(t), t)
+            wanted_tags = list(unique.values())
         text = _with_tags(text, wanted_tags)
     notebook_id = None
     notebook_title = None
@@ -932,12 +1001,17 @@ def restore_note(note_id: NoteId) -> dict[str, Any]:
 @server.tool(annotations=READ)
 def check_upnote_setup() -> dict[str, Any]:
     """Report whether the server can read UpNote correctly: database path, UpNote's data version,
-    missing columns, basic counts, and which programs macOS checks for access. Use it when other
+    missing columns, basic counts, and which program started the server, the one macOS checks for access. Use it when other
     tools fail or their results look wrong."""
     version = _data_version()
+    try:
+        found = _db_found()
+    except ToolError as e:
+        return {"database": str(DB_PATH), "database_found": None, "error": str(e), "ok": False,
+                "python": sys.executable, "started_by": _parent_process()}
     result: dict[str, Any] = {
         "database": str(DB_PATH),
-        "database_found": DB_PATH.exists(),
+        "database_found": found,
         "config_readable": version is not None,
         "python": sys.executable,
         "started_by": _parent_process(),
@@ -953,7 +1027,7 @@ def check_upnote_setup() -> dict[str, Any]:
             f"UpNote's data version is {version}, but this server was tested with {sorted(TESTED_DATA_VERSIONS)}. "
             "Results may be wrong if the format changed."
         )
-    if not DB_PATH.exists():
+    if not found:
         result["ok"] = False
         return result
     try:
@@ -1112,18 +1186,34 @@ def _tag_titles(conn: sqlite3.Connection, tag_links: list[str]) -> list[str]:
     return [titles.get(_tag_key(t), t) for t in tag_links]
 
 
+def _line_key(line: str) -> str:
+    """A line of a note's plain text, compared loosely: case, runs of spaces and non-breaking spaces."""
+    return _fold(re.sub(r"\s+", " ", line.replace("\xa0", " ")).strip())
+
+
+def _kept_lines(text: str | None, *drop: str) -> list[str]:
+    """The lines of a note's plain text a content-keeping rebuild must carry over: all but the
+    title, which is the first, and any named in drop."""
+    dropped = {_line_key(d) for d in drop if d}
+    return [x for x in (text or "").split("\n")[1:] if _line_key(x) and _line_key(x) not in dropped]
+
+
 def _strip_title_heading(text: str, *titles: str) -> str:
     """Drop a leading <h2> title, as in get_note's html, since UpNote adds the title itself."""
+    keys = {_line_key(t) for t in titles if t and t.strip()}
+    plain = lambda h: _line_key(html_lib.unescape(re.sub(r"<[^>]+>", "", h)))
     m = re.match(r"\s*<h2>(.*?)</h2>\s*", text, re.S)
     if m:
-        heading = _fold(html_lib.unescape(re.sub(r"<[^>]+>", "", m.group(1))).strip())
-        if heading in {_fold(t.strip()) for t in titles if t}:
-            return text[m.end():]
+        return text[m.end():] if plain(m.group(1)) in keys else text
+    # A note made outside the create link may have no <h2>: UpNote then takes the title from the
+    # first line, which would be repeated under the new note's own title heading.
+    m = re.match(r"(\s*(?:<div>)?)\s*<(div|p|h[1-6])>((?:(?!</?\2\b).)*?)</\2>\s*", text, re.S | re.I)
+    if m and plain(m.group(3)) in keys:
+        return m.group(1) + text[m.end():]
     return text
 
 
-@server.tool(annotations=REPLACE)
-def replace_note(
+def _replace(
     note_id: NoteId,
     text: Annotated[str, Field(description=(
         "The complete new body, not a list of changes. To keep existing formatting, start from get_note "
@@ -1141,7 +1231,8 @@ def replace_note(
     ))] = None,
     expected_revision: Annotated[int | None, Field(description="Omit to preview. To replace, pass the revision the preview returned.")] = None,
     acknowledge_warnings: Annotated[bool, Field(description="Set true only after the user has seen and accepted the preview's warnings.")] = False,
-    markdown: bool = True,
+    markdown: Annotated[bool, Field(description="The text is Markdown, raw HTML allowed. Leave true.")] = True,
+    keep_lines: list[str] | None = None,
 ) -> dict[str, Any]:
     """Edit a note by replacing it, since UpNote can't change a note in place. The new version gets a new id.
     Step 1: call without expected_revision. Nothing changes; the result gives the note's revision and any warnings.
@@ -1234,15 +1325,6 @@ def replace_note(
             ),
         }
 
-    if still := [t for t in removed if _tag_key(t) in {_tag_key(x) for x in new_note["tags"]}]:
-        return {
-            "done": False,
-            "new_note": new_note,
-            "message": (
-                f"The new version still has the tags {', '.join(still)}, so the original was left in place. "
-                "Remove them in UpNote, then move one of the two notes to Trash with move_note_to_trash."
-            ),
-        }
     if lacking := _wait_for_tags(new_note, tags):
         return {
             "done": False,
@@ -1253,6 +1335,33 @@ def replace_note(
                 "tags in UpNote, then move one of the two to Trash with move_note_to_trash."
             ),
         }
+
+    with closing(_connect()) as conn:
+        if removed and not tags:
+            time.sleep(1.5)  # no kept tag to wait for, so give UpNote a moment to record any tag at all
+        row = conn.execute("SELECT text, tagLinks FROM notes WHERE id = ?", (new_note["id"],)).fetchone()
+    new_note["tags"] = _json_list(row["tagLinks"]) if row else []
+    if still := [t for t in removed if _tag_key(t) in {_tag_key(x) for x in new_note["tags"]}]:
+        return {
+            "done": False,
+            "new_note": new_note,
+            "message": (
+                f"The new version still has the tags {', '.join(still)}, so the original was left in place. "
+                "Remove them in UpNote, then move one of the two notes to Trash with move_note_to_trash."
+            ),
+        }
+    if keep_lines:
+        have = {_line_key(x) for x in ((row["text"] if row else "") or "").split("\n")}
+        if lost := [x for x in keep_lines if _line_key(x) not in have]:
+            return {
+                "done": False,
+                "new_note": new_note,
+                "message": (
+                    f"The new version is missing {len(lost)} line(s) of the original, such as {lost[0][:80]!r}, "
+                    "so the original was left in place. Compare the two, then move one to Trash with "
+                    "move_note_to_trash."
+                ),
+            }
 
     with closing(_connect()) as conn:
         now = conn.execute("SELECT revision, trashed FROM notes WHERE id = ? AND deleted = 0", (note_id,)).fetchone()
@@ -1266,7 +1375,18 @@ def replace_note(
             ),
         }
 
-    trash = _set_trashed(note_id, True)
+    try:
+        trash = _set_trashed(note_id, True)
+    except ToolError as e:
+        return {
+            "done": False,
+            "new_note": new_note,
+            "original_note_id": note_id,
+            "message": (
+                f"The new version was created, but moving the original to Trash failed: {e} Both notes exist "
+                "now; move the original to Trash with move_note_to_trash once the new one looks right."
+            ),
+        }
     result: dict[str, Any] = {
         "done": bool(trash.get("confirmed")),
         "new_note": new_note,
@@ -1284,6 +1404,38 @@ def replace_note(
     if not trash.get("confirmed"):
         result["message"] = "The new version exists, but the original wasn't confirmed in Trash. Check it with get_note."
     return result
+
+
+@server.tool(annotations=REPLACE)
+def replace_note(
+    note_id: NoteId,
+    text: Annotated[str, Field(description=(
+        "The complete new body, not a list of changes. To keep existing formatting, start from get_note "
+        "with format=\"html\" and change only what's needed; a leading <h2> title heading is removed "
+        "automatically. New content follows the same rules as create_note's text."
+    ))],
+    title: Annotated[str | None, Field(description="New title. Omit to keep the current one.")] = None,
+    notebook: Annotated[str | None, Field(description=(
+        'Put the new version in this notebook instead: title, path such as "Parent / Child", or id. '
+        "Omit to keep the note where it is."
+    ))] = None,
+    remove_tags: Annotated[list[str] | None, Field(description=(
+        "Tags to take off the note, with or without #. Every other tag of the original is kept, "
+        "whether or not the new text carries it."
+    ))] = None,
+    expected_revision: Annotated[int | None, Field(description="Omit to preview. To replace, pass the revision the preview returned.")] = None,
+    acknowledge_warnings: Annotated[bool, Field(description="Set true only after the user has seen and accepted the preview's warnings.")] = False,
+    markdown: Annotated[bool, Field(description="The text is Markdown, raw HTML allowed. Leave true.")] = True,
+) -> dict[str, Any]:
+    """Edit a note by replacing it, since UpNote can't change a note in place. The new version gets a new id.
+    Step 1: call without expected_revision. Nothing changes; the result gives the note's revision and any warnings.
+    Show the warnings to the user. Step 2: call again with expected_revision and, if there were warnings,
+    acknowledge_warnings=true. The new version is created first. The original goes to Trash only after that
+    succeeds and only if nobody changed it meanwhile, so it stays recoverable with restore_note."""
+    return _replace(
+        note_id=note_id, text=text, title=title, notebook=notebook, remove_tags=remove_tags,
+        expected_revision=expected_revision, acknowledge_warnings=acknowledge_warnings, markdown=markdown,
+    )
 
 
 # ---------------------------------------------------------------- building sections
@@ -1464,10 +1616,11 @@ def _plan_section(source: str, heading: str, collapsed: bool = False, title: str
     }
 
 
-def _current_body(note_id: str) -> str:
-    """A note's HTML without its title heading, ready to be rebuilt through replace_note."""
+def _current_body(note_id: str) -> tuple[str, str]:
+    """A note's HTML without its title heading, ready to be rebuilt through _replace, and its plain text,
+    from which the rebuild checks that nothing was lost."""
     with closing(_connect()) as conn:
-        row = conn.execute("SELECT title, html FROM notes WHERE id = ? AND deleted = 0", (note_id,)).fetchone()
+        row = conn.execute("SELECT title, html, text FROM notes WHERE id = ? AND deleted = 0", (note_id,)).fetchone()
     if row is None:
         raise ToolError(f"No note with id {note_id!r}. Find ids with search_notes or list_notes.")
     body = _strip_title_heading(row["html"] or "", row["title"] or "")
@@ -1476,7 +1629,7 @@ def _current_body(note_id: str) -> str:
             "The note's own heading holds more than its title, so rebuilding it here would duplicate that "
             "heading. Use replace_note and write the body by hand."
         )
-    return body
+    return body, row["text"] or ""
 
 
 @server.tool(annotations=REPLACE)
@@ -1497,10 +1650,11 @@ def make_section(
     replace_note: call without expected_revision to preview what would move, then again with it. The note is rebuilt through replace_note, so the result has
     a new id and the original goes to Trash."""
     note_id = note_id.strip()
-    plan = _plan_section(_current_body(note_id), heading, collapsed, title=title, until=until)
+    body, plain = _current_body(note_id)
+    plan = _plan_section(body, heading, collapsed, title=title, until=until)
 
     if expected_revision is None:
-        preview = replace_note(note_id=note_id, text="unused")
+        preview = _replace(note_id=note_id, text="unused")
         preview.update({k: plan[k] for k in ("section_title", "inside_section", "blocks_moved", "first_blocks")})
         preview["next_step"] = (
             "Show the warnings and what would move to the user, then call again with expected_revision"
@@ -1508,9 +1662,11 @@ def make_section(
         )
         return preview
 
-    result = replace_note(
+    # The heading's own line goes when title renames the section, and the until marker always goes.
+    result = _replace(
         note_id=note_id, text=plan["html"], expected_revision=expected_revision,
         acknowledge_warnings=acknowledge_warnings,
+        keep_lines=_kept_lines(plain, heading if title else "", until or ""),
     )
     if result.get("done"):
         result.update({k: plan[k] for k in ("section_title", "inside_section", "blocks_moved")})
@@ -1524,7 +1680,7 @@ _BREAK_BETWEEN_TAGS = re.compile(rf"(<(/?){_BLOCK_TAGS}\b[^>]*>)\s*\n\s*(?=<(/?)
 
 
 def _tighten_html(source: str) -> str:
-    """Drop line breaks between two block tags, outside code blocks.
+    """Drop line breaks between two block tags, outside <pre> and Markdown code fences.
 
     A browser ignores them, but UpNote's create link turns each one into an empty <div>: after
     </ul> and before <div>, and also between two closing tags such as </ul> and </div> (tested
@@ -1533,6 +1689,10 @@ def _tighten_html(source: str) -> str:
     and a break that is the whole content of an element, as in <li>\n</li>.
     """
     code = [m.span() for m in re.finditer(r"<pre\b.*?</pre>", source, flags=re.S | re.I)]
+    # The text of replace_note and append_to_note is usually Markdown, where an HTML example sits
+    # in a fence; an unclosed fence runs to the end, as in Markdown.
+    code += [m.span() for m in re.finditer(r"^ {0,3}(`{3,}|~{3,})[^\n]*\n.*?(?:^ {0,3}\1[`~]*[ \t]*$|\Z)",
+                                           source, flags=re.S | re.M)]
 
     def drop(m: re.Match) -> str:
         inside = any(start < m.end(1) and m.end() <= end for start, end in code)
@@ -1568,8 +1728,12 @@ def _drop_tags(body: str, tags: list[str]) -> str:
 
     body = _TAG_ONLY_BLOCK.sub(lambda m: thin(m, lambda m, kept: f"<{m.group(1)}>{' '.join(kept)}</{m.group(1)}>"), body)
     body = _TRAILING_TAG_LINKS.sub(lambda m: thin(m, lambda m, kept: "<br>" + " ".join(kept)), body)
-    return re.sub(_TAG_LINK, lambda m: html_lib.escape(html_lib.unescape(re.sub(r"<[^>]+>", "", m.group(0))).lstrip("#"))
+    body = re.sub(_TAG_LINK, lambda m: html_lib.escape(html_lib.unescape(re.sub(r"<[^>]+>", "", m.group(0))).lstrip("#"))
                   if dropped(m.group(0)) else m.group(0), body, flags=re.I)
+    # UpNote finds tags by scanning the raw HTML, so the attribute quoted as text, in a code sample
+    # say, still tags the note. Writing its quotes as &quot; reads the same and no longer matches.
+    return re.sub(r'data-upnote-tag="([^"]*)"', lambda m: f"data-upnote-tag=&quot;{m.group(1)}&quot;"
+                  if _tag_key(html_lib.unescape(m.group(1))) in dropping else m.group(0), body)
 
 
 def _without_tag_blocks(body: str) -> str:
@@ -1601,19 +1765,19 @@ def append_to_note(
     note_id = note_id.strip()
     if not text.strip():
         raise ToolError("text is empty.")
-    body = _current_body(note_id)
+    body, plain = _current_body(note_id)
 
     if expected_revision is None:
-        preview = replace_note(note_id=note_id, text="unused")
+        preview = _replace(note_id=note_id, text="unused")
         preview["next_step"] = (
             "Show any warnings to the user, then call again with the same text and expected_revision"
             + (" and acknowledge_warnings=true." if preview["warnings"] else ".")
         )
         return preview
 
-    return replace_note(
+    return _replace(
         note_id=note_id, text=_appended(body, text), expected_revision=expected_revision,
-        acknowledge_warnings=acknowledge_warnings,
+        acknowledge_warnings=acknowledge_warnings, keep_lines=_kept_lines(plain),
     )
 
 
@@ -1631,17 +1795,17 @@ def move_note(
     Trash. Pin and bookmark don't carry over. Two steps like replace_note: preview without expected_revision,
     then call again with it."""
     note_id = note_id.strip()
-    body = _current_body(note_id)
+    body, plain = _current_body(note_id)
     if expected_revision is None:
-        preview = replace_note(note_id=note_id, text="unused", notebook=notebook)
+        preview = _replace(note_id=note_id, text="unused", notebook=notebook)
         preview["next_step"] = (
             "Show any warnings to the user, then call again with expected_revision"
             + (" and acknowledge_warnings=true." if preview["warnings"] else ".")
         )
         return preview
-    return replace_note(
+    return _replace(
         note_id=note_id, text=body, notebook=notebook, expected_revision=expected_revision,
-        acknowledge_warnings=acknowledge_warnings,
+        acknowledge_warnings=acknowledge_warnings, keep_lines=_kept_lines(plain),
     )
 
 
