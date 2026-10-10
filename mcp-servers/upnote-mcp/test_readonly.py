@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --script
+#!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.12"
 # dependencies = ["mcp==2.2.0"]
@@ -31,7 +31,7 @@ async def call(s, tool, **args):
     return r.is_error, data, text
 
 async def main():
-    params = StdioServerParameters(command="uv", args=["run", "--script", SERVER])
+    params = StdioServerParameters(command=sys.executable, args=["-I", SERVER])
     async with stdio_client(params) as (rd, wr):
         async with ClientSession(rd, wr) as s:
             await s.initialize()

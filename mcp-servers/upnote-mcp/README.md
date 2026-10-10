@@ -16,7 +16,6 @@ by hand.
 - [python.org's Python](https://www.python.org/downloads/macos/) 3.12 or newer, and `clang`
   from the Xcode Command Line Tools to build the launcher. [Full Disk Access](#full-disk-access)
   explains why the server runs this way.
-- [uv](https://docs.astral.sh/uv/), only to run the [tests](#test).
 - UpNote running, for any tool that changes a note or opens the app.
 
 ## Install
@@ -57,7 +56,7 @@ with, so start a new one after changing the server.
 | Tool | What it does |
 | :--- | :--- |
 | `search_notes` | Finds notes containing all the given words in the title or body, case-insensitive in any language |
-| `list_notes` | Lists notes newest first, optionally within a notebook or tag |
+| `list_notes` | Lists notes by last update or creation date, newest first, optionally within a notebook or tag |
 | `get_note` | Returns one note's text or HTML, in parts for long notes |
 | `list_notebooks` | Lists notebooks with their paths and note counts |
 | `list_tags` | Lists tags with note counts |
@@ -127,11 +126,11 @@ original to Trash. It takes two calls: a preview that changes nothing, then the 
 which has to pass back the revision number the preview returned.
 
 The preview refuses when something would be lost for good: attachments or images, links from
-other notes, a web share link, a template, a note already in Trash, or a notebook whose title
-another notebook shares. It warns, and the
-replacement needs those warnings accepted, when the note is pinned or bookmarked, has tags, sits
-in more than one notebook, has been saved 20 or more times, has collapsed or complex sections, or was
-edited in the last ten minutes.
+other notes, a web share link, or a template. It also refuses a note already in Trash, and one in
+a notebook whose title another notebook shares. It warns, and the replacement needs those
+warnings accepted, when the note is pinned or bookmarked, has tags, sits in more than one
+notebook, has been saved 20 or more times, has collapsible sections or a body over 20,000
+characters, or was edited in the last ten minutes.
 
 The original goes to Trash only after the new version is confirmed in the same notebook, and
 only if nobody changed the original in the meantime. The new version gets a new id, so pinning
@@ -155,7 +154,8 @@ itself is only a marker.
 It previews first, the same as `replace_note`, and rebuilds the note the same way, so the result has a
 new id. Everything outside the wrapped range is copied through byte for byte. It refuses a heading it
 can't find, one that appears twice, one that is already a section's title, one with nothing under it,
-and any note whose own title heading holds extra content, since rebuilding that would duplicate it.
+an `until` marker it can't find after the heading, and any note whose own title heading holds extra
+content, since rebuilding that would duplicate it.
 
 ## Limits
 
@@ -197,8 +197,10 @@ and any note whose own title heading holds extra content, since rebuilding that 
 
 A grant on uv or Homebrew's Python doesn't last. Homebrew signs them ad hoc, so macOS ties the
 grant to one build and drops it on the next `brew upgrade`. `launcher.c` builds a small binary
-that starts `server.py` and waits for it. It never changes, so its grant holds. Its command is
-fixed at build time, so the grant can't be used to run anything else.
+that starts `server.py` and waits for it. It never changes, so its grant holds. It takes no
+arguments and always runs `~/.claude/mcp-servers/upnote-mcp/server.py` with the venv's Python, so
+its command line can't point the grant at another program. It builds both paths from `HOME` when
+it starts, though, so anyone who can set `HOME` for it can run their own code under the grant.
 
 The launcher doesn't use uv. With uv in the chain, macOS recorded a separate "access data from
 UpNote" decision against each Homebrew uv build, switched off and locked, and the server failed
@@ -212,18 +214,18 @@ grant extends to any edit of that file.
 
 ## Test
 
-`test_make_section.py` checks the section-building logic against synthetic note markup. It touches
-neither UpNote nor your notes:
+Both tests run on the server's venv. `test_make_section.py` checks the section-building logic
+against synthetic note markup. It touches neither UpNote nor your notes:
 
 ```bash
-uv run --script test_make_section.py
+~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_make_section.py
 ```
 
-`test_readonly.py` compares every read tool with direct queries on your own library and confirms
-that `run_select` refuses writes. It changes nothing. Run it from this folder:
+`test_readonly.py` compares every read tool except `open_in_upnote`, which changes what the app
+shows, with direct queries on your own library, and confirms that `run_select` refuses writes. It changes nothing. Run it from this folder:
 
 ```bash
-uv run --script test_readonly.py
+~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_readonly.py
 ```
 
 The create, trash, restore and replace tools were tested by hand against labelled test notes.
