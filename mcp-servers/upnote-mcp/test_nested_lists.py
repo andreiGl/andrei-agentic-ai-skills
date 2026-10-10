@@ -59,6 +59,13 @@ check("link with brackets in the url", item("[w](https://e.org/a_(b))") == '<a h
       item("[w](https://e.org/a_(b))"))
 check("bare url becomes a link, without the full stop", item("see https://e.org/x?a=1&b=2.") ==
       'see <a href="https://e.org/x?a=1&amp;b=2">https://e.org/x?a=1&amp;b=2</a>.', item("see https://e.org/x?a=1&b=2."))
+W = "https://en.wikipedia.org/wiki/Python_(programming_language)"
+check("bare url keeps a bracket that belongs to it", item(f"see {W} now") == f'see <a href="{W}">{W}</a> now', item(f"see {W} now"))
+check("  and still drops the full stop after it", item(f"see {W}.") == f'see <a href="{W}">{W}</a>.', item(f"see {W}."))
+check("  a bracket around the whole url stays outside", item("(see https://e.org/x)") ==
+      '(see <a href="https://e.org/x">https://e.org/x</a>)', item("(see https://e.org/x)"))
+check("  so does a bracket closing outside a bracketed url", item(f"({W})") == f'(<a href="{W}">{W}</a>)', item(f"({W})"))
+check("  a scheme with nothing after it stays text", item("https:// alone") == "https:// alone", item("https:// alone"))
 check("raw inline HTML is kept", item('<u>Group</u> <span class="shine-highlight-yellow">blocked</span>') ==
       '<u>Group</u> <span class="shine-highlight-yellow">blocked</span>',
       item('<u>Group</u> <span class="shine-highlight-yellow">blocked</span>'))

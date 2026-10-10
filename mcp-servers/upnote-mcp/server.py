@@ -522,6 +522,25 @@ def _expand_indent(line: str) -> str:
     return line[:lead].expandtabs(4) + line[lead:]
 
 
+def _bare_url(url: str, hold) -> str:
+    """A bare URL as a link, trimmed the way GitHub's Markdown does: trailing punctuation stays
+    outside, and so does a closing bracket without a matching opening one inside the URL, so
+    https://en.wikipedia.org/wiki/Python_(programming_language) keeps its bracket."""
+    end = len(url)
+    while end:
+        last = url[end - 1]
+        if last in ".,;:!?*_~'\"]":
+            end -= 1
+        elif last == ")" and url.count(")", 0, end) > url.count("(", 0, end):
+            end -= 1
+        else:
+            break
+    link, rest = url[:end], url[end:]
+    if not link.split("://", 1)[1]:
+        return url
+    return hold(f'<a href="{html_lib.escape(link)}">{html_lib.escape(link, quote=False)}</a>') + rest
+
+
 def _inline_html(text: str, links: bool = True) -> str:
     """One list item's inline Markdown as the HTML UpNote itself produces for it."""
     held: list[str] = []
@@ -539,11 +558,7 @@ def _inline_html(text: str, links: bool = True) -> str:
             lambda m: hold(f'<a href="{html_lib.escape(m.group(2))}">{_inline_html(m.group(1), links=False)}</a>'),
             text,
         )
-        text = re.sub(
-            r"https?://[^\s<>\x00]*[^\s<>\x00.,;:!?)\]'\"]",
-            lambda m: hold(f'<a href="{html_lib.escape(m.group(0))}">{html_lib.escape(m.group(0), quote=False)}</a>'),
-            text,
-        )
+        text = re.sub(r"https?://[^\s<>\x00]+", lambda m: _bare_url(m.group(0), hold), text)
     text = re.sub(r"&(?!#?\w+;)", "&amp;", text).replace("<", "&lt;").replace(">", "&gt;")
     for pattern, open_tag, close_tag in (
         (r"\*\*\*(?=\S)(.+?)(?<=\S)\*\*\*", "<b><i>", "</i></b>"),
