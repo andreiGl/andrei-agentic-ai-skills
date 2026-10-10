@@ -1003,8 +1003,6 @@ def _replace_checks(conn: sqlite3.Connection, note_id: str):
         warnings.append("It is pinned. Pin the new version by hand.")
     if r["bookmarked"] or (bookmarks and note_id in _json_list(bookmarks["content"])):
         warnings.append("It is bookmarked. Bookmark the new version by hand.")
-    if tags := _json_list(r["tagLinks"]):
-        warnings.append(f"It has tags ({', '.join(tags)}). The new version can't carry tags; add them back by hand.")
     if len(notebook_ids) > 1:
         others = ", ".join(nbs[i]["path"] for i in notebook_ids[1:])
         warnings.append(f"It is in several notebooks. The new version goes into {nbs[notebook_ids[0]]['path']} only; add it to {others} by hand.")
@@ -1017,6 +1015,32 @@ def _replace_checks(conn: sqlite3.Connection, note_id: str):
     if r["updatedAt"] and time.time() * 1000 - r["updatedAt"] < RECENT_EDIT_MINUTES * 60000:
         warnings.append(f"It was edited in the last {RECENT_EDIT_MINUTES} minutes. If someone is typing in it, those changes stay in the original.")
     return r, nbs, notebook_ids, blockers, warnings
+
+
+def _tag_anchor(tag: str) -> str:
+    """A hashtag as UpNote writes it into a note. UpNote takes a note's tags from these links,
+    any number of them (tested 2026-10-10); the create link's tag parameter takes only one."""
+    name = tag.strip().lstrip("#")
+    shown = html_lib.escape(name)
+    return (
+        f'<a data-upnote-tag="#{shown}" spellcheck="false" data-non-editable="true" '
+        f'href="upnote://x-callback-url/tag/view?tag={quote(name, safe="/")}">#{shown}</a>'
+    )
+
+
+def _with_tags(body: str, tags: list[str]) -> str:
+    """The body with a hashtag added at the end for each tag it doesn't already carry."""
+    present = {_tag_key(html_lib.unescape(t)) for t in re.findall(r'data-upnote-tag="([^"]*)"', body)}
+    missing = [t for t in tags if _tag_key(t) not in present]
+    if not missing:
+        return body
+    return body.rstrip() + "\n\n<div>" + " ".join(_tag_anchor(t) for t in missing) + "</div>"
+
+
+def _tag_titles(conn: sqlite3.Connection, tag_links: list[str]) -> list[str]:
+    """A note's tags as the tags table writes them. tagLinks holds them lower-cased."""
+    titles = {_tag_key(t): t.strip().lstrip("#") for (t,) in conn.execute("SELECT title FROM tags WHERE deleted = 0") if t}
+    return [titles.get(_tag_key(t), t) for t in tag_links]
 
 
 def _strip_title_heading(text: str, *titles: str) -> str:
@@ -1050,6 +1074,7 @@ def replace_note(
     note_id = note_id.strip()
     with closing(_connect()) as conn:
         r, nbs, notebook_ids, blockers, warnings = _replace_checks(conn, note_id)
+        tags = _tag_titles(conn, _json_list(r["tagLinks"]))
     if blockers:
         raise ToolError(f"Can't replace {r['title']!r}. " + " ".join(blockers))
     if expected_revision is None:
@@ -1059,6 +1084,7 @@ def replace_note(
             "title": r["title"],
             "revision": r["revision"],
             "notebook": nbs[notebook_ids[0]]["path"] if notebook_ids else None,
+            "tags_kept": tags,
             "warnings": warnings,
             "next_step": "Show any warnings to the user, then call again with expected_revision"
             + (" and acknowledge_warnings=true." if warnings else "."),
@@ -1075,6 +1101,7 @@ def replace_note(
     body = _strip_title_heading(text, r["title"] or "", new_title)
     if not new_title and not body.strip():
         raise ToolError("Give a title or some text.")
+    body = _with_tags(body, tags)
     notebook_title = nbs[notebook_ids[0]]["title"] if notebook_ids else None
 
     since_ms = time.time() * 1000 - 2000
@@ -1102,6 +1129,26 @@ def replace_note(
             ),
         }
 
+    # UpNote records a new note's tags a moment after the note itself.
+    wanted = {_tag_key(t) for t in tags}
+    deadline = time.monotonic() + CONFIRM_SECONDS
+    while wanted - {_tag_key(t) for t in new_note["tags"]}:
+        if time.monotonic() >= deadline:
+            lacking = [t for t in tags if _tag_key(t) not in {_tag_key(x) for x in new_note["tags"]}]
+            return {
+                "done": False,
+                "new_note": new_note,
+                "message": (
+                    f"The new version was created but didn't get the tags {', '.join(lacking)} within "
+                    f"{CONFIRM_SECONDS:.0f} seconds, so the original was left in place. Check the new note's "
+                    "tags in UpNote, then move one of the two to Trash with move_note_to_trash."
+                ),
+            }
+        time.sleep(0.5)
+        with closing(_connect()) as conn:
+            row = conn.execute("SELECT tagLinks FROM notes WHERE id = ?", (new_note["id"],)).fetchone()
+        new_note["tags"] = _json_list(row["tagLinks"]) if row else []
+
     with closing(_connect()) as conn:
         now = conn.execute("SELECT revision, trashed FROM notes WHERE id = ? AND deleted = 0", (note_id,)).fetchone()
     if now is None or now["revision"] != expected_revision or now["trashed"]:
@@ -1121,6 +1168,8 @@ def replace_note(
         "original_note_id": note_id,
         "original_in_trash": bool(trash.get("confirmed")),
     }
+    if tags:
+        result["tags_kept"] = tags
     if notebook_path is not None:
         result["in_original_notebook"] = True
     if warnings:

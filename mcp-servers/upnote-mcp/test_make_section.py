@@ -146,5 +146,17 @@ joined = srv._appended(EXISTING + "\n", "  ### New\n\n- x  \n")
 check("appended Markdown follows the HTML after one blank line", joined == tight + "\n\n### New\n\n- x", repr(joined[-30:]))
 check("appending to an empty note leaves only the new text", srv._appended("", "- x").strip() == "- x")
 
+# 10. tags travel as hashtag links in the body
+anchor = srv._tag_anchor("RV")
+check("a tag link has UpNote's own shape", anchor ==
+      '<a data-upnote-tag="#RV" spellcheck="false" data-non-editable="true" href="upnote://x-callback-url/tag/view?tag=RV">#RV</a>', anchor)
+check("  a nested tag keeps its slash, odd characters are escaped",
+      'tag=work/ping"' in srv._tag_anchor("work/ping") and "#a&amp;b" in srv._tag_anchor("a&b"))
+check("missing tags are added at the end", srv._with_tags("- x", ["RV", "UpNote"]) ==
+      "- x\n\n<div>" + srv._tag_anchor("RV") + " " + srv._tag_anchor("UpNote") + "</div>")
+check("  a tag the body already carries isn't added twice, whatever its case",
+      srv._with_tags("<div>" + srv._tag_anchor("RV") + "</div>", ["rv"]) == "<div>" + srv._tag_anchor("RV") + "</div>")
+check("  no tags, no change", srv._with_tags("- x", []) == "- x")
+
 print("FAILURES:", fails)
 sys.exit(1 if fails else 0)

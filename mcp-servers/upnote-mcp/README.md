@@ -138,13 +138,19 @@ which has to pass back the revision number the preview returned.
 The preview refuses when something would be lost for good: attachments or images, links from
 other notes, a web share link, or a template. It also refuses a note already in Trash, and one in
 a notebook whose title another notebook shares. It warns, and the replacement needs those
-warnings accepted, when the note is pinned or bookmarked, has tags, sits in more than one
+warnings accepted, when the note is pinned or bookmarked, sits in more than one
 notebook, has been saved 20 or more times, has collapsible sections or a body over 20,000
 characters, or was edited in the last ten minutes.
 
-The original goes to Trash only after the new version is confirmed in the same notebook, and
-only if nobody changed the original in the meantime. The new version gets a new id, so pinning
-and Version History stay with the original.
+The new version keeps the original's tags. UpNote stores a tag as a hashtag link inside the note,
+so the server adds one at the end for each tag the new text doesn't already carry, and waits until
+UpNote has recorded them. To drop a tag, remove it in UpNote afterwards. Pin and bookmark can't be
+carried over: no link sets them (tested 2026-10-10; UpNote answers "This link is not supported."
+for routes such as `note/pin`), so the preview warns about them.
+
+The original goes to Trash only after the new version is confirmed in the same notebook with the
+same tags, and only if nobody changed the original in the meantime. The new version gets a new
+id, so Version History stays with the original.
 
 Hand-written raw HTML, such as a collapsible section copied from the note's own `get_note` html,
 survives the round-trip: UpNote re-parses it as native formatting (2026-09-24, UpNote 9.22.2).
