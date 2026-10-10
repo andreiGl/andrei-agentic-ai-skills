@@ -486,7 +486,180 @@ not plain paragraphs. The title becomes the note's heading, so don't repeat it.
 Don't use <mark>; UpNote drops it."""
 
 
+# ---------------------------------------------------------------- nested lists
+#
+# UpNote's Markdown conversion adds an empty bullet after every nested list (tested 2026-10-10,
+# UpNote 9.22.6, with every indent style). Its own format puts a nested list beside its parent
+# item, as in <ul><li>a</li><ul><li>b</li></ul><li>c</li></ul>, and HTML in that shape comes
+# through clean. So lists with nesting are rewritten to that HTML before the link is sent.
+# Markdown isn't converted inside HTML, so the items' inline formatting is converted here too.
+
+_LIST_ITEM = re.compile(r"^( *)([-*+]|\d{1,9}[.)])( +|$)(.*)$")
+_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_HTML_START = re.compile(r"^ {0,3}</?[a-zA-Z][a-zA-Z0-9-]*(?:\s|/?>|$)")
+_BLOCK_START = re.compile(r"^ {0,3}(?:#{1,6}(?:\s|$)|>|`{3}|~{3}|\||</?[a-zA-Z]|(?:[-*_] *){3,}$)")
+# Content inside an item the converter doesn't handle; such a list is left to UpNote.
+_UNSUPPORTED_IN_ITEM = re.compile(r"^(?:`{3}|~{3}|>|#|\||<(?:div|ul|ol|li|pre|table|blockquote|h\d|p)\b)", re.I)
+
+
+def _expand_indent(line: str) -> str:
+    lead = len(line) - len(line.lstrip(" \t"))
+    return line[:lead].expandtabs(4) + line[lead:]
+
+
+def _inline_html(text: str, links: bool = True) -> str:
+    """One list item's inline Markdown as the HTML UpNote itself produces for it."""
+    held: list[str] = []
+
+    def hold(s: str) -> str:
+        held.append(s)
+        return f"\x00{len(held) - 1}\x00"
+
+    text = re.sub(r"(`+)(.+?)\1", lambda m: hold(f"<code>{html_lib.escape(m.group(2).strip(), quote=False)}</code>"), text)
+    text = re.sub(r"\\([!-/:-@\[-`{-~])", lambda m: hold(html_lib.escape(m.group(1), quote=False)), text)
+    text = re.sub(r"</?[a-zA-Z][^<>]*>", lambda m: hold(m.group(0)), text)
+    if links:
+        text = re.sub(
+            r"\[([^\]]+)\]\(\s*<?((?:[^()\s<>]|\([^()\s]*\))+)>?(?:\s+\"[^\"]*\")?\s*\)",
+            lambda m: hold(f'<a href="{html_lib.escape(m.group(2))}">{_inline_html(m.group(1), links=False)}</a>'),
+            text,
+        )
+        text = re.sub(
+            r"https?://[^\s<>\x00]*[^\s<>\x00.,;:!?)\]'\"]",
+            lambda m: hold(f'<a href="{html_lib.escape(m.group(0))}">{html_lib.escape(m.group(0), quote=False)}</a>'),
+            text,
+        )
+    text = re.sub(r"&(?!#?\w+;)", "&amp;", text).replace("<", "&lt;").replace(">", "&gt;")
+    for pattern, open_tag, close_tag in (
+        (r"\*\*\*(?=\S)(.+?)(?<=\S)\*\*\*", "<b><i>", "</i></b>"),
+        (r"\*\*(?=\S)(.+?)(?<=\S)\*\*", "<b>", "</b>"),
+        (r"(?<!\w)__(?=\S)(.+?)(?<=\S)__(?!\w)", "<b>", "</b>"),
+        (r"\*(?=[^\s*])([^*]+?)(?<=[^\s*])\*", "<i>", "</i>"),
+        (r"(?<!\w)_(?=[^\s_])([^_]+?)(?<=[^\s_])_(?!\w)", "<i>", "</i>"),
+        (r"~~(?=\S)(.+?)(?<=\S)~~", "<s>", "</s>"),
+        (r"==(?=\S)(.+?)(?<=\S)==", '<span class="shine-highlight">', "</span>"),
+    ):
+        text = re.sub(pattern, lambda m: open_tag + m.group(1) + close_tag, text)
+    while "\x00" in text:
+        text = re.sub(r"\x00(\d+)\x00", lambda m: held[int(m.group(1))], text)
+    return text
+
+
+def _list_html(block: list[str]) -> str | None:
+    """A Markdown list as UpNote's HTML, or None to leave it as Markdown: when nothing in it is
+    nested, which UpNote converts cleanly, or when an item holds content this doesn't handle."""
+    items: list[dict[str, Any]] = []
+    for line in block:
+        if not line.strip():
+            continue
+        m = _LIST_ITEM.match(line)
+        if m:
+            indent, marker, gap = len(m.group(1)), m.group(2), len(m.group(3))
+            items.append({
+                "indent": indent,
+                "column": indent + len(marker) + (gap if 1 <= gap <= 4 else 1),
+                "kind": "ol" if marker[0].isdigit() else "ul",
+                "text": m.group(4).strip(),
+                "children": [],
+            })
+        elif not items or _UNSUPPORTED_IN_ITEM.match(line.strip()):
+            return None
+        else:
+            items[-1]["text"] += " " + line.strip()
+
+    top: list[dict[str, Any]] = []
+    stack: list[dict[str, Any]] = []
+    for item in items:
+        while stack and item["indent"] < stack[-1]["column"]:
+            stack.pop()
+        (stack[-1]["children"] if stack else top).append(item)
+        stack.append(item)
+    if all(not item["children"] for item in items):
+        return None
+
+    def render(siblings: list[dict[str, Any]]) -> str:
+        out, kind = [], None
+        for item in siblings:
+            if item["kind"] != kind:
+                if kind:
+                    out.append(f"</{kind}>")
+                kind = item["kind"]
+                out.append(f"<{kind}>")
+            text, checked = item["text"], ""
+            if box := re.match(r"\[([ xX])\](?:\s+|$)(.*)", text):
+                checked = f' data-checked="{"false" if box.group(1) == " " else "true"}"'
+                text = box.group(2)
+            out.append(f"<li{checked}>{_inline_html(text)}</li>")
+            if item["children"]:
+                out.append(render(item["children"]))
+        out.append(f"</{kind}>")
+        return "".join(out)
+
+    return render(top)
+
+
+def _nested_lists_to_html(text: str) -> str:
+    """Rewrite each Markdown list with nesting in UpNote's own list HTML, leaving everything else,
+    including lists in code blocks and in HTML, exactly as it was."""
+    lines = text.split("\n")
+    out: list[str] = []
+    fence = None
+    in_html = in_pre = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        lower = line.lower()
+        if fence:
+            if line.strip().startswith(fence):
+                fence = None
+        elif in_pre:
+            in_pre = "</pre>" not in lower
+        elif in_html and line.strip():
+            in_pre = "<pre" in lower and "</pre>" not in lower[lower.rfind("<pre"):]
+        elif (f := _FENCE.match(line)):
+            fence = f.group(1)
+        elif _HTML_START.match(line):
+            in_html = True
+            in_pre = "<pre" in lower and "</pre>" not in lower[lower.rfind("<pre"):]
+        elif not line.strip():
+            in_html = False
+        elif (m := _LIST_ITEM.match(_expand_indent(line))) and len(m.group(1)) <= 3:
+            j = i + 1
+            while j < len(lines):
+                nxt = _expand_indent(lines[j])
+                if _LIST_ITEM.match(nxt) or (nxt.strip() and nxt.startswith("  ")):
+                    j += 1
+                elif not nxt.strip():
+                    k = j
+                    while k < len(lines) and not lines[k].strip():
+                        k += 1
+                    after = _expand_indent(lines[k]) if k < len(lines) else ""
+                    if k < len(lines) and (_LIST_ITEM.match(after) or after.startswith("  ")):
+                        j = k
+                    else:
+                        break
+                elif not lines[j - 1].strip() or _BLOCK_START.match(nxt):
+                    break
+                else:
+                    j += 1
+            block = [_expand_indent(b) for b in lines[i:j]]
+            converted = _list_html(block)
+            if converted is None:
+                out.extend(lines[i:j])
+            else:
+                out.append(converted)
+                if j < len(lines) and lines[j].strip():
+                    out.append("")
+            i = j
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
 def _create_url(title: str, text: str, notebook_title: str | None, markdown: bool) -> str:
+    if markdown:
+        text = _nested_lists_to_html(text)
     params = {"title": title, "text": text, "notebook": notebook_title, "markdown": "true" if markdown else "false"}
     # quote() writes a space as %20. A form encoder would write "+", which a
     # link handler may keep as a literal plus sign.

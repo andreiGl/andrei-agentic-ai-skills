@@ -102,6 +102,13 @@ creating a note with it:
 
 UpNote drops `<mark>`. The note title becomes the note's heading, so the body shouldn't repeat it.
 
+UpNote's own Markdown conversion adds an empty bullet after every nested list, whatever the
+indent. So before sending, the server rewrites each list that has nesting as HTML in the shape
+UpNote's editor uses, with the items' formatting converted too: bold, italic, code, links, bare
+URLs, strikethrough, `==green==`, checkboxes, and inline HTML such as `<u>`. Flat lists, and lists
+in code blocks or HTML, are sent as written. A list whose items hold a code block, a quote or a
+table is also sent as written, so it keeps the empty bullet.
+
 Tags can't be set this way. The create link has no tag option, and a `#hashtag` in the body stays
 plain text, so tags have to be added in UpNote.
 
@@ -231,11 +238,13 @@ grant extends to any edit of that file.
 
 ## Test
 
-Both tests run on the server's venv. `test_make_section.py` checks the section-building logic,
-and the HTML clean-up `append_to_note` does, against synthetic note markup. It touches neither UpNote nor your notes:
+The tests run on the server's venv. `test_make_section.py` checks the section-building logic,
+and the HTML clean-up `append_to_note` does, against synthetic note markup, and
+`test_nested_lists.py` checks the nested-list rewrite. Neither touches UpNote or your notes:
 
 ```bash
 ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_make_section.py
+~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_nested_lists.py
 ```
 
 `test_readonly.py` compares every read tool except `open_in_upnote`, which changes what the app
