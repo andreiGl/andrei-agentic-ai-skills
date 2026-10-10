@@ -1133,7 +1133,8 @@ def replace_note(
     body = _strip_title_heading(text, r["title"] or "", new_title)
     if not new_title and not body.strip():
         raise ToolError("Give a title or some text.")
-    body = _with_tags(body, tags)
+    # Line breaks between blocks would come back as empty <div>s; see _tighten_html.
+    body = _with_tags(_tighten_html(body), tags)
     notebook_title = nbs[notebook_ids[0]]["title"] if notebook_ids else None
 
     since_ms = time.time() * 1000 - 2000
@@ -1436,30 +1437,46 @@ def make_section(
 # ---------------------------------------------------------------- appending
 
 _BLOCK_TAGS = r"(?:div|p|ul|ol|li|h[1-6]|pre|blockquote|table|thead|tbody|tr|td|th|hr)"
-_BREAK_BETWEEN_TAGS = re.compile(rf"(</{_BLOCK_TAGS}\s*>)\s*\n\s*(?=<{_BLOCK_TAGS}\b)", re.I)
+_BREAK_BETWEEN_TAGS = re.compile(rf"(<(/?){_BLOCK_TAGS}\b[^>]*>)\s*\n\s*(?=<(/?){_BLOCK_TAGS}\b)", re.I)
 
 
 def _tighten_html(source: str) -> str:
-    """Drop line breaks between a closing block tag and the next opening block tag, outside code blocks.
+    """Drop line breaks between two block tags, outside code blocks.
 
-    Between inline tags such as </b> and <i> a line break shows as a space, so those stay.
-    Between blocks a browser ignores it, but UpNote's create link turns each one into an empty <div>, so
-    without this the note's HTML would grow with every append. Tested 2026-10-10: with them
-    removed, the existing part came back byte for byte.
+    A browser ignores them, but UpNote's create link turns each one into an empty <div>: after
+    </ul> and before <div>, and also between two closing tags such as </ul> and </div> (tested
+    2026-10-10). Without this a note's HTML grows with every rebuild. Two kinds stay: a break
+    between inline tags such as </b> and <i>, which shows as a space and which UpNote keeps,
+    and a break that is the whole content of an element, as in <li>\n</li>.
     """
     code = [m.span() for m in re.finditer(r"<pre\b.*?</pre>", source, flags=re.S | re.I)]
 
     def drop(m: re.Match) -> str:
         inside = any(start < m.end(1) and m.end() <= end for start, end in code)
-        return m.group(0) if inside else m.group(1)
+        empty_element = not m.group(2) and m.group(3)
+        return m.group(0) if inside or empty_element else m.group(1)
 
     return _BREAK_BETWEEN_TAGS.sub(drop, source)
 
 
+_TAG_LINK = r'<a\b[^>]*\bdata-upnote-tag="[^"]*"[^>]*>[^<]*</a>'
+_TAG_FILLER = rf"(?:\s|&nbsp;|<br\s*/?>|{_TAG_LINK})*"
+# A block holding nothing but tag links, as the editor and _with_tags write them, and the
+# "<br><a ...>#tag</a>" that UpNote's own tag= link parameter appends.
+_TAG_ONLY_BLOCK = re.compile(rf"\s*<(div|p)>{_TAG_FILLER}{_TAG_LINK}{_TAG_FILLER}</\1>", re.I)
+_TRAILING_TAG_LINKS = re.compile(rf"\s*(?:<br\s*/?>\s*)+{_TAG_LINK}{_TAG_FILLER}(?=(?:\s*</div>)*\s*$)", re.I)
+
+
+def _without_tag_blocks(body: str) -> str:
+    """The body without blocks that hold only tag links. A hashtag inside a sentence stays."""
+    return _TRAILING_TAG_LINKS.sub("", _TAG_ONLY_BLOCK.sub("", body))
+
+
 def _appended(body: str, text: str) -> str:
     """The note's HTML followed by the new Markdown. The blank line ends the HTML block, so
-    UpNote converts what follows as Markdown (tested 2026-10-10)."""
-    return _tighten_html(body).rstrip() + "\n\n" + text.strip()
+    UpNote converts what follows as Markdown (tested 2026-10-10). Blocks of tag links are taken
+    out here, and replace_note adds the tags back after the new content, so they stay last."""
+    return _tighten_html(_without_tag_blocks(body)).rstrip() + "\n\n" + text.strip()
 
 
 @server.tool(annotations=REPLACE)

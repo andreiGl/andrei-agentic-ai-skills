@@ -137,6 +137,9 @@ check("line breaks between a closing and an opening tag are removed",
       "</h3><div>text</div><ul>" in tight and "</pre><div>end</div>" in tight, tight)
 check("  a line break inside an element's text stays", "<li>item\n</li>" in tight)
 check("  a line break between an opening and a closing tag stays", "<li>\n</li>" in tight)
+check("  a break between two closing block tags goes", srv._tighten_html("<ul><li>a</li></ul>\n</div>") == "<ul><li>a</li></ul></div>")
+check("  a break between two opening block tags goes", srv._tighten_html("<div>\n<h3>x</h3>") == "<div><h3>x</h3>")
+check("  a break that is an element's whole content stays", srv._tighten_html("<li>\n</li><div>\n</div>") == "<li>\n</li><div>\n</div>")
 check("  a line break between inline tags stays, since it shows as a space",
       srv._tighten_html("<div><b>bold</b>\n<i>italic</i></div>") == "<div><b>bold</b>\n<i>italic</i></div>")
 check("  a break between a block and an inline tag stays",
@@ -157,6 +160,24 @@ check("missing tags are added at the end", srv._with_tags("- x", ["RV", "UpNote"
 check("  a tag the body already carries isn't added twice, whatever its case",
       srv._with_tags("<div>" + srv._tag_anchor("RV") + "</div>", ["rv"]) == "<div>" + srv._tag_anchor("RV") + "</div>")
 check("  no tags, no change", srv._with_tags("- x", []) == "- x")
+
+# 11. appending keeps tags last: tag-only blocks come out, replace_note adds them back at the end
+RVL, UPL = srv._tag_anchor("RV"), srv._tag_anchor("UpNote")
+same_ = lambda name, got, want: check(name, got == want, repr(got))
+same_("a block of tag links is taken out", srv._without_tag_blocks(f"<div>x</div><div>{RVL} {UPL}</div>"), "<div>x</div>")
+same_("  with the line break before it, so no break is left between closing tags",
+      srv._without_tag_blocks(f"<div><ul><li>a</li></ul>\n<div>{RVL}</div></div>"), "<div><ul><li>a</li></ul></div>")
+same_("  so is UpNote's own <br> + tag link at the end", srv._without_tag_blocks(f"<div><div>x</div></div><br>{RVL}"),
+      "<div><div>x</div></div>")
+same_("  and a <br> + tag link just inside the closing div", srv._without_tag_blocks(f"<div><div>x</div><br>{RVL}</div>"),
+      "<div><div>x</div></div>")
+same_("  a block with a non-breaking space and a <br> around the link", srv._without_tag_blocks(f"<div>&nbsp;{RVL}<br></div>"), "")
+same_("  a hashtag inside a sentence stays", srv._without_tag_blocks(f"<div>ask {RVL} first</div>"), f"<div>ask {RVL} first</div>")
+same_("  a block with text and a tag stays", srv._without_tag_blocks(f"<div>{RVL} notes</div>"), f"<div>{RVL} notes</div>")
+same_("  an ordinary link stays", srv._without_tag_blocks('<div><a href="https://e.org">e</a></div>'), '<div><a href="https://e.org">e</a></div>')
+check("after an append, the tags come back after the new content",
+      srv._with_tags(srv._appended(f"<div>x</div>\n<div>{RVL}</div>", "- new"), ["RV"]) ==
+      f"<div>x</div>\n\n- new\n\n<div>{RVL}</div>")
 
 print("FAILURES:", fails)
 sys.exit(1 if fails else 0)

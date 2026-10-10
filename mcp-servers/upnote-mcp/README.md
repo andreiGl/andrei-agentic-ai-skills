@@ -165,10 +165,15 @@ with the same preview, warnings and checks, so the result has a new id and the o
 Trash.
 
 The existing HTML goes first, then a blank line, then the new Markdown. The blank line makes
-UpNote convert what follows as Markdown. Line breaks between block tags in the existing HTML are
-removed first: a browser ignores them, but UpNote's create link turns each one into an empty `<div>`, so
-the note would collect them with every append. With them removed, the existing part comes back
-byte for byte (2026-10-10, UpNote 9.22.6).
+UpNote convert what follows as Markdown. If the note ends with a list and the new text starts
+with one, UpNote joins them into one list. Tag links are moved below the new content, so a
+note's tags stay at its end however often it's appended to. A hashtag inside a sentence stays
+where it is.
+
+Every rebuild, by `replace_note`, `append_to_note` or `make_section`, first removes line breaks
+between block tags. A browser ignores them, but UpNote's create link turns each one into an empty
+`<div>`, so a note would collect them with every rebuild. A line break between inline tags, such
+as `</b>` and `<i>`, shows as a space and is kept; UpNote keeps it too (2026-10-10, UpNote 9.22.6).
 
 ## Nested sections
 
@@ -261,5 +266,13 @@ shows, with direct queries on your own library, and confirms that `run_select` r
 ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_readonly.py
 ```
 
-The create, trash, restore, replace and append tools were tested by hand against labelled test notes.
-Those tests aren't included, because they change a real library.
+`test_live.py` checks the tools that change notes: create, append, `make_section`, replace,
+trash and restore. It works on notes it creates, titled "ZZ live test" with the time, and checks
+after each step what UpNote stored: tags kept and last, no empty bullets or empty `<div>`s, and
+the existing content unchanged. At the end it moves every note it created to Trash, so they stay
+there, synced to your other devices, until you empty Trash. It needs UpNote running, takes about
+a minute, and only runs with `--live`. Run it after an UpNote update:
+
+```bash
+~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_live.py --live
+```
