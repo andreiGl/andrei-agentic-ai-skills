@@ -9,7 +9,7 @@ Starts server.py from this folder over stdio, calls every read tool, and compare
 with a direct read-only query on the database. Also sends writes through run_select and expects
 every one to be refused. Changes nothing. Exits non-zero if any check fails.
 """
-import asyncio, json, os, sqlite3, sys
+import asyncio, importlib.util, json, os, sqlite3, sys, time
 from pathlib import Path
 from urllib.parse import quote
 from mcp import ClientSession, StdioServerParameters
@@ -111,6 +111,18 @@ async def main():
             check("unknown note id is an error", err, text[:60])
             err, _, text = await call(s, "search_notes", query="   ")
             check("empty query is an error", err, text[:60])
+            started = time.monotonic()
+            err, _, text = await call(s, "run_select", sql="WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c) SELECT count(*) FROM c")
+            took = time.monotonic() - started
+            check("a query that never ends is stopped", err and "stopped after" in text and took < 20, f"{took:.1f}s {text[:70]}")
+
+    # excerpts land on the match even when casefold() changes the text's length
+    spec = importlib.util.spec_from_file_location("upnote_server", SERVER)
+    srv = importlib.util.module_from_spec(spec); spec.loader.exec_module(srv)
+    ex = srv._excerpt("x" * 300 + " Straße here", [srv._fold("straße")], 60)
+    check("excerpt finds a word that casefold() lengthens", "Straße" in ex, ex)
+    ex = srv._excerpt("ß" * 200 + " target word", [srv._fold("target")], 40)
+    check("excerpt position maps back past lengthened letters", "target" in ex, ex)
     print("FAILURES:", fails)
 asyncio.run(main())
 sys.exit(1 if fails else 0)

@@ -41,6 +41,9 @@ DB_PATH = Path(
 # How long create_note and the Trash tools wait for UpNote to save a change to its database.
 CONFIRM_SECONDS = 10.0
 
+# How long a run_select query may run before it is stopped.
+SELECT_SECONDS = 10.0
+
 # Tables and columns the server reads. Checked on every connection, so an UpNote update that
 # drops or renames one fails with the column named instead of returning wrong results.
 REQUIRED_COLUMNS = {
@@ -264,8 +267,11 @@ def _filtered_notes(conn, nbs, members, notebook: str | None, tag: str | None, i
 
 def _excerpt(text: str | None, words: list[str], width: int = 240) -> str:
     flat = re.sub(r"\s+", " ", text or "").strip()
-    low = flat.lower()
-    positions = [p for p in (low.find(w) for w in words) if p >= 0]
+    # The words were folded with casefold(), which can change a text's length ("ß" becomes "ss"),
+    # so fold the text the same way and map each folded position back to the original.
+    origin = [i for i, ch in enumerate(flat) for _ in _fold(ch)]
+    low = "".join(_fold(ch) for ch in flat)
+    positions = [origin[p] for p in (low.find(w) for w in words) if p >= 0]
     start = max(0, min(positions) - width // 3) if positions else 0
     snippet = flat[start:start + width]
     return ("…" if start > 0 else "") + snippet + ("…" if start + width < len(flat) else "")
@@ -446,11 +452,20 @@ def run_select(
 ) -> dict[str, Any]:
     """Run a custom read-only SQL query when the other tools don't cover the question."""
     with closing(_connect()) as conn:
+        # A query that never ends, such as a recursive one without a stop, would otherwise hold
+        # its worker thread and a CPU core until the server restarts.
+        deadline = time.monotonic() + SELECT_SECONDS
+        conn.set_progress_handler(lambda: int(time.monotonic() > deadline), 10000)
         try:
             cur = conn.execute(sql)
             columns = [c[0] for c in cur.description or []]
             rows = cur.fetchmany(limit + 1)
         except sqlite3.Error as e:
+            if time.monotonic() > deadline:
+                raise ToolError(
+                    f"The query was stopped after {SELECT_SECONDS:.0f} seconds. Narrow it, or check that a "
+                    "recursive query has a condition that ends it."
+                ) from e
             raise ToolError(f"Query refused or failed: {e}") from e
     return {
         "columns": columns,
@@ -1127,9 +1142,9 @@ class _NoteHtml(HTMLParser):
     def __init__(self, source: str):
         super().__init__(convert_charrefs=False)
         self.source = source
-        self._line_starts = [0]
-        for line in source.splitlines(keepends=True):
-            self._line_starts.append(self._line_starts[-1] + len(line))
+        # HTMLParser counts lines by "\n" alone. splitlines() would also break at \r, \x0c,
+        #   and others, and shift every offset after one.
+        self._line_starts = [0] + [m.end() for m in re.finditer("\n", source)]
         self.root = _Node("#root", (), 0, 0, None)
         self.root.inner_end = self.root.end = len(source)
         self._stack = [self.root]
@@ -1333,13 +1348,15 @@ def make_section(
 
 # ---------------------------------------------------------------- appending
 
-_BREAK_BETWEEN_TAGS = re.compile(r"(</[a-zA-Z][^>]*>)\s*\n\s*(?=<[a-zA-Z])")
+_BLOCK_TAGS = r"(?:div|p|ul|ol|li|h[1-6]|pre|blockquote|table|thead|tbody|tr|td|th|hr)"
+_BREAK_BETWEEN_TAGS = re.compile(rf"(</{_BLOCK_TAGS}\s*>)\s*\n\s*(?=<{_BLOCK_TAGS}\b)", re.I)
 
 
 def _tighten_html(source: str) -> str:
-    """Drop line breaks between a closing tag and the next opening tag, outside code blocks.
+    """Drop line breaks between a closing block tag and the next opening block tag, outside code blocks.
 
-    A browser ignores them, but UpNote's create link turns each one into an empty <div>, so
+    Between inline tags such as </b> and <i> a line break shows as a space, so those stay.
+    Between blocks a browser ignores it, but UpNote's create link turns each one into an empty <div>, so
     without this the note's HTML would grow with every append. Tested 2026-10-10: with them
     removed, the existing part came back byte for byte.
     """

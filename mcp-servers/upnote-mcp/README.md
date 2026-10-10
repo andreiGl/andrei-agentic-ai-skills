@@ -61,7 +61,7 @@ with, so start a new one after changing the server.
 | `get_note` | Returns one note's text or HTML, in parts for long notes |
 | `list_notebooks` | Lists notebooks with their paths and note counts |
 | `list_tags` | Lists tags with note counts |
-| `run_select` | Runs one read-only SQL query, for questions the other tools don't cover |
+| `run_select` | Runs one read-only SQL query, for questions the other tools don't cover, and stops it after ten seconds |
 | `create_note` | Creates a note, optionally in a notebook, and returns its id once UpNote has saved it |
 | `move_note_to_trash` | Moves a note to Trash |
 | `restore_note` | Moves a note out of Trash |
@@ -158,8 +158,8 @@ with the same preview, warnings and checks, so the result has a new id and the o
 Trash.
 
 The existing HTML goes first, then a blank line, then the new Markdown. The blank line makes
-UpNote convert what follows as Markdown. Line breaks between tags in the existing HTML are removed
-first: a browser ignores them, but UpNote's create link turns each one into an empty `<div>`, so
+UpNote convert what follows as Markdown. Line breaks between block tags in the existing HTML are
+removed first: a browser ignores them, but UpNote's create link turns each one into an empty `<div>`, so
 the note would collect them with every append. With them removed, the existing part comes back
 byte for byte (2026-10-10, UpNote 9.22.6).
 
