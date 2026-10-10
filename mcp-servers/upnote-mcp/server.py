@@ -495,8 +495,7 @@ not plain paragraphs. The title becomes the note's heading, so don't repeat it.
   ```json, ```bash, ```java, ```yaml or ```markdown. UpNote stores it as the block's language.
 - <span class="shine-highlight-yellow">text</span> marks who or what is blocking; ==text== is a green highlight.
 - Links as [text](url); bare URLs also become links. Checkboxes: - [ ] and - [x]. Markdown tables work.
-- Tags can't be set: the create link has no tag option, and a #hashtag in the body stays plain text.
-  Tell the user to add tags in UpNote.
+- Tags go in the tags parameter, not in this text: a #hashtag typed here stays plain text.
 - --- between major parts, > for quotes.
 Don't use <mark>; UpNote drops it."""
 
@@ -749,11 +748,22 @@ def create_note(
     title: Annotated[str, Field(description="Note title.")],
     text: Annotated[str, Field(description=_FORMAT_GUIDE)] = "",
     notebook: Annotated[str | None, Field(description='Notebook title, path such as "Parent / Child", or id. Omit for UpNote\'s default location.')] = None,
+    tags: Annotated[list[str] | None, Field(description=(
+        "Tags for the note, with or without #, such as [\"work\", \"java\"]. An existing tag is matched whatever "
+        "its case; a new one is created. No spaces. They appear as hashtags at the end of the note."
+    ))] = None,
     markdown: bool = True,
 ) -> dict[str, Any]:
     """Create a new note in UpNote. The app creates it, so it syncs normally. Returns the new note's id once UpNote has saved it."""
     if not title.strip() and not text.strip():
         raise ToolError("Give a title or some text.")
+    wanted_tags = [t.strip().lstrip("#") for t in tags or [] if t.strip().lstrip("#")]
+    if bad := [t for t in wanted_tags if re.search(r"[\s#]", t)]:
+        raise ToolError(f"Tags can't contain spaces or #: {', '.join(repr(t) for t in bad)}.")
+    if wanted_tags:
+        with closing(_connect()) as conn:
+            wanted_tags = list(dict.fromkeys(_tag_titles(conn, wanted_tags)))
+        text = _with_tags(text, wanted_tags)
     notebook_id = None
     notebook_title = None
     if notebook:
@@ -788,7 +798,29 @@ def create_note(
     result: dict[str, Any] = {"confirmed": True, "note": note}
     if notebook_id is not None:
         result["in_requested_notebook"] = nbs[notebook_id]["path"] in note["notebooks"]
+    if wanted_tags:
+        if lacking := _wait_for_tags(note, wanted_tags):
+            result["missing_tags"] = lacking
+            result["message"] = (
+                f"The note was created, but UpNote hadn't recorded the tags {', '.join(lacking)} after "
+                f"{CONFIRM_SECONDS:.0f} seconds. Check them in UpNote."
+            )
     return result
+
+
+def _wait_for_tags(note: dict[str, Any], tags: list[str]) -> list[str]:
+    """Poll until UpNote has recorded every tag on a new note, which it does a moment after
+    saving the note itself. Updates note["tags"]; returns the tags still missing at the deadline."""
+    deadline = time.monotonic() + CONFIRM_SECONDS
+    while True:
+        have = {_tag_key(t) for t in note["tags"]}
+        lacking = [t for t in tags if _tag_key(t) not in have]
+        if not lacking or time.monotonic() >= deadline:
+            return lacking
+        time.sleep(0.5)
+        with closing(_connect()) as conn:
+            row = conn.execute("SELECT tagLinks FROM notes WHERE id = ?", (note["id"],)).fetchone()
+        note["tags"] = _json_list(row["tagLinks"]) if row else []
 
 
 # ---------------------------------------------------------------- trash tools
@@ -1129,25 +1161,16 @@ def replace_note(
             ),
         }
 
-    # UpNote records a new note's tags a moment after the note itself.
-    wanted = {_tag_key(t) for t in tags}
-    deadline = time.monotonic() + CONFIRM_SECONDS
-    while wanted - {_tag_key(t) for t in new_note["tags"]}:
-        if time.monotonic() >= deadline:
-            lacking = [t for t in tags if _tag_key(t) not in {_tag_key(x) for x in new_note["tags"]}]
-            return {
-                "done": False,
-                "new_note": new_note,
-                "message": (
-                    f"The new version was created but didn't get the tags {', '.join(lacking)} within "
-                    f"{CONFIRM_SECONDS:.0f} seconds, so the original was left in place. Check the new note's "
-                    "tags in UpNote, then move one of the two to Trash with move_note_to_trash."
-                ),
-            }
-        time.sleep(0.5)
-        with closing(_connect()) as conn:
-            row = conn.execute("SELECT tagLinks FROM notes WHERE id = ?", (new_note["id"],)).fetchone()
-        new_note["tags"] = _json_list(row["tagLinks"]) if row else []
+    if lacking := _wait_for_tags(new_note, tags):
+        return {
+            "done": False,
+            "new_note": new_note,
+            "message": (
+                f"The new version was created but didn't get the tags {', '.join(lacking)} within "
+                f"{CONFIRM_SECONDS:.0f} seconds, so the original was left in place. Check the new note's "
+                "tags in UpNote, then move one of the two to Trash with move_note_to_trash."
+            ),
+        }
 
     with closing(_connect()) as conn:
         now = conn.execute("SELECT revision, trashed FROM notes WHERE id = ? AND deleted = 0", (note_id,)).fetchone()

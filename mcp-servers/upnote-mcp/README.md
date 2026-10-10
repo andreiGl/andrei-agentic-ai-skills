@@ -62,7 +62,7 @@ with, so start a new one after changing the server.
 | `list_notebooks` | Lists notebooks with their paths and note counts |
 | `list_tags` | Lists tags with note counts |
 | `run_select` | Runs one read-only SQL query, for questions the other tools don't cover, and stops it after ten seconds |
-| `create_note` | Creates a note, optionally in a notebook, and returns its id once UpNote has saved it |
+| `create_note` | Creates a note, optionally in a notebook and with tags, and returns its id once UpNote has saved it |
 | `move_note_to_trash` | Moves a note to Trash |
 | `restore_note` | Moves a note out of Trash |
 | `replace_note` | Edits a note by creating a new version and trashing the original, after a preview |
@@ -109,8 +109,9 @@ URLs, strikethrough, `==green==`, checkboxes, and inline HTML such as `<u>`. Fla
 in code blocks or HTML, are sent as written. A list whose items hold a code block, a quote or a
 table is also sent as written, so it keeps the empty bullet.
 
-Tags can't be set this way. The create link has no tag option, and a `#hashtag` in the body stays
-plain text, so tags have to be added in UpNote.
+Tags go in `create_note`'s `tags` parameter. The server adds each one as a hashtag link at the
+end of the note, which is how UpNote stores tags, and waits until UpNote has recorded them. A
+`#hashtag` typed in the body stays plain text.
 
 ## How changes are made
 
