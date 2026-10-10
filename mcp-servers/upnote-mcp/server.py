@@ -17,6 +17,7 @@ import os
 import re
 import sqlite3
 import subprocess
+import sys
 import time
 from contextlib import closing
 from html.parser import HTMLParser
@@ -54,6 +55,14 @@ REQUIRED_COLUMNS = {
 
 # UpNote's data version, read from config.json beside the database, that this server was tested with.
 TESTED_DATA_VERSIONS = {17}
+
+# What fixed a blocked read on 2026-10-09. macOS checks the binary that starts the server, not Claude.
+ACCESS_FIX = (
+    "If macOS blocked access, give Full Disk Access to the binary that starts this server (the launcher in "
+    "the README's \"Full Disk Access\" section) and restart Claude. If it already has it, look in System "
+    "Settings > Privacy & Security > Files & Folders for an entry whose UpNote access is switched off; "
+    "the user can clear those with `tccutil reset SystemPolicyAppData`, then restart Claude."
+)
 
 INSTRUCTIONS = """\
 The user's UpNote notes on this Mac. Use search_notes or list_notes to find notes,
@@ -112,6 +121,16 @@ def _data_version() -> int | None:
         return None
 
 
+def _parent_process() -> str | None:
+    """Path of the process that started this one. Under the Claude desktop app, that is the
+    binary macOS checks for Full Disk Access."""
+    try:
+        out = subprocess.run(["ps", "-o", "comm=", "-p", str(os.getppid())], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() or None
+
+
 def _connect() -> sqlite3.Connection:
     if not DB_PATH.exists():
         raise ToolError(f"UpNote database not found at {DB_PATH}. Set UPNOTE_DB to its path.")
@@ -124,10 +143,7 @@ def _connect() -> sqlite3.Connection:
     except sqlite3.Error as e:
         if conn is not None:
             conn.close()
-        raise ToolError(
-            f"Cannot open the UpNote database read-only: {e}. If macOS blocked access, allow the "
-            "Claude app to access data from other apps in System Settings > Privacy & Security."
-        ) from e
+        raise ToolError(f"Cannot open the UpNote database read-only: {e}. {ACCESS_FIX}") from e
     if missing:
         conn.close()
         raise ToolError(
@@ -201,6 +217,13 @@ def _resolve_notebook(nbs: dict[str, dict[str, Any]], ref: str) -> str:
     if not hits:
         raise ToolError(f"No notebook matches {ref!r}. Call list_notebooks to see titles and ids.")
     raise ToolError(f"{ref!r} matches several notebooks: {', '.join(nbs[i]['path'] for i in hits)}. Pass an id.")
+
+
+def _same_title_notebooks(nbs: dict[str, dict[str, Any]], nb_id: str) -> list[str]:
+    """Paths of other notebooks titled like this one. The create link names a notebook by
+    title alone, so with any of these UpNote may file the note in the wrong one."""
+    title = _fold(nbs[nb_id]["title"].strip())
+    return [nb["path"] for i, nb in nbs.items() if i != nb_id and _fold(nb["title"].strip()) == title]
 
 
 def _with_descendants(nbs: dict[str, dict[str, Any]], root: str) -> set[str]:
@@ -533,6 +556,12 @@ def create_note(
         with closing(_connect()) as conn:
             nbs = _notebooks(conn)
         notebook_id = _resolve_notebook(nbs, notebook)
+        if others := _same_title_notebooks(nbs, notebook_id):
+            raise ToolError(
+                f"UpNote's create link names a notebook by title only, and {nbs[notebook_id]['path']} shares its "
+                f"title with {', '.join(others)}, so the note could land in the wrong one. Rename one of them "
+                "in UpNote, or create the note without a notebook and move it by hand."
+            )
         notebook_title = nbs[notebook_id]["title"]
 
     url = _create_url(title.strip(), text, notebook_title, markdown)
@@ -621,11 +650,15 @@ def restore_note(note_id: NoteId) -> dict[str, Any]:
 @server.tool(annotations=READ)
 def check_upnote_setup() -> dict[str, Any]:
     """Report whether the server can read UpNote correctly: database path, UpNote's data version,
-    missing columns, and basic counts. Use it when other tools fail or their results look wrong."""
+    missing columns, basic counts, and which programs macOS checks for access. Use it when other
+    tools fail or their results look wrong."""
     version = _data_version()
     result: dict[str, Any] = {
         "database": str(DB_PATH),
         "database_found": DB_PATH.exists(),
+        "config_readable": version is not None,
+        "python": sys.executable,
+        "started_by": _parent_process(),
         "data_version": version,
         "tested_data_versions": sorted(TESTED_DATA_VERSIONS),
         "missing_columns": {},
@@ -662,6 +695,7 @@ def check_upnote_setup() -> dict[str, Any]:
                     )
     except sqlite3.Error as e:
         result["error"] = str(e)
+        result["fix"] = ACCESS_FIX
     result["ok"] = result["database_found"] and not result["missing_columns"] and "error" not in result
     return result
 
@@ -752,6 +786,12 @@ def _replace_checks(conn: sqlite3.Connection, note_id: str):
         blockers.append("It is shared by web link, and the link belongs to the original note.")
     if r["isTemplate"]:
         blockers.append("It is a template, and the new version would be an ordinary note.")
+    if notebook_ids and (others := _same_title_notebooks(nbs, notebook_ids[0])):
+        blockers.append(
+            f"Its notebook {nbs[notebook_ids[0]]['path']} shares its title with {', '.join(others)}, and the "
+            "create link names a notebook by title only, so the new version could land in the wrong one. "
+            "Rename one of them in UpNote first."
+        )
 
     # Warnings: recoverable by hand, or worth checking afterwards.
     bookmarks = conn.execute("SELECT content FROM lists WHERE id = 'bookmarkedNotes'").fetchone()

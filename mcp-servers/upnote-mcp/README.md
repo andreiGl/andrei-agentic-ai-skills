@@ -13,39 +13,44 @@ by hand.
 - macOS, with UpNote installed from the Mac App Store. The server reads
   `~/Library/Containers/com.getupnote.desktop/Data/Library/Application Support/UpNote/upnote.sqlite3`.
   Set `UPNOTE_DB` to point it elsewhere.
-- [uv](https://docs.astral.sh/uv/) and Python 3.12 or newer. The server declares its one
-  dependency, the MCP Python SDK, inside `server.py`, and uv installs it on first run. The
-  launcher under [Full Disk Access](#full-disk-access) skips uv and needs
-  [python.org's Python](https://www.python.org/downloads/macos/) 3.12 or newer instead.
+- [python.org's Python](https://www.python.org/downloads/macos/) 3.12 or newer, and `clang`
+  from the Xcode Command Line Tools to build the launcher. [Full Disk Access](#full-disk-access)
+  explains why the server runs this way.
+- [uv](https://docs.astral.sh/uv/), only to run the [tests](#test).
 - UpNote running, for any tool that changes a note or opens the app.
 
 ## Install
 
-Link this folder into `~/.claude` as shown in the [root README](../../README.md), then register
-the server with each app.
-
-Claude Code, for all projects:
+Link this folder into `~/.claude` as shown in the [root README](../../README.md). Then build a
+venv for the server and the launcher that starts it, and register the launcher with Claude Code
+for all projects:
 
 ```bash
-claude mcp add --scope user upnote -- "$(command -v uv)" run --script ~/.claude/mcp-servers/upnote-mcp/server.py
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12 -m venv ~/.claude/mcp-servers/upnote-mcp-venv
+~/.claude/mcp-servers/upnote-mcp-venv/bin/python -m pip install 'mcp==2.2.0'
+clang -O2 -o ~/.claude/mcp-servers/upnote-mcp-launcher ~/.claude/mcp-servers/upnote-mcp/launcher.c
+codesign -s - -i ca.glotov.upnote-mcp-launcher -f ~/.claude/mcp-servers/upnote-mcp-launcher
+claude mcp add --scope user upnote -- ~/.claude/mcp-servers/upnote-mcp-launcher
 ```
 
-Claude Desktop, in `~/Library/Application Support/Claude/claude_desktop_config.json`, with
-absolute paths for both uv and the script:
+Keep the `mcp` version in the venv in step with the one `server.py` declares.
+
+For Claude Desktop, add the launcher by its absolute path to
+`~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "upnote": {
-      "command": "/opt/homebrew/bin/uv",
-      "args": ["run", "--script", "/Users/you/.claude/mcp-servers/upnote-mcp/server.py"]
+      "command": "/Users/you/.claude/mcp-servers/upnote-mcp-launcher"
     }
   }
 }
 ```
 
-Restart Claude Desktop after editing that file. A running Claude Code session keeps the tools it
-started with, so start a new one after changing the server.
+Last, add `~/.claude/mcp-servers/upnote-mcp-launcher` under System Settings, Privacy & Security,
+Full Disk Access, and restart Claude. A running Claude Code session keeps the tools it started
+with, so start a new one after changing the server.
 
 ## Tools
 
@@ -63,7 +68,7 @@ started with, so start a new one after changing the server.
 | `replace_note` | Edits a note by creating a new version and trashing the original, after a preview |
 | `make_section` | Turns a heading, or a range between two markers, into a collapsible section, nested where it sits |
 | `open_in_upnote` | Shows a note, notebook, tag or search in the app |
-| `check_upnote_setup` | Reports the database path, UpNote's data version, any missing columns, and note counts |
+| `check_upnote_setup` | Reports the database path, UpNote's data version, any missing columns, note counts, and which program started the server |
 
 Notes in Trash are left out of searches and lists unless `include_trashed` is set. No tool
 deletes a note permanently.
@@ -122,7 +127,8 @@ original to Trash. It takes two calls: a preview that changes nothing, then the 
 which has to pass back the revision number the preview returned.
 
 The preview refuses when something would be lost for good: attachments or images, links from
-other notes, a web share link, a template, or a note already in Trash. It warns, and the
+other notes, a web share link, a template, a note already in Trash, or a notebook whose title
+another notebook shares. It warns, and the
 replacement needs those warnings accepted, when the note is pinned or bookmarked, has tags, sits
 in more than one notebook, has been saved 20 or more times, has collapsed or complex sections, or was
 edited in the last ten minutes.
@@ -158,11 +164,14 @@ and any note whose own title heading holds extra content, since rebuilding that 
 - A search left active in UpNote stays active when `open_in_upnote` shows a notebook or tag, and
   no link clears it.
 - Search matches substrings in the title and plain text. It is not a ranked index.
+- Creating or replacing a note in a notebook whose title another notebook shares is refused,
+  since UpNote's create link names a notebook by title only.
 
 ## Troubleshooting
 
 - **Start with `check_upnote_setup`.** Ask Claude to run it. It shows which database the server
-  reads, UpNote's data version, and any columns an UpNote update removed.
+  reads, UpNote's data version, any columns an UpNote update removed, and which program started
+  the server, which is the one macOS checks for access.
 - **Check the connection.** In Claude Code, `claude mcp get upnote` should report the server as
   connected. Claude Desktop logs each server to
   `~/Library/Logs/Claude/mcp-server-upnote.log`, and a working start logs
@@ -170,8 +179,19 @@ and any note whose own title heading holds extra content, since rebuilding that 
 - **"Cannot open the UpNote database read-only".** macOS blocks reading another app's data
   without Full Disk Access, and granting it to Claude is not enough: the Claude desktop app
   starts MCP servers as their own responsible process, so macOS checks the binary in `command`.
-  The desktop app may serve the tools even in a Claude Code session, so fix its config too. Use
-  the launcher in the next section.
+  The desktop app may serve the tools even in a Claude Code session, so fix its config too.
+  Check that the launcher from [Install](#install) has Full Disk Access.
+- **Still blocked with Full Disk Access granted.** Look in System Settings, Privacy & Security,
+  Files & Folders, for an entry whose "access data from UpNote" is switched off, often greyed out.
+  `tccutil reset SystemPolicyAppData` clears those, and then Claude needs a restart: a server
+  already running stays blocked after the reset.
+- **Claude Desktop can't start the server.** The app doesn't use your shell's `PATH`, so the
+  `command` in its config has to be the launcher's absolute path, without `~`.
+- **A change reports it wasn't confirmed.** The tool waited ten seconds without seeing UpNote
+  save it. Check the note before trying again, so nothing gets created twice.
+- **A notebook is refused because another one has the same title.** UpNote's create link names a
+  notebook by title only, so with two notebooks of that title the note could land in either.
+  Rename one of them in UpNote.
 
 ## Full Disk Access
 
@@ -186,24 +206,9 @@ with "unable to open database file" until `tccutil reset SystemPolicyAppData` an
 restart. So the launcher runs a venv built from python.org's Python, which is signed by the
 Python Software Foundation rather than ad hoc, and which Homebrew never upgrades.
 
-```bash
-/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12 -m venv ~/.claude/mcp-servers/upnote-mcp-venv
-~/.claude/mcp-servers/upnote-mcp-venv/bin/python -m pip install 'mcp==2.2.0'
-clang -O2 -o ~/.claude/mcp-servers/upnote-mcp-launcher ~/.claude/mcp-servers/upnote-mcp/launcher.c
-codesign -s - -i ca.glotov.upnote-mcp-launcher -f ~/.claude/mcp-servers/upnote-mcp-launcher
-claude mcp remove --scope user upnote
-claude mcp add --scope user upnote -- ~/.claude/mcp-servers/upnote-mcp-launcher
-```
-
-In `claude_desktop_config.json`, set the server's `command` to the launcher's absolute path and
-drop `args`. Then add `~/.claude/mcp-servers/upnote-mcp-launcher` under System Settings, Privacy & Security,
-Full Disk Access, and restart Claude. Rebuilding the launcher changes its signature, so grant it
-again after a rebuild. It runs whatever `server.py` holds, so the grant extends to any edit of
-that file. Keep the `mcp` version in the venv in step with the one `server.py` declares.
-- **Claude Desktop can't start the server.** The app doesn't use your shell's `PATH`, so the
-  `command` in its config has to be uv's absolute path. `command -v uv` prints it.
-- **A change reports it wasn't confirmed.** The tool waited ten seconds without seeing UpNote
-  save it. Check the note before trying again, so nothing gets created twice.
+Rebuilding the launcher changes its signature, so grant it again after a rebuild: remove it from
+Full Disk Access, add it back, and restart Claude. It runs whatever `server.py` holds, so the
+grant extends to any edit of that file.
 
 ## Test
 
