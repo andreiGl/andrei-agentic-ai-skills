@@ -118,5 +118,18 @@ check("result parses back with one section inside another",
       srv._enclosing_section(plan["html"], sections[1]) == "Outer",
       f"{len(sections)} sections")
 
+# 8. appending: line breaks between tags go, everything else stays
+EXISTING = ('<div><h3>Part</h3>\n<div>text</div>\n<ul><li>item\n</li><li>\n</li></ul>'
+            '<pre data-code-language="bash">echo a</b>\n<b>\n</pre>\n<div>end</div></div>')
+tight = srv._tighten_html(EXISTING)
+check("line breaks between a closing and an opening tag are removed",
+      "</h3><div>text</div><ul>" in tight and "</pre><div>end</div>" in tight, tight)
+check("  a line break inside an element's text stays", "<li>item\n</li>" in tight)
+check("  a line break between an opening and a closing tag stays", "<li>\n</li>" in tight)
+check("  a code block is left exactly as it was", '<pre data-code-language="bash">echo a</b>\n<b>\n</pre>' in tight)
+joined = srv._appended(EXISTING + "\n", "  ### New\n\n- x  \n")
+check("appended Markdown follows the HTML after one blank line", joined == tight + "\n\n### New\n\n- x", repr(joined[-30:]))
+check("appending to an empty note leaves only the new text", srv._appended("", "- x").strip() == "- x")
+
 print("FAILURES:", fails)
 sys.exit(1 if fails else 0)

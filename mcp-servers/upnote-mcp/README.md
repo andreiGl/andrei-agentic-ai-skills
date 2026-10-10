@@ -2,7 +2,8 @@
 
 An MCP server that connects Claude Code and Claude Desktop to the [UpNote](https://getupnote.com)
 desktop app on macOS. Claude can search and read your notes, create formatted notes, move notes
-to Trash and back, replace a note with an edited version, and open notes in the app.
+to Trash and back, add to the end of a note, replace a note with an edited version, and open
+notes in the app.
 
 It never writes to UpNote's database. Reads open the database read-only, and every change goes
 through UpNote's own `upnote://` links, so the app makes the change and syncs it like one made
@@ -65,6 +66,7 @@ with, so start a new one after changing the server.
 | `move_note_to_trash` | Moves a note to Trash |
 | `restore_note` | Moves a note out of Trash |
 | `replace_note` | Edits a note by creating a new version and trashing the original, after a preview |
+| `append_to_note` | Adds content to the end of a note, copying what's already there, the same way as `replace_note` |
 | `make_section` | Turns a heading, or a range between two markers, into a collapsible section, nested where it sits |
 | `open_in_upnote` | Shows a note, notebook, tag or search in the app |
 | `check_upnote_setup` | Reports the database path, UpNote's data version, any missing columns, note counts, and which program started the server |
@@ -83,6 +85,7 @@ Ask in plain language. Claude picks the tools.
 - "Move the note titled Old draft to Trash." Claude should confirm which note first.
 - "In my Plans note, change Triage to In progress." Claude previews the replacement and shows
   any warnings before making it.
+- "Add a follow-up item to my Plans note." Claude appends it and keeps the rest of the note.
 - "Open my Recipes notebook in UpNote."
 
 ## Formatting
@@ -138,6 +141,20 @@ and Version History stay with the original.
 
 Hand-written raw HTML, such as a collapsible section copied from the note's own `get_note` html,
 survives the round-trip: UpNote re-parses it as native formatting (2026-09-24, UpNote 9.22.2).
+
+## Adding to a note
+
+`append_to_note` takes only the new content, in Markdown, and adds it after everything already in
+the note. The server copies the existing content itself, so Claude never resends a long note, and
+nothing in it can be dropped or reworded on the way. It rebuilds the note through `replace_note`,
+with the same preview, warnings and checks, so the result has a new id and the original goes to
+Trash.
+
+The existing HTML goes first, then a blank line, then the new Markdown. The blank line makes
+UpNote convert what follows as Markdown. Line breaks between tags in the existing HTML are removed
+first: a browser ignores them, but UpNote's create link turns each one into an empty `<div>`, so
+the note would collect them with every append. With them removed, the existing part comes back
+byte for byte (2026-10-10, UpNote 9.22.6).
 
 ## Nested sections
 
@@ -214,8 +231,8 @@ grant extends to any edit of that file.
 
 ## Test
 
-Both tests run on the server's venv. `test_make_section.py` checks the section-building logic
-against synthetic note markup. It touches neither UpNote nor your notes:
+Both tests run on the server's venv. `test_make_section.py` checks the section-building logic,
+and the HTML clean-up `append_to_note` does, against synthetic note markup. It touches neither UpNote nor your notes:
 
 ```bash
 ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_make_section.py
@@ -228,5 +245,5 @@ shows, with direct queries on your own library, and confirms that `run_select` r
 ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_readonly.py
 ```
 
-The create, trash, restore and replace tools were tested by hand against labelled test notes.
+The create, trash, restore, replace and append tools were tested by hand against labelled test notes.
 Those tests aren't included, because they change a real library.

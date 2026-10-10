@@ -704,7 +704,8 @@ session hooks.
 
 [`mcp-servers/upnote-mcp`](mcp-servers/upnote-mcp) connects Claude Code and Claude Desktop to the
 UpNote desktop app on macOS. Claude can search and read notes, create formatted notes, move
-notes to Trash and back, replace a note with an edited version, and open notes in the app.
+notes to Trash and back, add to the end of a note, replace a note with an edited version, and
+open notes in the app.
 Setup, tools and limits are in [its README](mcp-servers/upnote-mcp/README.md).
 
 ## License

@@ -74,8 +74,9 @@ move_note_to_trash and restore_note move a note into or out of UpNote's Trash.
 open_in_upnote shows a note, notebook, tag or search in the app; use it only when the user
 asks to see something there.
 UpNote can't change a note in place. To edit one, use replace_note: it previews first, then
-creates the new version and moves the original to Trash. Notes can't be moved between
-notebooks or deleted permanently."""
+creates the new version and moves the original to Trash. To add to the end of a note, use
+append_to_note, which works the same way but copies the existing content itself. Notes can't
+be moved between notebooks or deleted permanently."""
 
 READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
 CREATE = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
@@ -1104,6 +1105,21 @@ def _plan_section(source: str, heading: str, collapsed: bool = False, title: str
     }
 
 
+def _current_body(note_id: str) -> str:
+    """A note's HTML without its title heading, ready to be rebuilt through replace_note."""
+    with closing(_connect()) as conn:
+        row = conn.execute("SELECT title, html FROM notes WHERE id = ? AND deleted = 0", (note_id,)).fetchone()
+    if row is None:
+        raise ToolError(f"No note with id {note_id!r}. Find ids with search_notes or list_notes.")
+    body = _strip_title_heading(row["html"] or "", row["title"] or "")
+    if body.lstrip().lower().startswith("<h2"):
+        raise ToolError(
+            "The note's own heading holds more than its title, so rebuilding it here would duplicate that "
+            "heading. Use replace_note and write the body by hand."
+        )
+    return body
+
+
 @server.tool(annotations=REPLACE)
 def make_section(
     note_id: NoteId,
@@ -1122,17 +1138,7 @@ def make_section(
     replace_note: call without expected_revision to preview what would move, then again with it. The note is rebuilt through replace_note, so the result has
     a new id and the original goes to Trash."""
     note_id = note_id.strip()
-    with closing(_connect()) as conn:
-        row = conn.execute("SELECT title, html FROM notes WHERE id = ? AND deleted = 0", (note_id,)).fetchone()
-    if row is None:
-        raise ToolError(f"No note with id {note_id!r}. Find ids with search_notes or list_notes.")
-    body = _strip_title_heading(row["html"] or "", row["title"] or "")
-    if body.lstrip().lower().startswith("<h2"):
-        raise ToolError(
-            "The note's own heading holds more than its title, so rebuilding it here would duplicate that "
-            "heading. Use replace_note and write the body by hand."
-        )
-    plan = _plan_section(body, heading, collapsed, title=title, until=until)
+    plan = _plan_section(_current_body(note_id), heading, collapsed, title=title, until=until)
 
     if expected_revision is None:
         preview = replace_note(note_id=note_id, text="unused")
@@ -1150,6 +1156,66 @@ def make_section(
     if result.get("done"):
         result.update({k: plan[k] for k in ("section_title", "inside_section", "blocks_moved")})
     return result
+
+
+# ---------------------------------------------------------------- appending
+
+_BREAK_BETWEEN_TAGS = re.compile(r"(</[a-zA-Z][^>]*>)\s*\n\s*(?=<[a-zA-Z])")
+
+
+def _tighten_html(source: str) -> str:
+    """Drop line breaks between a closing tag and the next opening tag, outside code blocks.
+
+    A browser ignores them, but UpNote's create link turns each one into an empty <div>, so
+    without this the note's HTML would grow with every append. Tested 2026-10-10: with them
+    removed, the existing part came back byte for byte.
+    """
+    code = [m.span() for m in re.finditer(r"<pre\b.*?</pre>", source, flags=re.S | re.I)]
+
+    def drop(m: re.Match) -> str:
+        inside = any(start < m.end(1) and m.end() <= end for start, end in code)
+        return m.group(0) if inside else m.group(1)
+
+    return _BREAK_BETWEEN_TAGS.sub(drop, source)
+
+
+def _appended(body: str, text: str) -> str:
+    """The note's HTML followed by the new Markdown. The blank line ends the HTML block, so
+    UpNote converts what follows as Markdown (tested 2026-10-10)."""
+    return _tighten_html(body).rstrip() + "\n\n" + text.strip()
+
+
+@server.tool(annotations=REPLACE)
+def append_to_note(
+    note_id: NoteId,
+    text: Annotated[str, Field(description=(
+        "Only the new content, added after everything already in the note. Markdown, following the same "
+        "rules as create_note's text. Don't repeat the existing content."
+    ))],
+    expected_revision: Annotated[int | None, Field(description="Omit to preview. To apply, pass the revision the preview returned.")] = None,
+    acknowledge_warnings: Annotated[bool, Field(description="Set true only after the user has seen and accepted the preview's warnings.")] = False,
+) -> dict[str, Any]:
+    """Add content to the end of a note and keep everything already in it. Use this instead of replace_note
+    when the existing content stays as it is: the server copies it, so nothing has to be resent. Two steps like
+    replace_note: call without expected_revision to preview, then again with it. The note is rebuilt through
+    replace_note, so the result has a new id and the original goes to Trash."""
+    note_id = note_id.strip()
+    if not text.strip():
+        raise ToolError("text is empty.")
+    body = _current_body(note_id)
+
+    if expected_revision is None:
+        preview = replace_note(note_id=note_id, text="unused")
+        preview["next_step"] = (
+            "Show any warnings to the user, then call again with the same text and expected_revision"
+            + (" and acknowledge_warnings=true." if preview["warnings"] else ".")
+        )
+        return preview
+
+    return replace_note(
+        note_id=note_id, text=_appended(body, text), expected_revision=expected_revision,
+        acknowledge_warnings=acknowledge_warnings,
+    )
 
 
 if __name__ == "__main__":
