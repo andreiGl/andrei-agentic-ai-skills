@@ -1,9 +1,9 @@
 # UpNote MCP server
 
 An MCP server that connects Claude Code and Claude Desktop to the [UpNote](https://getupnote.com)
-desktop app on macOS. Claude can search and read your notes, create formatted notes, move notes
-to Trash and back, add to the end of a note, replace a note with an edited version, and open
-notes in the app.
+desktop app on macOS. Claude can search and read your notes, create formatted and tagged notes,
+edit a note, add to its end, move it to another notebook, turn a heading into a collapsible
+section, change its tags, move notes to Trash and back, and open notes in the app.
 
 It never writes to UpNote's database. Reads open the database read-only, and every change goes
 through UpNote's own `upnote://` links, so the app makes the change and syncs it like one made
@@ -65,7 +65,7 @@ with, so start a new one after changing the server.
 | `create_note` | Creates a note, optionally in a notebook and with tags, and returns its id once UpNote has saved it |
 | `move_note_to_trash` | Moves a note to Trash |
 | `restore_note` | Moves a note out of Trash |
-| `replace_note` | Edits a note by creating a new version and trashing the original, after a preview; can also move it or remove tags |
+| `replace_note` | Edits a note by creating a new version and trashing the original, after a preview; can also move it, remove tags or add them |
 | `append_to_note` | Adds content to the end of a note, copying what's already there, the same way as `replace_note` |
 | `move_note` | Moves a note to another notebook by rebuilding it there unchanged, the same way as `replace_note` |
 | `make_section` | Turns a heading and what's under it, up to the next heading or a hand-written end marker, into a collapsible section, nested where it sits |
