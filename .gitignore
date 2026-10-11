@@ -20,3 +20,6 @@ Icon?
 # ~/IdeaProjects/vipvip-style-corpus/skill/ and is symlinked into ~/.claude/skills,
 # never into this repo. The rule is here in case it gets copied by mistake.
 skills/write-as-agnostic/
+
+# Python bytecode
+__pycache__/

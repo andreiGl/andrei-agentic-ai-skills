@@ -14,10 +14,11 @@
  * runs instead on a venv built from python.org's Python, which is signed by the
  * Python Software Foundation and which Homebrew never touches.
  *
- * The command is fixed at build time rather than taken from argv, so the
- * grant cannot be borrowed to run anything else.
+ * It takes no arguments, so its command line cannot point the grant at another
+ * program. Both paths are built from $HOME at startup, though, so anyone who
+ * can set HOME for it can run their own code under the grant.
  *
- * Build: see README.md, "Full Disk Access".
+ * Build: see README.md, "Install".
  */
 #include <signal.h>
 #include <spawn.h>
@@ -26,7 +27,7 @@
 #include <string.h>
 #include <sys/wait.h>
 
-/* Relative to $HOME. Built per README.md, "Full Disk Access". */
+/* Relative to $HOME. Built per README.md, "Install". */
 #define VENV_PYTHON "/.claude/mcp-servers/upnote-mcp-venv/bin/python"
 
 extern char **environ;
