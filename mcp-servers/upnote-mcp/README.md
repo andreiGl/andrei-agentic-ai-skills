@@ -273,6 +273,18 @@ content, since rebuilding that would duplicate it.
 - Pin and bookmark can't be set: no link does it.
 - Creating or replacing a note in a notebook whose title another notebook shares is refused,
   since UpNote's create link names a notebook by title only.
+- **UpNote can wipe a notebook's membership when a note is added to it.** Its create link adds the
+  note by rebuilding the notebook's list from an in-memory copy, and when that copy is missing it
+  writes the new note alone and syncs that to every device. On 2026-10-11 a note created in a
+  notebook of 351 left it holding 1 (UpNote 9.22.6; it happened once, during UpNote's daily backup
+  and re-sync, and a note created an hour earlier in the same notebook was fine). The notes stay
+  intact; only their place in the notebook is lost. The server can't prevent it, but every tool
+  that adds a note to a notebook checks the notebook's members before and after. A loss is reported
+  in `notebook_members_lost` with the missing ids, and a rebuild then leaves the original in place.
+- UpNote keeps a daily backup per account in `~/Library/Containers/com.getupnote.desktop/Data/Library/Application Support/UpNote/UpNote Backup/<account>/data/`,
+  one `.upnx` file per day: gzip holding a `version:2` line, then one JSON record per line (`user`,
+  `notebooks`, `lists`, `filters`, `tags`, `files`, `notes`). A notebook's members are the `lists`
+  record with id `notebooks_<notebook id>`. It is the way back from a wipe like the one above.
 
 ## Troubleshooting
 

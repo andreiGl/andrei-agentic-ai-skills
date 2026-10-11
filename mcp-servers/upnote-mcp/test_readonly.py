@@ -425,6 +425,24 @@ async def main():
             check("  a late copy the user trashed doesn't block the note", res.get("done") and nid not in srv._PENDING, str(res)[:100])
         srv._PENDING.clear()
         srv._find_created_note = lambda marker, path=None: {"id": "fake-new", "trashed": False, "notebooks": [path] if path else [], "tags": []}
+
+        # UpNote's list wipe (2026-10-11): the notebook's list comes back holding only the new note
+        real_members = srv._notebook_members
+        calls = []
+        srv._notebook_members = lambda nb: (calls.append(nb) or (["a", "b", "c"] if len(calls) % 2 else ["fake-new"]))
+        try:
+            nid, html, text, rev = accepted
+            stored["text"] = text or ""
+            res = srv._replace(nid, title="Wipe test", expected_revision=rev, acknowledge_warnings=True)
+            check("a rebuild that wipes the notebook's list keeps the original and says so",
+                  not res.get("done") and res.get("notebook_members_lost", {}).get("missing") == 3, str(res)[:120])
+            with srv.closing(real_connect()) as conn:
+                nb = next(v for v in srv._notebooks(conn).values() if not srv._same_title_notebooks(srv._notebooks(conn), v["id"]))
+            res = srv.create_note("Wipe test", "x", notebook=nb["id"])
+            check("  and create_note reports it", res.get("notebook_members_lost", {}).get("missing_note_ids") == ["a", "b", "c"], str(res)[:120])
+        finally:
+            srv._notebook_members = real_members
+            stored["text"] = None
         if bare:
             nid, html, text, rev = bare
             stored["text"] = text or ""

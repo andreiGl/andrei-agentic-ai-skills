@@ -240,6 +240,37 @@ def _membership(conn: sqlite3.Connection, nbs: dict[str, dict[str, Any]]) -> dic
     return members
 
 
+def _notebook_members(notebook_id: str) -> list[str]:
+    with closing(_connect()) as conn:
+        row = conn.execute("SELECT content FROM lists WHERE id = ?", (f"notebooks_{notebook_id}",)).fetchone()
+    return _json_list(row["content"]) if row else []
+
+
+# UpNote adds a linked note to its notebook by rebuilding the notebook's list from its in-memory copy,
+# `getListContents.get(id) || new Set()` (renderer.js, 9.22.6). When that copy is missing, the list is
+# written as the new note alone and synced to every device: on 2026-10-11 a note created in Ping
+# Identity left that notebook with 1 of its 351 members. The server can't prevent it, since it never
+# writes the database, so every link that adds a note to a notebook is checked for it.
+_LOST_MEMBERS = (
+    "UpNote dropped {missing} of the {had} notes in {notebook!r} from that notebook while adding this one. This is a "
+    "bug in UpNote: it rebuilt the notebook's list from an empty copy and synced it to every device. The notes "
+    "themselves are intact; only their place in the notebook is gone. Tell the user now and make no more changes "
+    "in this notebook. To repair it, add the notes in missing_note_ids back to the notebook, or restore the "
+    "notebook's list from UpNote's daily backup (UpNote Backup folder in UpNote's Application Support; gzip, a "
+    "'version:2' line, then one JSON record per line, the list's id being notebooks_<notebook id>) with UpNote "
+    "quit on every device."
+)
+
+
+def _lost_members(notebook_id: str, before: list[str], path: str) -> dict[str, Any] | None:
+    """The notebook members present before a link that are gone after it, reported, or None."""
+    after = set(_notebook_members(notebook_id))
+    if not (lost := [n for n in before if n not in after]):
+        return None
+    return {"notebook": path, "had": len(before), "missing": len(lost), "missing_note_ids": lost,
+            "message": _LOST_MEMBERS.format(missing=len(lost), had=len(before), notebook=path)}
+
+
 def _resolve_notebook(nbs: dict[str, dict[str, Any]], ref: str) -> str:
     ref = ref.strip()
     if ref in nbs:
@@ -968,6 +999,7 @@ def create_note(
 
     marker = _new_marker()
     url = _create_url(title.strip(), text, notebook_title, markdown, marker)
+    members_before = _notebook_members(notebook_id) if notebook_id is not None else []
     _open_link(url)
 
     try:
@@ -992,6 +1024,10 @@ def create_note(
         return result
     if notebook_id is not None:
         result["in_requested_notebook"] = nbs[notebook_id]["path"] in note["notebooks"]
+        if lost := _lost_members(notebook_id, members_before, nbs[notebook_id]["path"]):
+            result["notebook_members_lost"] = lost
+            result["message"] = lost["message"]
+            return result
         if not result["in_requested_notebook"]:
             result["message"] = (
                 f"The note was created but hadn't appeared in {nbs[notebook_id]['path']!r} after "
@@ -1521,6 +1557,7 @@ def _replace(
         else:
             del _PENDING[note_id]
     marker = _new_marker()
+    members_before = _notebook_members(target) if target else []
     _open_link(_create_url(new_title, body, notebook_title, markdown, marker))
     new_note = None
     trashing = False
@@ -1553,6 +1590,10 @@ def _replace(
                 "seconds, so the original was left in place. Ask the user to check the new note's notebook in "
                 "UpNote, then move the one they don't want to Trash with move_note_to_trash. Don't call this tool again."
             )
+        if target and (lost := _lost_members(target, members_before, notebook_path)):
+            result = kept_both(lost["message"] + " The original was left in place, so it isn't lost as well.")
+            result["notebook_members_lost"] = lost
+            return result
         if lacking := _wait_for_tags(new_note, tags):
             return kept_both(
                 f"The new version was created but didn't get the tags {', '.join(lacking)} within "
