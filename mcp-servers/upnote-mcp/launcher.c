@@ -15,19 +15,23 @@
  * Python Software Foundation and which Homebrew never touches.
  *
  * It takes no arguments, so its command line cannot point the grant at another
- * program. Both paths are built from $HOME at startup, though, so anyone who
- * can set HOME for it can run their own code under the grant.
+ * program. Both paths are built from the home folder in the user database, not
+ * from $HOME, so setting HOME for it cannot point the grant elsewhere either.
+ * It still runs whatever server.py holds.
  *
  * Build: see README.md, "Install".
  */
+#include <errno.h>
+#include <pwd.h>
 #include <signal.h>
 #include <spawn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
-/* Relative to $HOME. Built per README.md, "Install". */
+/* Relative to the home folder. Built per README.md, "Install". */
 #define VENV_PYTHON "/.claude/mcp-servers/upnote-mcp-venv/bin/python"
 
 extern char **environ;
@@ -40,9 +44,10 @@ static void forward(int sig) {
 }
 
 int main(void) {
-    const char *home = getenv("HOME");
-    if (!home) {
-        fprintf(stderr, "upnote-mcp-launcher: HOME is not set\n");
+    const struct passwd *pw = getpwuid(getuid());
+    const char *home = pw ? pw->pw_dir : NULL;
+    if (!home || !*home) {
+        fprintf(stderr, "upnote-mcp-launcher: cannot find this user's home folder\n");
         return 1;
     }
     char python[4096], script[4096];
@@ -63,6 +68,10 @@ int main(void) {
 
     int status;
     while (waitpid(child, &status, 0) < 0) {
+        if (errno != EINTR) {  /* a signal interrupted the wait; anything else won't clear on retry */
+            perror("upnote-mcp-launcher: waitpid");
+            return 1;
+        }
     }
     if (WIFEXITED(status))
         return WEXITSTATUS(status);

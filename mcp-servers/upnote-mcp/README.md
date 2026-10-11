@@ -306,8 +306,8 @@ A grant on uv or Homebrew's Python doesn't last. Homebrew signs them ad hoc, so 
 grant to one build and drops it on the next `brew upgrade`. `launcher.c` builds a small binary
 that starts `server.py` and waits for it. It never changes, so its grant holds. It takes no
 arguments and always runs `~/.claude/mcp-servers/upnote-mcp/server.py` with the venv's Python, so
-its command line can't point the grant at another program. It builds both paths from `HOME` when
-it starts, though, so anyone who can set `HOME` for it can run their own code under the grant.
+its command line can't point the grant at another program. It builds both paths from the home
+folder in the user database, not from `HOME`, so setting `HOME` can't point it elsewhere either.
 
 The launcher doesn't use uv. With uv in the chain, macOS recorded a separate "access data from
 UpNote" decision against each Homebrew uv build, switched off and locked, and the server failed
