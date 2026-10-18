@@ -23,3 +23,8 @@ skills/write-as-agnostic/
 
 # Python bytecode
 __pycache__/
+
+# Files Claude Code writes into a mod's folder when it loads the mod from there
+# (its API types and a tsconfig that extends them). Regenerated on every load.
+/mods/*/.claude-plugin/types/
+/mods/*/tsconfig.json
