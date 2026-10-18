@@ -1,0 +1,7 @@
+{
+  "name": "collision-guard",
+  "version": "0.1.0",
+  "description": "For several sessions in one project: asks before editing a file another session changed in the last 30 minutes, and shows a banner with what the other sessions are working on.",
+  "author": { "name": "Andrei Glotov" },
+  "types": "./types/index.d.ts"
+}

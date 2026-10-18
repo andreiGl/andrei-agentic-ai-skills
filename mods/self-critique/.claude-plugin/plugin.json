@@ -1,0 +1,7 @@
+{
+  "name": "self-critique",
+  "version": "0.1.0",
+  "description": "/critique opens a side panel reviewing Claude's last response: verdict, summary, strengths, flaws with one-click fixes, Rerun, Auto and a reviewer model picker.",
+  "author": { "name": "Andrei Glotov" },
+  "types": "./types/index.d.ts"
+}

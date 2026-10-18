@@ -1,0 +1,7 @@
+{
+  "name": "session-keeper",
+  "version": "0.1.0",
+  "description": "A strip above the prompt: prompt-cache countdown, usage limits and API-equivalent cost on one row; context fill, a quality warning and one-key handoff on the other.",
+  "author": { "name": "Andrei Glotov" },
+  "types": "./types/index.d.ts"
+}

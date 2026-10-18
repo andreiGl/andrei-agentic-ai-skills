@@ -28,6 +28,7 @@ a custom status line, and an MCP server for the UpNote notes app.
 - [UpNote MCP server](#upnote-mcp-server)
 - [License](#license)
 - [KB actions band (plugin)](#kb-actions-band-plugin)
+- [Mods](#mods)
 - [Session hooks](#session-hooks)
 
 ## Installation
@@ -770,6 +771,57 @@ Install as a plugin (works on Claude Code 2.1.275+):
 ```
 /plugin install andrei-personal --marketplace andreiGl/andrei-agentic-ai-skills
 ```
+
+## Mods
+
+Four more function-hook plugins live under `mods/`, each its own plugin in the same
+marketplace, so you install only the ones you want. They were built on Claude Code
+2.1.299; the mod API is early access and moves between releases.
+
+| Mod | What it does |
+| :--- | :--- |
+| [`session-keeper`](mods/session-keeper) | Two rows above the prompt. The first: a countdown until the prompt cache goes cold (window read from the transcript, 60 min by default), 5-hour and weekly usage, the session's API-equivalent cost, and what the next message costs if the cache expires. The second: context fill, a warning when quality may start to slip, and buttons for a new session with a handoff brief (`1`) or a fresh one (`2`). Notifies 5 minutes before the cache goes cold. Commands: `/cache-ttl`, `/autohandoff`, `/handoff`, `/session-keeper show\|hide cache\|context`. |
+| [`plan-progress`](mods/plan-progress) | A side panel for multi-step work and `/goal`: the goal, the phase (researching, planning, building, testing, auditing), a checklist from Claude's task list, a progress bar and elapsed time, plus an All tasks tab listing other sessions' goals. Plays a short chime when a turn ends. Command: `/plan-progress [all\|sound on\|sound off]`. |
+| [`self-critique`](mods/self-critique) | `/critique` opens a side panel reviewing Claude's last response: a verdict (Strong, Mixed, Weak), a summary, strengths, and flaws, each with a fix and a Make this fix button. Rerun, Auto on/off, and a reviewer picker (same as session, Opus, Sonnet, Haiku). |
+| [`collision-guard`](mods/collision-guard) | For several sessions in one folder. Before Claude edits a file another session changed in the last 30 minutes, it asks: Proceed, Move to a worktree, Cancel, or type your own answer. A banner lists the other sessions, what each is working on, and whether it is in progress, waiting or done. |
+
+Install any of them by name:
+
+```
+/plugin install session-keeper --marketplace andreiGl/andrei-agentic-ai-skills
+/plugin install plan-progress --marketplace andreiGl/andrei-agentic-ai-skills
+/plugin install self-critique --marketplace andreiGl/andrei-agentic-ai-skills
+/plugin install collision-guard --marketplace andreiGl/andrei-agentic-ai-skills
+```
+
+In the desktop app, install from a terminal (`claude plugin install <mod> --marketplace
+andreiGl/andrei-agentic-ai-skills`): desktop sessions load plugins installed at the user
+scope. Listing a mod's folder in `CLAUDE_CODE_PLUGIN_DIRS` loads it in the terminal but
+not in desktop sessions.
+
+Every band here, the KB actions band included, keeps what other mods draw beneath it,
+so they stack instead of hiding each other.
+
+Things to know:
+
+- **macOS assumed.** The desktop app has no terminal notifications, so the cache warning
+  falls back to `osascript`; the chime falls back to `afplay`.
+- **Prices are fixed.** `session-keeper` prices the cold-cache message from a table of list
+  prices in [`mods/session-keeper/hooks/logic.ts`](mods/session-keeper/hooks/logic.ts),
+  current on 2026-10-06. Bedrock and Vertex price differently.
+- **Files they write:** handoff briefs in `~/.claude/handoffs/`; one record per session in
+  `~/.claude/plan-progress/` and `~/.claude/collision-guard/<project>/`, which is how
+  sessions see each other.
+
+Run a mod's tests from its own folder:
+
+```bash
+claude plugin test mods/session-keeper
+```
+
+Run from the repo root, `claude plugin test .` also collects the mods' tests and runs
+them against the root plugin, so their drawing tests fail there. The KB actions band's
+tests are the ones to read in that run.
 
 ## Session hooks
 

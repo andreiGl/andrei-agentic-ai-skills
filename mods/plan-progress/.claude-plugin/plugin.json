@@ -1,0 +1,7 @@
+{
+  "name": "plan-progress",
+  "version": "0.1.0",
+  "description": "A panel with the goal, phase, checklist, progress bar and elapsed time of Claude's current plan, an All tasks view across sessions, and a chime when a turn ends.",
+  "author": { "name": "Andrei Glotov" },
+  "types": "./types/index.d.ts"
+}

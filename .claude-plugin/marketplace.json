@@ -7,6 +7,22 @@
     {
       "name": "andrei-personal",
       "source": "./"
+    },
+    {
+      "name": "session-keeper",
+      "source": "./mods/session-keeper"
+    },
+    {
+      "name": "plan-progress",
+      "source": "./mods/plan-progress"
+    },
+    {
+      "name": "self-critique",
+      "source": "./mods/self-critique"
+    },
+    {
+      "name": "collision-guard",
+      "source": "./mods/collision-guard"
     }
   ]
 }
