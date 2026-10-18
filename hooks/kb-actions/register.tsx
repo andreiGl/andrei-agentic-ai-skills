@@ -191,20 +191,22 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    // What other mods draw in the band; this row goes on top of it, so neither hides the other.
+    const below = await next(e)
     const [snapshot, debt, toolUses] = await Promise.all([
       read($, snapshotAtom),
       read($, debtAtom),
       read($, toolsAtom),
     ])
 
-    if (snapshot === null) return next(e)
+    if (snapshot === null) return below
     const verdict = verdictOf(snapshot)
     const actions = actionsOf(snapshot, verdict, toolUses, debtToolThreshold, debt.length)
-    if (actions.length === 0) return next(e)
+    if (actions.length === 0) return below
 
     const { Box, Text, Button } = $.ui.resolve(e)
 
-    return (
+    const row = (
       <Box>
         <Text dimColor>KB: </Text>
         {actions.map((action) => (
@@ -225,6 +227,15 @@ export const register: Register = (on, options) => {
           </Box>
         ))}
       </Box>
+    )
+
+    return below ? (
+      <Box flexDirection="column">
+        {row}
+        {below}
+      </Box>
+    ) : (
+      row
     )
   })
 }

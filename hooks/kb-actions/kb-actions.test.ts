@@ -182,6 +182,25 @@ test('band shows due buttons and queues the skill prompt on press', async ($, on
   }
 })
 
+test('band keeps what another mod draws beneath it', async ($, on) => {
+  mock.env(on, { HOME: '/nonexistent-kb-test-home' })
+  on('ui.render', (): RenderElement => h('Text', null, 'other band') as RenderElement)
+  on('tool.call', () => ({ result: { output: 'ok' } }))
+  on('turn.complete', (_$, e) => ({ text: e.answer ?? '' }))
+
+  for (let index = 0; index < 34; index += 1) {
+    await $.tool.call({ tool: 'Bash', command: 'true' })
+  }
+  await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1' })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'andrei-personal', surface, ...BAND })
+    expect(await ui.find({ type: 'Button', text: /34 tools/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'other band' })).toBeDefined()
+    await ui.unmount()
+  }
+})
+
 test('band draws nothing when nothing is owed', async ($, on) => {
   on('ui.render', (): RenderElement => h('Box', null) as RenderElement)
   for (const surface of ['terminal', 'desktop'] as const) {
