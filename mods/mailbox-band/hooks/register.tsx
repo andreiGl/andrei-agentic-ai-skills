@@ -208,10 +208,11 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const sid = await $.session.id()
     const sid8 = sid.slice(0, 8)
-    void (async () => {
-      const snap = await snapshot($, sid8)
-      await update($, snapAtom, () => snap)
-    })()
+    // Awaited here (home's review): the first prompt must find the snapshot
+    // ready, else its briefing block is skipped. Turn completion stays
+    // background - that is the hot path.
+    const snap = await snapshot($, sid8)
+    await update($, snapAtom, () => snap)
     await $.command.register({ name: 'mailbox', description: 'Show mailbox state: mapping, daemon, unread (read-only).' })
     await $.command.register({
       name: 'mailbox-wire',
@@ -222,7 +223,7 @@ export const register: Register = on => {
   })
 
   on('turn.complete', async ($, e, next) => {
-    if (e.agentId !== undefined) return next(e)
+    if (e.agentId !== undefined) return (await next(e)) ?? { text: '' }
     const sid = await $.session.id()
     const sid8 = sid.slice(0, 8)
     // Background refresh (home's finding): the turn must not wait on
@@ -230,8 +231,8 @@ export const register: Register = on => {
     void (async () => {
       const snap = await snapshot($, sid8)
       await update($, snapAtom, () => snap)
-    })()
-    return next(e)
+    })().catch(() => {})
+    return (await next(e)) ?? { text: '' }
   })
 
   on('prompt.context', async ($, e, next) => {
@@ -316,7 +317,7 @@ export const register: Register = on => {
                   }
                 }
                 await $.prompt.fill({ text, mode: 'insert' })
-              })()
+              })().catch(() => {})
             }}
           />
         )}
