@@ -26,7 +26,9 @@ prefix)):
 The snapshot refreshes at `session.start` and after each main turn
 (`turn.complete`, main thread only) **in the background** - the hooks
 return at once and the row updates when the fetch lands, so turn
-completion never waits on the network. It is deliberately not on a timer:
+completion never waits on the network. Every snapshot carries a schema
+version; readers drop snapshots with an older one, because `$.state`
+survives a reload and the atom can briefly hold a pre-reload shape. It is deliberately not on a timer:
 idle polling would spend API calls for nothing.
 
 **First-turn context block** (`prompt.context`, block name `mailbox`): lane

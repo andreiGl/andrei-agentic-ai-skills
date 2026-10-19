@@ -78,3 +78,16 @@ test('mailbox-wire preserves the existing !wake flag on re-wire', async ($, on) 
   expect(map).toContain('mine:0123abcd:4,7:!wake')
   expect(map).not.toMatch(/^mine:0123abcd:4,7\n/m)
 })
+
+test('ui.render + prompt.context pass through on a stale-schema snapshot (pre-reload state)', async ($, on) => {
+  on('session.id', () => ({ value: SID }))
+  // A pre-reload snapshot: no flags, no schema. Readers must skip it, not crash.
+  const stale = { installed: true, nick: 'work', peer: 'home', mapped: { name: 'infra', threads: '4' }, live: [], sid8: '0123abcd', liveRegistered: true, daemon: { running: false, pid: null }, lagSeconds: null, responderActive: false, unread: [], unreadError: false }
+  on('state.get', async (_$, e) => (e.key === 'snap' ? { value: { value: stale, version: 1 } } : { value: { value: false, version: 0 } }))
+  on('prompt.context', () => ({ blocks: [] }))
+  on('ui.render', { component: 'AbovePrompt' }, async () => ({ type: 'Box', props: {}, children: [] }))
+  const ctx = await $.prompt.context({ blocks: [] })
+  expect(ctx.blocks.find(b => b.name === 'mailbox')).toBeUndefined()
+  const tree = await $.ui.render({ component: 'AbovePrompt' } as never)
+  expect(tree).toBeDefined()
+})

@@ -1,4 +1,6 @@
 export type MailboxSnapshot = {
+  /** Snapshot-shape version; readers drop snapshots with another value */
+  schema: number
   /** Script present at ~/.claude/scripts/claude-mail */
   installed: boolean
   /** NICK= from ~/.claude/mailbox/config */

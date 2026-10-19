@@ -7,6 +7,10 @@ type Engine = EngineInterface
 
 const snapAtom = atom({ plugin: 'mailbox-band', key: 'snap' } as const, null)
 const hiddenAtom = atom({ plugin: 'mailbox-band', key: 'hidden' } as const, false)
+// Bump when the snapshot shape changes: $.state survives a reload, so the
+// atom can hold a pre-reload snapshot (missing new fields - the
+// flags.includes crash Andrei saw) until the next refresh lands.
+const SNAPSHOT_SCHEMA = 2
 
 const mailboxDir = async ($: Engine): Promise<string> =>
   `${await $.env.get('HOME') ?? ''}/.claude/mailbox`
@@ -123,6 +127,7 @@ async function unreadCounts(
 async function snapshot($: Engine, sid8: string): Promise<MailboxSnapshot> {
   const dir = await mailboxDir($)
   const out: MailboxSnapshot = {
+    schema: SNAPSHOT_SCHEMA,
     installed: false,
     nick: '',
     peer: '',
@@ -188,7 +193,7 @@ function formatStatus(snap: MailboxSnapshot): string {
   lines.push(`lane: ${snap.nick} (peer: ${snap.peer})`)
   lines.push(
     snap.mapped !== null
-      ? `this session: ${snap.nick}/${snap.mapped.name}, thread(s) ${snap.mapped.threads}${snap.mapped.flags !== '' ? `, flags ${snap.mapped.flags}` : ''}${snap.liveRegistered ? '' : '  [NOT live-registered: the SessionStart hook did not fire]'}`
+      ? `this session: ${snap.nick}/${snap.mapped.name}, thread(s) ${snap.mapped.threads}${snap.mapped.flags ? `, flags ${snap.mapped.flags}` : ''}${snap.liveRegistered ? '' : '  [NOT live-registered: the SessionStart hook did not fire]'}`
       : `this session: unmapped (sends stay lane-only ${snap.nick}; directed mail cannot reach it). Wire with /mailbox-wire <name> <threads>`,
   )
   lines.push(`daemon: ${snap.daemon.running ? `running (pid ${snap.daemon.pid ?? '?'})` : 'NOT RUNNING'}${snap.lagSeconds !== null ? `, cursor lag ${Math.round(snap.lagSeconds / 60)}m` : ''}`)
@@ -243,11 +248,13 @@ export const register: Register = on => {
     // in unrelated projects the "not mapped" text is pure noise. The band,
     // /mailbox and /mailbox-wire still work there.
     if (snap === null || !snap.installed || snap.mapped === null) return next(e)
+    // A pre-reload snapshot (schema 1) lacks flags; skip until refreshed.
+    if ((snap as { schema?: number }).schema !== SNAPSHOT_SCHEMA) return next(e)
     const lines: string[] = [
       '## Mailbox (inter-Claude lane mail)',
       `Lane nick: ${snap.nick} (peer: ${snap.peer}). Script: ~/.claude/scripts/claude-mail. For the full briefing read BRIEFING.md in the ${REPO} repo before acting on mailbox mail.`,
     ]
-    lines.push(`This session is mapped as ${snap.nick}/${snap.mapped.name} on thread(s) ${snap.mapped.threads}; its sends carry from=${snap.nick}/${snap.mapped.name}.${snap.mapped.flags.includes('!wake') ? ' This session is !wake: no socket wakes; check for mail at session start, on the band, or on request.' : ''}`)
+    lines.push(`This session is mapped as ${snap.nick}/${snap.mapped.name} on thread(s) ${snap.mapped.threads}; its sends carry from=${snap.nick}/${snap.mapped.name}.${snap.mapped.flags?.includes('!wake') ? ' This session is !wake: no socket wakes; check for mail at session start, on the band, or on request.' : ''}`)
     if (snap.unreadError) {
       lines.push('Unread count unavailable (fetch failed).')
     } else {
@@ -278,10 +285,13 @@ export const register: Register = on => {
     const snap = await read($, snapAtom)
     const hidden = await read($, hiddenAtom)
     if (snap === null || !snap.installed || hidden) return next(e)
+    // A pre-reload snapshot (schema 1) lacks flags; pass through until the
+    // background refresh replaces it (session.start / turn.complete).
+    if ((snap as { schema?: number }).schema !== SNAPSHOT_SCHEMA) return next(e)
 
     const { Box, Button, Text } = $.ui.resolve(e)
     const who = snap.mapped !== null
-      ? `${snap.nick}/${snap.mapped.name}${snap.mapped.flags.includes('!wake') ? ' (no-wake)' : ''}`
+      ? `${snap.nick}/${snap.mapped.name}${snap.mapped.flags?.includes('!wake') ? ' (no-wake)' : ''}`
       : `${snap.nick} (unmapped)`
     const daemon = snap.daemon.running
       ? `ok${snap.lagSeconds !== null ? ` · lag ${Math.round(snap.lagSeconds / 60)}m` : ''}`
