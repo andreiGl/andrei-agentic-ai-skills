@@ -426,6 +426,10 @@ async function runCommand(
     const sid = await $.session.id()
     const snap = await snapshot($, sid.slice(0, 8))
     await update($, snapAtom, () => snap)
+    // /mailbox un-hides the band (no other unhide exists; a Hide press is
+    // otherwise permanent for the session).
+    await update($, hiddenAtom, () => false)
+    lastDrawn = null
     return { text: formatStatus(snap) }
   }
   if (e.command === 'mailbox-wire') {
