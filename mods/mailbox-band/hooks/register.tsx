@@ -21,12 +21,14 @@ function parseConfig(text: string): { nick: string; peer: string; plainGh: boole
   return { nick, peer, plainGh }
 }
 
-function parseSessions(text: string, sid8: string): { name: string; threads: string } | null {
+function parseSessions(text: string, sid8: string): { name: string; threads: string; flags: string } | null {
   for (const line of text.split('\n')) {
+    // Map line: NAME:prefix:threads[:flags] - field 4 carries flags such as
+    // !wake (per-session socket-wake opt-out); it is never part of threads.
     const parts = line.trim().split(':')
     const tag = parts[1]
     if (parts.length >= 3 && tag !== undefined && tag !== '' && sid8.startsWith(tag)) {
-      return { name: parts[0] ?? '', threads: parts.slice(2).join(':') }
+      return { name: parts[0] ?? '', threads: parts[2] ?? '', flags: parts[3] ?? '' }
     }
   }
   return null
@@ -65,7 +67,7 @@ async function ghEnv($: Engine): Promise<Record<string, string>> {
  */
 async function unreadCounts(
   $: Engine,
-  mapped: { name: string; threads: string },
+  mapped: { name: string; threads: string; flags: string },
 ): Promise<{ unread: { thread: string; count: number }[]; error: boolean }> {
   const dir = await mailboxDir($)
   let cursor = 0
@@ -186,7 +188,7 @@ function formatStatus(snap: MailboxSnapshot): string {
   lines.push(`lane: ${snap.nick} (peer: ${snap.peer})`)
   lines.push(
     snap.mapped !== null
-      ? `this session: ${snap.nick}/${snap.mapped.name}, thread(s) ${snap.mapped.threads}${snap.liveRegistered ? '' : '  [NOT live-registered: the SessionStart hook did not fire]'}`
+      ? `this session: ${snap.nick}/${snap.mapped.name}, thread(s) ${snap.mapped.threads}${snap.mapped.flags !== '' ? `, flags ${snap.mapped.flags}` : ''}${snap.liveRegistered ? '' : '  [NOT live-registered: the SessionStart hook did not fire]'}`
       : `this session: unmapped (sends stay lane-only ${snap.nick}; directed mail cannot reach it). Wire with /mailbox-wire <name> <threads>`,
   )
   lines.push(`daemon: ${snap.daemon.running ? `running (pid ${snap.daemon.pid ?? '?'})` : 'NOT RUNNING'}${snap.lagSeconds !== null ? `, cursor lag ${Math.round(snap.lagSeconds / 60)}m` : ''}`)
@@ -245,7 +247,7 @@ export const register: Register = on => {
       '## Mailbox (inter-Claude lane mail)',
       `Lane nick: ${snap.nick} (peer: ${snap.peer}). Script: ~/.claude/scripts/claude-mail. For the full briefing read BRIEFING.md in the ${REPO} repo before acting on mailbox mail.`,
     ]
-    lines.push(`This session is mapped as ${snap.nick}/${snap.mapped.name} on thread(s) ${snap.mapped.threads}; its sends carry from=${snap.nick}/${snap.mapped.name}.`)
+    lines.push(`This session is mapped as ${snap.nick}/${snap.mapped.name} on thread(s) ${snap.mapped.threads}; its sends carry from=${snap.nick}/${snap.mapped.name}.${snap.mapped.flags.includes('!wake') ? ' This session is !wake: no socket wakes; check for mail at session start, on the band, or on request.' : ''}`)
     if (snap.unreadError) {
       lines.push('Unread count unavailable (fetch failed).')
     } else {
@@ -278,7 +280,9 @@ export const register: Register = on => {
     if (snap === null || !snap.installed || hidden) return next(e)
 
     const { Box, Button, Text } = $.ui.resolve(e)
-    const who = snap.mapped !== null ? `${snap.nick}/${snap.mapped.name}` : `${snap.nick} (unmapped)`
+    const who = snap.mapped !== null
+      ? `${snap.nick}/${snap.mapped.name}${snap.mapped.flags.includes('!wake') ? ' (no-wake)' : ''}`
+      : `${snap.nick} (unmapped)`
     const daemon = snap.daemon.running
       ? `ok${snap.lagSeconds !== null ? ` · lag ${Math.round(snap.lagSeconds / 60)}m` : ''}`
       : 'DOWN'
@@ -365,8 +369,12 @@ async function runCommand(
       return { text: `mailbox: ${mapPath} not found - is the mailbox installed on this machine?` }
     }
     const existing = parseSessions(map, sid8)
+    // A re-wire keeps the line's existing flags (field 4): /mailbox-wire
+    // never silently turns a !wake session back into a wake target.
+    const flags = existing?.flags ?? ''
+    const line = flags !== '' ? `${name}:${sid8}:${threads}:${flags}` : `${name}:${sid8}:${threads}`
     if (existing !== null && existing.name === name && existing.threads === threads) {
-      return { text: `already mapped: ${existing.name}:${sid8}:${existing.threads} - nothing to do.` }
+      return { text: `already mapped: ${line} - nothing to do.` }
     }
     const kept = map
       .split('\n')
@@ -376,9 +384,9 @@ async function runCommand(
         return !(p.length >= 3 && tag !== undefined && tag !== '' && sid8.startsWith(tag))
       })
       .join('\n')
-    await $.fs.write(mapPath, `${kept.replace(/\n*$/, '\n')}${name}:${sid8}:${threads}\n`)
+    await $.fs.write(mapPath, `${kept.replace(/\n*$/, '\n')}${line}\n`)
     const verify = parseSessions(await $.fs.read(mapPath), sid8)
-    if (verify === null || verify.name !== name || verify.threads !== threads) {
+    if (verify === null || verify.name !== name || verify.threads !== threads || verify.flags !== flags) {
       return { text: 'wire FAILED: the map line did not resolve after the write - inspect ~/.claude/mailbox/sessions by hand.' }
     }
     const snap = await snapshot($, sid8)

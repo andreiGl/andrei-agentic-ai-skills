@@ -5,8 +5,8 @@ export type MailboxSnapshot = {
   nick: string
   /** PEER= from ~/.claude/mailbox/config */
   peer: string
-  /** This session's map line: name + threads, when the sessions map names it */
-  mapped: { name: string; threads: string } | null
+  /** This session's map line: name + threads + flags (field 4, e.g. !wake) */
+  mapped: { name: string; threads: string; flags: string } | null
   /** live-sessions entries: "<sid8> <socket>" */
   live: { sid: string; socket: string }[]
   /** This session's id (8-char head) */

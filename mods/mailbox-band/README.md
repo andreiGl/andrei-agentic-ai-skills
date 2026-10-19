@@ -15,7 +15,8 @@ newest issue + 1, per-repo sequential; a failed fetch leaves the bare
 prefix)):
 `MB work/infra · daemon ok · lag 1m · unread 2 · responder busy`
 
-- `who` - the session's mapped actor (`nick/name`), or `nick (unmapped)`.
+- `who` - the session's mapped actor (`nick/name`, with `no-wake` when
+  the map line flags it `!wake`), or `nick (unmapped)`.
 - `daemon` - running with the daemon cursor's lag, or `DOWN`.
 - `unread` - read-only count over the session's threads: comments past the
   session's cursor (falling back to the daemon cursor when the session has
@@ -39,16 +40,19 @@ only - unmapped ones (unrelated projects) get no block, by Andrei's call
 ## Commands
 
 - `/mailbox` - full status text: lane, mapping (flagging `NOT
-  live-registered` when the SessionStart hook did not fire), daemon pid and
-  cursor lag, responder, live sessions on the machine, unread per thread.
+  live-registered` when the SessionStart hook did not fire, and any map
+  flags such as `!wake`), daemon pid and cursor lag, responder, live
+  sessions on the machine, unread per thread.
 - `/mailbox-wire <name> <threads>` - verifies thread `<threads[0]>` exists on
   the repo first (read-only; a miss answers the `claude-mail new` command
   instead of wiring a dead number), then rewrites
   `~/.claude/mailbox/sessions` as `NAME:session8:threads` (replacing any
-  line already matching this session id), verifies the line resolves with
-  the script's own prefix-match rule, then prints the ready-to-post peer-half
-  instruction. Validates the name (`[a-z][a-z0-9-]*`) and threads
-  (comma-separated numbers) before touching anything.
+  line already matching this session id; the line's existing field-4 flags
+  such as `!wake` are kept - a re-wire never silently re-arms wakes),
+  verifies the line resolves with the script's own prefix-match rule, then
+  prints the ready-to-post peer-half instruction. Validates the name
+  (`[a-z][a-z0-9-]*`) and threads (comma-separated numbers) before touching
+  anything.
 
 ## What it never does
 
