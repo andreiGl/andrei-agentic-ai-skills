@@ -7,6 +7,11 @@ type Engine = EngineInterface
 
 const snapAtom = atom({ plugin: 'mailbox-band', key: 'snap' } as const, null)
 const hiddenAtom = atom({ plugin: 'mailbox-band', key: 'hidden' } as const, false)
+// The band string as last DRAWN (module-level: a render hook may not write
+// $.state - drawing is pure). ui.render skips the redraw while the visible
+// text is unchanged (focus-steal fix); a reload resets it, which costs at
+// most one extra redraw.
+let lastDrawn: string | null = null
 // Bump when the snapshot shape changes: $.state survives a reload, so the
 // atom can hold a pre-reload snapshot (missing new fields - the
 // flags.includes crash Andrei saw) until the next refresh lands.
@@ -289,7 +294,6 @@ export const register: Register = on => {
     // background refresh replaces it (session.start / turn.complete).
     if ((snap as { schema?: number }).schema !== SNAPSHOT_SCHEMA) return next(e)
 
-    const { Box, Button, Text } = $.ui.resolve(e)
     const who = snap.mapped !== null
       ? `${snap.nick}/${snap.mapped.name}${snap.mapped.flags?.includes('!wake') ? ' (no-wake)' : ''}`
       : `${snap.nick} (unmapped)`
@@ -299,6 +303,16 @@ export const register: Register = on => {
     const unread = snap.unreadError ? '?' : String(snap.unread.reduce((a, u) => a + u.count, 0))
     const unreadPart = snap.mapped !== null ? ` · unread ${unread}` : ''
     const responder = snap.responderActive ? ' · responder busy' : ''
+    const visible = `MB ${who} · daemon ${daemon}${unreadPart}${responder}`
+
+    // Redraw only on genuine change (Andrei's focus-steal fix): a render
+    // event with an identical band redraws the prompt area under the
+    // user's typing - the background snapshot refresh lands ~a minute
+    // after every turn.
+    if (lastDrawn === visible) return next(e)
+    lastDrawn = visible
+
+    const { Box, Button, Text } = $.ui.resolve(e)
 
     return (
       <Box>
@@ -361,7 +375,10 @@ export const register: Register = on => {
             }}
           />
         )}
-        <Button key="hide" label="Hide" onPress={() => update($, hiddenAtom, () => true)} />
+        <Button key="hide" label="Hide" onPress={() => {
+          lastDrawn = null   // the band must redraw when it comes back
+          void update($, hiddenAtom, () => true).catch(() => {})
+        }} />
       </Box>
     )
   })
