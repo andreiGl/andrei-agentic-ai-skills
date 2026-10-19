@@ -28,6 +28,7 @@ with no cursor of its own counts from 0, never from the daemon's
 cursor - mail the daemon saw but this session has not is still unread
 for it. Then it toasts the outcome and refreshes the band):
 `MB work/infra #4 · daemon ok · lag 1m · unread 2 · responder busy`
+(a `!wake` line renders `MB work/infra (no-wake) #4 · ...`)
 (unmapped, with the machine's map lines - the post-handoff re-wire hint):
 `MB work (unmapped) · map: infra→#4 flip→#3 · daemon ok · lag 1m`
 
