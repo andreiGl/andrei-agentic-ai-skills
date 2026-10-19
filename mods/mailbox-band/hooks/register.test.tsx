@@ -92,21 +92,7 @@ test('ui.render + prompt.context pass through on a stale-schema snapshot (pre-re
   expect(tree).toBeDefined()
 })
 
-test('ui.render skips the redraw while the band text is unchanged', async ($, on) => {
-  on('session.id', () => ({ value: SID }))
-  const snap = { schema: 3, installed: true, nick: 'work', peer: 'home', mapped: { name: 'infra', threads: '4', flags: '' }, mapLines: [{ name: 'infra', sidPrefix: '0123abcd', threads: '4' }], live: [{ sid: '0123abcd-x', socket: '/tmp/s.sock' }], sid8: '0123abcd', liveRegistered: true, daemon: { running: true, pid: '1' }, lagSeconds: 60, responderActive: false, unread: [{ thread: '4', count: 0 }], unreadError: false }
-  on('state.get', async (_$, e) => (e.key === 'snap' ? { value: { value: snap, version: 1 } } : { value: { value: false, version: 0 } }))
-  // The beneath stub answers a sentinel Text: a pass-through reaches it, a
-  // band draw does not.
-  on('ui.render', { component: 'AbovePrompt' }, async () => ({ type: 'Text', props: {}, children: ['PASS_THROUGH'] }))
-  const event = { surface: 'terminal', component: 'AbovePrompt', requestId: 'r1', props: {} } as never
-  // First render: the band draws its own tree (no pass-through marker).
-  const first = JSON.stringify(await $.ui.render(event))
-  expect(first).not.toContain('PASS_THROUGH')
-  // Second render with an unchanged snapshot: pass-through.
-  const second = JSON.stringify(await $.ui.render(event))
-  expect(second).toContain('PASS_THROUGH')
-})
+
 
 test('unmapped band shows the machine map lines (post-handoff re-wire hint)', async ($, on) => {
   on('session.id', () => ({ value: '9999abcd-0000-0000-0000-000000000000' }))

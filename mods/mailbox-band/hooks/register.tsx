@@ -7,11 +7,6 @@ type Engine = EngineInterface
 
 const snapAtom = atom({ plugin: 'mailbox-band', key: 'snap' } as const, null)
 const hiddenAtom = atom({ plugin: 'mailbox-band', key: 'hidden' } as const, false)
-// The band string as last DRAWN (module-level: a render hook may not write
-// $.state - drawing is pure). ui.render skips the redraw while the visible
-// text is unchanged (focus-steal fix); a reload resets it, which costs at
-// most one extra redraw.
-let lastDrawn: string | null = null
 // Bump when the snapshot shape changes: $.state survives a reload, so the
 // atom can hold a pre-reload snapshot (missing new fields - the
 // flags.includes crash Andrei saw) until the next refresh lands.
@@ -328,15 +323,6 @@ export const register: Register = on => {
     const mapPart = snap.mapped === null && snap.mapLines.length > 0
       ? ` · map: ${snap.mapLines.map(l => `${l.name}→#${l.threads}`).join(' ')}`
       : ''
-    const visible = `MB ${who}${mapPart} · daemon ${daemon}${unreadPart}${responder}`
-
-    // Redraw only on genuine change (Andrei's focus-steal fix): a render
-    // event with an identical band redraws the prompt area under the
-    // user's typing - the background snapshot refresh lands ~a minute
-    // after every turn.
-    if (lastDrawn === visible) return next(e)
-    lastDrawn = visible
-
     const { Box, Button, Text } = $.ui.resolve(e)
 
     return (
@@ -409,7 +395,6 @@ export const register: Register = on => {
           />
         )}
         <Button key="hide" label="Hide" onPress={() => {
-          lastDrawn = null   // the band must redraw when it comes back
           void update($, hiddenAtom, () => true).catch(() => {})
         }} />
       </Box>
@@ -429,7 +414,6 @@ async function runCommand(
     // /mailbox un-hides the band (no other unhide exists; a Hide press is
     // otherwise permanent for the session).
     await update($, hiddenAtom, () => false)
-    lastDrawn = null
     return { text: formatStatus(snap) }
   }
   if (e.command === 'mailbox-wire') {

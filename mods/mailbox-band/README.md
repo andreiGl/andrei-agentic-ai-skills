@@ -40,11 +40,6 @@ for it. Then it toasts the outcome and refreshes the band):
   none) minus the machine's own ids. `?` when the fetch failed.
 - `responder busy` - a responder turn is in flight.
 
-The band redraws only when its visible text actually changed - a render
-with an identical row passes through untouched (a redraw blips typing
-under it; Andrei's focus-steal fix). Hide clears the drawn-state so the
-band returns on unhide.
-
 The snapshot refreshes at `session.start` and after each main turn
 (`turn.complete`, main thread only) **in the background** - the hooks
 return at once and the row updates when the fetch lands, so turn
