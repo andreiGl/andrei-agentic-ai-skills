@@ -23,14 +23,18 @@ prefix)):
 - `responder busy` - a responder turn is in flight.
 
 The snapshot refreshes at `session.start` and after each main turn
-(`turn.complete`, main thread only). It is deliberately not on a timer:
+(`turn.complete`, main thread only) **in the background** - the hooks
+return at once and the row updates when the fetch lands, so turn
+completion never waits on the network. It is deliberately not on a timer:
 idle polling would spend API calls for nothing.
 
 **First-turn context block** (`prompt.context`, block name `mailbox`): lane
 nick and peer, this session's mapping or how to get wired, unread summary,
 and the standing warning - never `claude-mail check` to browse (it consumes
 the cursor); read with `claude-mail read <thread> --tail 30`. The block is
-recomputed after compaction, so the briefing survives.
+recomputed after compaction, so the briefing survives. Mapped sessions
+only - unmapped ones (unrelated projects) get no block, by Andrei's call
+(home's review finding); the band and commands still work there.
 
 ## Commands
 
@@ -65,8 +69,8 @@ script follows, and the token never appears outside the child env.
 
 - The unread count approximates what the session's next check would
   consume: `since=` is time-based (24h window) while cursors are id-based,
-  and the fetch caps at 100 comments. Good enough for a status row, not a
-  delivery mechanism.
+  and the fetch (newest-100, `direction=desc` - the unread are the newest)
+  caps at one page. Good enough for a status row, not a delivery mechanism.
 - The band goes stale while the session is idle; it redraws on the next turn.
 - `prompt.context` does not run for installed plugins where an organization
   manages Claude Code (validator warning) - the band and commands still work.
@@ -89,7 +93,7 @@ At session.start register two commands and keep a snapshot in $.state:
 - /mailbox prints full status: lane nick/peer, mapping (with NOT live-registered flagged when live-sessions lacks the id), daemon pid + lag, responder state, live session ids, unread per thread, and the reminder that `claude-mail check` consumes the cursor and reads go through `claude-mail read <thread> --tail 30`.
 - /mailbox-wire <name> <threads> maps THIS session: validates name [a-z][a-z0-9-]* and threads as comma-separated numbers, reads ~/.claude/mailbox/sessions, drops any line whose tag matches this session's 8-char id prefix, appends NAME:sid8:threads, re-reads and re-parses to verify (report wire FAILED if not), refreshes the snapshot, and prints the ready-to-post peer-half instruction (claude-mail send --thread <first> --text "session pair setup: ..."). It never posts by itself.
 
-A prompt.context hook (block name `mailbox`) injects a briefing into the conversation's first turn: lane nick and peer, the mapping (or that the session is unmapped and /mailbox-wire exists), the unread summary when nonzero, and the never-check-to-browse warning. Filter out an existing mailbox block before appending so re-computation after compaction stays one copy. Guards: pass through unchanged when the script is missing or the snapshot is null; tolerate e.blocks being undefined.
+A prompt.context hook (block name `mailbox`) injects a briefing into the conversation's first turn of MAPPED sessions only (unmapped sessions get no block): lane nick and peer, the mapping, the unread summary when nonzero, and the never-check-to-browse warning. Filter out an existing mailbox block before appending so re-computation after compaction stays one copy. Guards: pass through unchanged when the script is missing or the snapshot is null; tolerate e.blocks being undefined.
 
 Type notes: $ is per-dispatch (helpers take $ explicitly); there is no Node - read HOME via $.env.get("HOME") (call-site paths must await it); ~/ paths are not expanded by $.fs - always absolute. Wrap the command.run body in try/catch answering "mailbox-band: command failed: <msg>" and add on(...).catch so the validator sees the gate. Tests (claude plugin test): the kit has no fs/process - stub on('session.id', () => ({ value: SID })) (call hooks answer { value }), stub core prompt.context with on('prompt.context', () => ({ blocks: [] })), and $.command.run args need origin { kind: 'composer' } and presentation { isFullscreen: false, columns: 120 }. Cover: pass-through when no snapshot, all three usage-error paths of mailbox-wire, /mailbox surfacing the failure text in an fs-less env, and foreign commands falling through. Run `npx -y -p typescript@5.9.3 tsc -p <dev>/tsconfig.mailbox-band.json` (target es2023, jsx react with h/Fragment, strict + noUncheckedIndexedAccess, no DOM lib) until clean.
 ```

@@ -95,7 +95,10 @@ async function unreadCounts(
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
   const env = await ghEnv($)
   const r = await $.process.run(
-    ['gh', 'api', `repos/${REPO}/issues/comments?sort=created&direction=asc&per_page=100&since=${since}`],
+    // desc: the unread are the NEWEST comments; asc page 1 is the oldest
+    // 100 of the window, which misses exactly them on busy days (home's
+    // finding, same class as the receipts pagination bug).
+    ['gh', 'api', `repos/${REPO}/issues/comments?sort=created&direction=desc&per_page=100&since=${since}`],
     { timeoutMs: 20_000, env },
   )
   if (r.exitCode !== 0) return { unread: [], error: true }
@@ -204,8 +207,11 @@ function formatStatus(snap: MailboxSnapshot): string {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const sid = await $.session.id()
-    const snap = await snapshot($, sid.slice(0, 8))
-    await update($, snapAtom, () => snap)
+    const sid8 = sid.slice(0, 8)
+    void (async () => {
+      const snap = await snapshot($, sid8)
+      await update($, snapAtom, () => snap)
+    })()
     await $.command.register({ name: 'mailbox', description: 'Show mailbox state: mapping, daemon, unread (read-only).' })
     await $.command.register({
       name: 'mailbox-wire',
@@ -218,23 +224,27 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     if (e.agentId !== undefined) return next(e)
     const sid = await $.session.id()
-    const snap = await snapshot($, sid.slice(0, 8))
-    await update($, snapAtom, () => snap)
+    const sid8 = sid.slice(0, 8)
+    // Background refresh (home's finding): the turn must not wait on
+    // pgrep + the GitHub fetch; the atom updates when the snapshot lands.
+    void (async () => {
+      const snap = await snapshot($, sid8)
+      await update($, snapAtom, () => snap)
+    })()
     return next(e)
   })
 
   on('prompt.context', async ($, e, next) => {
     const snap = await read($, snapAtom)
-    if (snap === null || !snap.installed) return next(e)
+    // Unmapped sessions get no block (Andrei's call, home's finding 3):
+    // in unrelated projects the "not mapped" text is pure noise. The band,
+    // /mailbox and /mailbox-wire still work there.
+    if (snap === null || !snap.installed || snap.mapped === null) return next(e)
     const lines: string[] = [
       '## Mailbox (inter-Claude lane mail)',
       `Lane nick: ${snap.nick} (peer: ${snap.peer}). Script: ~/.claude/scripts/claude-mail. For the full briefing read BRIEFING.md in the ${REPO} repo before acting on mailbox mail.`,
     ]
-    if (snap.mapped !== null) {
-      lines.push(`This session is mapped as ${snap.nick}/${snap.mapped.name} on thread(s) ${snap.mapped.threads}; its sends carry from=${snap.nick}/${snap.mapped.name}.`)
-    } else {
-      lines.push(`This session is not mapped to a named session: sends stay lane-only (${snap.nick}) and directed mail cannot reach it. Offer /mailbox-wire <name> <threads> when a named session is wanted.`)
-    }
+    lines.push(`This session is mapped as ${snap.nick}/${snap.mapped.name} on thread(s) ${snap.mapped.threads}; its sends carry from=${snap.nick}/${snap.mapped.name}.`)
     if (snap.unreadError) {
       lines.push('Unread count unavailable (fetch failed).')
     } else {
