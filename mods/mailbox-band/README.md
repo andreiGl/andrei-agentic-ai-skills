@@ -13,9 +13,14 @@ is unmapped it also shows a **Wire...** button that types
 `/mailbox-wire <name> <predicted>` into the prompt box (the prediction is
 newest issue + 1, per-repo sequential; a failed fetch leaves the bare
 prefix); when the session IS mapped it shows a **Fetch** button that runs
-`claude-mail fetch` - posts this session's wake envelope on demand, the
-turn it starts consumes the session's cursor exactly like a daemon wake,
-then toasts the outcome and refreshes the band):
+`claude-mail fetch --session <sid>` - posts this session's wake envelope
+on demand (the sid is passed explicitly; a spawned process may not inherit
+`CLAUDE_CODE_SESSION_ID`). The button works on `!wake` sessions - that is
+its main use: the flag suppresses only the daemon's envelope, never an
+explicit pull. With no unread mail the fetch no-ops ("no new mail" toast,
+no turn started); the envelope names only threads with unread mail. A
+mid-turn press queues the envelope like a daemon wake does (step-0
+proven). Then it toasts the outcome and refreshes the band):
 `MB work/infra · daemon ok · lag 1m · unread 2 · responder busy`
 
 - `who` - the session's mapped actor (`nick/name`, with `no-wake` when
