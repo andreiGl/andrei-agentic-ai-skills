@@ -350,7 +350,9 @@ export const register: Register = on => {
                 const sid = await $.session.id()
                 const r = await $.process.run(
                   [await scriptPath($), 'fetch', '--session', sid],
-                  { timeoutMs: 15_000 },
+                  // 30s: the script's peek allows 20s; the button must
+                  // outlive it so the fail-open path can still post.
+                  { timeoutMs: 30_000 },
                 )
                 await $.ui.toast(r.exitCode === 0 && r.stdout.includes('no new mail') ? 'mailbox: no new mail' : r.exitCode === 0 ? 'mailbox: fetch posted - the turn starts now' : `mailbox: fetch failed - ${r.stderr.trim() || r.stdout.trim() || `exit ${r.exitCode}`}`)
                 const snap2 = await snapshot($, sid.slice(0, 8))

@@ -20,7 +20,11 @@ its main use: the flag suppresses only the daemon's envelope, never an
 explicit pull. With no unread mail the fetch no-ops ("no new mail" toast,
 no turn started); the envelope names only threads with unread mail. A
 mid-turn press queues the envelope like a daemon wake does (step-0
-proven). Then it toasts the outcome and refreshes the band):
+proven). The peek looks at the last 24h - unread mail older than that
+does not trigger it (the same approximation the band makes). A session
+with no cursor of its own counts from 0, never from the daemon's
+cursor - mail the daemon saw but this session has not is still unread
+for it. Then it toasts the outcome and refreshes the band):
 `MB work/infra · daemon ok · lag 1m · unread 2 · responder busy`
 
 - `who` - the session's mapped actor (`nick/name`, with `no-wake` when
