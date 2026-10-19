@@ -12,7 +12,10 @@ wakes a session, never sends mail by itself.
 is unmapped it also shows a **Wire...** button that types
 `/mailbox-wire <name> <predicted>` into the prompt box (the prediction is
 newest issue + 1, per-repo sequential; a failed fetch leaves the bare
-prefix)):
+prefix); when the session IS mapped it shows a **Fetch** button that runs
+`claude-mail fetch` - posts this session's wake envelope on demand, the
+turn it starts consumes the session's cursor exactly like a daemon wake,
+then toasts the outcome and refreshes the band):
 `MB work/infra · daemon ok · lag 1m · unread 2 · responder busy`
 
 - `who` - the session's mapped actor (`nick/name`, with `no-wake` when

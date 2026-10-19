@@ -335,6 +335,27 @@ export const register: Register = on => {
             }}
           />
         )}
+        {snap.mapped !== null && (
+          <Button
+            key="fetch"
+            label="Fetch"
+            onPress={() => {
+              void (async () => {
+                // The script's own envelope to THIS session's socket: the
+                // turn it starts consumes the session's cursor - the same
+                // path a daemon wake takes, user-triggered. Read-only
+                // contract intact: the mod itself never checks or sends.
+                const r = await $.process.run(
+                  [await scriptPath($), 'fetch'],
+                  { timeoutMs: 15_000 },
+                )
+                await $.ui.toast(r.exitCode === 0 ? 'mailbox: fetch posted - the turn starts now' : `mailbox: fetch failed - ${r.stderr.trim() || r.stdout.trim() || `exit ${r.exitCode}`}`)
+                const snap2 = await snapshot($, (await $.session.id()).slice(0, 8))
+                await update($, snapAtom, () => snap2)
+              })().catch(() => {})
+            }}
+          />
+        )}
         <Button key="hide" label="Hide" onPress={() => update($, hiddenAtom, () => true)} />
       </Box>
     )
