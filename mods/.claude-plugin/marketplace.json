@@ -1,10 +1,28 @@
 {
   "name": "local-mods",
-  "owner": { "name": "Andrei Glotov" },
+  "owner": {
+    "name": "Andrei Glotov"
+  },
   "plugins": [
-    { "name": "session-keeper", "source": "./session-keeper" },
-    { "name": "plan-progress", "source": "./plan-progress" },
-    { "name": "self-critique", "source": "./self-critique" },
-    { "name": "collision-guard", "source": "./collision-guard" }
+    {
+      "name": "session-keeper",
+      "source": "./session-keeper"
+    },
+    {
+      "name": "plan-progress",
+      "source": "./plan-progress"
+    },
+    {
+      "name": "self-critique",
+      "source": "./self-critique"
+    },
+    {
+      "name": "collision-guard",
+      "source": "./collision-guard"
+    },
+    {
+      "name": "mailbox-band",
+      "source": "./mailbox-band"
+    }
   ]
 }

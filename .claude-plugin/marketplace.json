@@ -23,6 +23,10 @@
     {
       "name": "collision-guard",
       "source": "./mods/collision-guard"
+    },
+    {
+      "name": "mailbox-band",
+      "source": "./mods/mailbox-band"
     }
   ]
 }

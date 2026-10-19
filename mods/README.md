@@ -11,6 +11,7 @@ it from scratch in a fresh session.
 | [`plan-progress`](plan-progress/) | Side panel with the goal, phase, checklist, progress bar and elapsed time of the current plan; All tasks tab across sessions; chime when a turn ends. | [README](plan-progress/README.md) |
 | [`self-critique`](self-critique/) | `/critique` reviews Claude's last response in a side panel: verdict, strengths, flaws with one-click fixes. | [README](self-critique/README.md) |
 | [`collision-guard`](collision-guard/) | Asks before editing a file another session changed in the last 30 minutes; banner listing the other sessions in the folder. | [README](collision-guard/README.md) |
+| [`mailbox-band`](mailbox-band/) | Mailbox status row (mapping, daemon lag, read-only unread, responder), first-turn mailbox briefing, `/mailbox` and `/mailbox-wire` with thread prediction and existence check. | [README](mailbox-band/README.md) |
 
 ## Installing
 
@@ -22,7 +23,7 @@ claude plugin install session-keeper@andrei-personal-skills
 ```
 
 Or, from a clone of this repository, install a folder marketplace that lists the
-same four (see `.claude-plugin/marketplace.json` here):
+same five (see `.claude-plugin/marketplace.json` here):
 
 ```
 claude plugin marketplace add <clone>/mods

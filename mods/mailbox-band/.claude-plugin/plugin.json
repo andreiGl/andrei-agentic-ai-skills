@@ -1,0 +1,6 @@
+{
+  "name": "mailbox-band",
+  "version": "0.1.0",
+  "description": "Mailbox state above the prompt, self-briefing context, and /mailbox + /mailbox-wire commands. Read-only: never consumes cursors or wakes sessions.",
+  "types": "./types/index.d.ts"
+}
