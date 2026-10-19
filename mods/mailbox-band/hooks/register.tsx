@@ -309,7 +309,7 @@ export const register: Register = on => {
     if ((snap as { schema?: number }).schema !== SNAPSHOT_SCHEMA) return next(e)
 
     const who = snap.mapped !== null
-      ? `${snap.nick}/${snap.mapped.name}${snap.mapped.flags?.includes('!wake') ? ' (no-wake)' : ''} #${snap.mapped.threads.split(',').map(t => `#${t.trim()}`).join('')}`
+      ? `${snap.nick}/${snap.mapped.name}${snap.mapped.flags?.includes('!wake') ? ' (no-wake)' : ''}${snap.mapped.threads.split(',').map(t => ` #${t.trim()}`).join('')}`
       : `${snap.nick} (unmapped)`
     const daemon = snap.daemon.running
       ? `ok${snap.lagSeconds !== null ? ` · lag ${Math.round(snap.lagSeconds / 60)}m` : ''}`
