@@ -9,6 +9,8 @@ export type MailboxSnapshot = {
   peer: string
   /** This session's map line: name + threads + flags (field 4, e.g. !wake) */
   mapped: { name: string; threads: string; flags: string } | null
+  /** Every sessions-map line (name + id prefix + threads): shown when unmapped */
+  mapLines: { name: string; sidPrefix: string; threads: string }[]
   /** live-sessions entries: "<sid8> <socket>" */
   live: { sid: string; socket: string }[]
   /** This session's id (8-char head) */

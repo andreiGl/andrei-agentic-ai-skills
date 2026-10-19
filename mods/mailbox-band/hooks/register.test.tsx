@@ -94,7 +94,7 @@ test('ui.render + prompt.context pass through on a stale-schema snapshot (pre-re
 
 test('ui.render skips the redraw while the band text is unchanged', async ($, on) => {
   on('session.id', () => ({ value: SID }))
-  const snap = { schema: 2, installed: true, nick: 'work', peer: 'home', mapped: { name: 'infra', threads: '4', flags: '' }, live: [], sid8: '0123abcd', liveRegistered: true, daemon: { running: true, pid: '1' }, lagSeconds: 60, responderActive: false, unread: [{ thread: '4', count: 0 }], unreadError: false }
+  const snap = { schema: 3, installed: true, nick: 'work', peer: 'home', mapped: { name: 'infra', threads: '4', flags: '' }, mapLines: [{ name: 'infra', sidPrefix: '0123abcd', threads: '4' }], live: [{ sid: '0123abcd-x', socket: '/tmp/s.sock' }], sid8: '0123abcd', liveRegistered: true, daemon: { running: true, pid: '1' }, lagSeconds: 60, responderActive: false, unread: [{ thread: '4', count: 0 }], unreadError: false }
   on('state.get', async (_$, e) => (e.key === 'snap' ? { value: { value: snap, version: 1 } } : { value: { value: false, version: 0 } }))
   // The beneath stub answers a sentinel Text: a pass-through reaches it, a
   // band draw does not.
@@ -106,4 +106,26 @@ test('ui.render skips the redraw while the band text is unchanged', async ($, on
   // Second render with an unchanged snapshot: pass-through.
   const second = JSON.stringify(await $.ui.render(event))
   expect(second).toContain('PASS_THROUGH')
+})
+
+test('unmapped band shows the machine map lines (post-handoff re-wire hint)', async ($, on) => {
+  on('session.id', () => ({ value: '9999abcd-0000-0000-0000-000000000000' }))
+  const snap = { schema: 3, installed: true, nick: 'work', peer: 'home', mapped: null, mapLines: [{ name: 'infra', sidPrefix: '0c42', threads: '4' }, { name: 'flip', sidPrefix: '009a', threads: '3' }], live: [], sid8: '9999abcd', liveRegistered: false, daemon: { running: true, pid: '1' }, lagSeconds: 60, responderActive: false, unread: [], unreadError: false }
+  on('state.get', async (_$, e) => (e.key === 'snap' ? { value: { value: snap, version: 1 } } : { value: { value: false, version: 0 } }))
+  const first = JSON.stringify(await $.ui.render({ surface: 'terminal', component: 'AbovePrompt', requestId: 'r9', props: {} } as never))
+  expect(first).toContain('unmapped')
+  expect(first).toContain('infra→#4')
+  expect(first).toContain('flip→#3')
+})
+
+test('Wire prefill reclaims a dead map line (handoff case)', async ($, on) => {
+  on('session.id', () => ({ value: '9999abcd-0000-0000-0000-000000000000' }))
+  const snap = { schema: 3, installed: true, nick: 'work', peer: 'home', mapped: null, mapLines: [{ name: 'infra', sidPrefix: '0c42', threads: '4' }], live: [{ sid: 'other-session', socket: '/tmp/other.sock' }], sid8: '9999abcd', liveRegistered: false, daemon: { running: false, pid: null }, lagSeconds: null, responderActive: false, unread: [], unreadError: false }
+  on('state.get', async (_$, e) => (e.key === 'snap' ? { value: { value: snap, version: 1 } } : { value: { value: false, version: 0 } }))
+  on('ui.render', { component: 'AbovePrompt' }, async () => ({ type: 'Box', props: {}, children: [] }))
+  let filled = ''
+  on('prompt.fill', async (_$, e) => { filled = (e as unknown as { text: string }).text; return { isFilled: true } })
+  const ui = await $.ui.mount({ plugin: 'mailbox-band', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 200, scroll: { offset: 0, bodyRows: 10 }, view: {} } })
+  await ui.press({ key: 'wire' })
+  expect(filled).toBe('/mailbox-wire infra 4')
 })

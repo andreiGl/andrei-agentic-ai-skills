@@ -15,7 +15,7 @@ let lastDrawn: string | null = null
 // Bump when the snapshot shape changes: $.state survives a reload, so the
 // atom can hold a pre-reload snapshot (missing new fields - the
 // flags.includes crash Andrei saw) until the next refresh lands.
-const SNAPSHOT_SCHEMA = 2
+const SNAPSHOT_SCHEMA = 3
 
 const mailboxDir = async ($: Engine): Promise<string> =>
   `${await $.env.get('HOME') ?? ''}/.claude/mailbox`
@@ -51,6 +51,22 @@ function parseLive(text: string): { sid: string; socket: string }[] {
     const socket = parts[1]
     if (parts.length === 2 && sid !== undefined && socket !== undefined && sid !== '' && socket !== '') {
       out.push({ sid, socket })
+    }
+  }
+  return out
+}
+
+/** Every map line, name + threads: the band shows it for unmapped sessions
+ * so a post-handoff session can see (and re-wire) the old threads. */
+function parseMapLines(text: string): { name: string; sidPrefix: string; threads: string }[] {
+  const out: { name: string; sidPrefix: string; threads: string }[] = []
+  for (const line of text.split('\n')) {
+    const parts = line.trim().split(':')
+    const name = parts[0]
+    const sidPrefix = parts[1]
+    const threads = parts[2]
+    if (parts.length >= 3 && name !== undefined && name !== '' && sidPrefix !== undefined && sidPrefix !== '' && threads !== undefined && threads !== '') {
+      out.push({ name, sidPrefix, threads })
     }
   }
   return out
@@ -137,6 +153,7 @@ async function snapshot($: Engine, sid8: string): Promise<MailboxSnapshot> {
     nick: '',
     peer: '',
     mapped: null,
+    mapLines: [],
     live: [],
     sid8,
     liveRegistered: false,
@@ -156,7 +173,9 @@ async function snapshot($: Engine, sid8: string): Promise<MailboxSnapshot> {
     const cfg = parseConfig(await $.fs.read(`${dir}/config`))
     out.nick = cfg.nick
     out.peer = cfg.peer
-    out.mapped = parseSessions(await $.fs.read(`${dir}/sessions`), sid8)
+    const mapText = await $.fs.read(`${dir}/sessions`)
+    out.mapped = parseSessions(mapText, sid8)
+    out.mapLines = parseMapLines(mapText)
   } catch {
     // No config or map yet: stay unmapped.
   }
@@ -253,7 +272,7 @@ export const register: Register = on => {
     // in unrelated projects the "not mapped" text is pure noise. The band,
     // /mailbox and /mailbox-wire still work there.
     if (snap === null || !snap.installed || snap.mapped === null) return next(e)
-    // A pre-reload snapshot (schema 1) lacks flags; skip until refreshed.
+    // A pre-reload snapshot (schema < 3) lacks flags/mapLines; skip until refreshed.
     if ((snap as { schema?: number }).schema !== SNAPSHOT_SCHEMA) return next(e)
     const lines: string[] = [
       '## Mailbox (inter-Claude lane mail)',
@@ -290,12 +309,12 @@ export const register: Register = on => {
     const snap = await read($, snapAtom)
     const hidden = await read($, hiddenAtom)
     if (snap === null || !snap.installed || hidden) return next(e)
-    // A pre-reload snapshot (schema 1) lacks flags; pass through until the
+    // A pre-reload snapshot (schema < 3) lacks flags/mapLines; pass through until the
     // background refresh replaces it (session.start / turn.complete).
     if ((snap as { schema?: number }).schema !== SNAPSHOT_SCHEMA) return next(e)
 
     const who = snap.mapped !== null
-      ? `${snap.nick}/${snap.mapped.name}${snap.mapped.flags?.includes('!wake') ? ' (no-wake)' : ''}`
+      ? `${snap.nick}/${snap.mapped.name}${snap.mapped.flags?.includes('!wake') ? ' (no-wake)' : ''} #${snap.mapped.threads.split(',').map(t => `#${t.trim()}`).join('')}`
       : `${snap.nick} (unmapped)`
     const daemon = snap.daemon.running
       ? `ok${snap.lagSeconds !== null ? ` · lag ${Math.round(snap.lagSeconds / 60)}m` : ''}`
@@ -303,7 +322,13 @@ export const register: Register = on => {
     const unread = snap.unreadError ? '?' : String(snap.unread.reduce((a, u) => a + u.count, 0))
     const unreadPart = snap.mapped !== null ? ` · unread ${unread}` : ''
     const responder = snap.responderActive ? ' · responder busy' : ''
-    const visible = `MB ${who} · daemon ${daemon}${unreadPart}${responder}`
+    // Unmapped sessions see the machine's map lines (Andrei's ask): after a
+    // "New session with handoff" the old session's threads are visible for
+    // re-wiring without remembering them.
+    const mapPart = snap.mapped === null && snap.mapLines.length > 0
+      ? ` · map: ${snap.mapLines.map(l => `${l.name}→#${l.threads}`).join(' ')}`
+      : ''
+    const visible = `MB ${who}${mapPart} · daemon ${daemon}${unreadPart}${responder}`
 
     // Redraw only on genuine change (Andrei's focus-steal fix): a render
     // event with an identical band redraws the prompt area under the
@@ -317,7 +342,7 @@ export const register: Register = on => {
     return (
       <Box>
         <Text dimColor>
-          MB {who} · daemon {daemon}{unreadPart}{responder}{' '}
+          MB {who}{mapPart} · daemon {daemon}{unreadPart}{responder}{' '}
         </Text>
         {snap.mapped === null && (
           <Button
@@ -325,23 +350,31 @@ export const register: Register = on => {
             label="Wire…"
             onPress={() => {
               void (async () => {
-                // Issue numbers are per-repo sequential, so newest + 1
-                // predicts the next thread; the user edits before Enter and
-                // the real number lands only on creation.
-                const env = await ghEnv($)
-                const r = await $.process.run(
-                  ['gh', 'api', `repos/${REPO}/issues?state=all&per_page=1`],
-                  { timeoutMs: 15_000, env },
-                )
+                // Handoff-aware prefill (Andrei's ask): when exactly one map
+                // line's session is dead (its id prefix matches no
+                // live-session), that line is the old seat of a handed-off
+                // session - prefill reclaiming it. Otherwise newest issue + 1
+                // predicts the next thread (issue numbers are per-repo
+                // sequential; the user edits before Enter either way).
+                const dead = snap.mapLines.filter(l => !snap.live.some(lv => lv.sid.startsWith(l.sidPrefix)))
                 let text = '/mailbox-wire '
-                if (r.exitCode === 0) {
-                  try {
-                    const newest = JSON.parse(r.stdout) as { number: number }[]
-                    if (newest.length > 0 && newest[0] !== undefined) {
-                      text = `/mailbox-wire <name> ${newest[0].number + 1}`
+                if (dead.length === 1 && dead[0] !== undefined) {
+                  text = `/mailbox-wire ${dead[0].name} ${dead[0].threads}`
+                } else {
+                  const env = await ghEnv($)
+                  const r = await $.process.run(
+                    ['gh', 'api', `repos/${REPO}/issues?state=all&per_page=1`],
+                    { timeoutMs: 15_000, env },
+                  )
+                  if (r.exitCode === 0) {
+                    try {
+                      const newest = JSON.parse(r.stdout) as { number: number }[]
+                      if (newest.length > 0 && newest[0] !== undefined) {
+                        text = `/mailbox-wire <name> ${newest[0].number + 1}`
+                      }
+                    } catch {
+                      // Keep the bare prefix.
                     }
-                  } catch {
-                    // Keep the bare prefix.
                   }
                 }
                 await $.prompt.fill({ text, mode: 'insert' })

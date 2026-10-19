@@ -9,10 +9,12 @@ wakes a session, never sends mail by itself.
 ## What it shows
 
 **Band** (above the prompt, hideable with its Hide button; when the session
-is unmapped it also shows a **Wire...** button that types
-`/mailbox-wire <name> <predicted>` into the prompt box (the prediction is
-newest issue + 1, per-repo sequential; a failed fetch leaves the bare
-prefix); when the session IS mapped it shows a **Fetch** button that runs
+is unmapped it also shows a **Wire...** button that types the prefill
+into the prompt box: when exactly one map line's session is dead (its id
+prefix matches no live session - the post-handoff seat), it reclaims that
+line (`/mailbox-wire infra 4`); otherwise it predicts newest issue + 1
+(`/mailbox-wire <name> <predicted>`; per-repo sequential; a failed fetch
+leaves the bare prefix); when the session IS mapped it shows a **Fetch** button that runs
 `claude-mail fetch --session <sid>` - posts this session's wake envelope
 on demand (the sid is passed explicitly; a spawned process may not inherit
 `CLAUDE_CODE_SESSION_ID`). The button works on `!wake` sessions - that is
@@ -25,10 +27,13 @@ does not trigger it (the same approximation the band makes). A session
 with no cursor of its own counts from 0, never from the daemon's
 cursor - mail the daemon saw but this session has not is still unread
 for it. Then it toasts the outcome and refreshes the band):
-`MB work/infra · daemon ok · lag 1m · unread 2 · responder busy`
+`MB work/infra #4 · daemon ok · lag 1m · unread 2 · responder busy`
+(unmapped, with the machine's map lines - the post-handoff re-wire hint):
+`MB work (unmapped) · map: infra→#4 flip→#3 · daemon ok · lag 1m`
 
-- `who` - the session's mapped actor (`nick/name`, with `no-wake` when
-  the map line flags it `!wake`), or `nick (unmapped)`.
+- `who` - the session's mapped actor (`nick/name #threads`, with `no-wake`
+  when the map line flags it `!wake`), or `nick (unmapped)` followed by the
+  machine's map lines, so a handed-off session can see the old threads.
 - `daemon` - running with the daemon cursor's lag, or `DOWN`.
 - `unread` - read-only count over the session's threads: comments past the
   session's cursor (falling back to the daemon cursor when the session has
