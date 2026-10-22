@@ -1,6 +1,6 @@
 ---
 name: writing-guidelines
-description: Write prose a person will actually read - plain language, no invented terms, register matched to the venue, and none of the sentence shapes that mark text as machine-written. Use whenever drafting or editing prose in any language for any audience - code comments, docstrings, READMEs, docs, commit messages, PR and issue text, design notes, reports, analyses, research summaries, essays, emails, forum and social posts, and chat replies, including text drafted for someone else to send under their own name. Load it before drafting, not after - it is cheaper to write this way than to strip the tells out afterwards.
+description: Write prose a person will actually read - plain language, no invented terms, ASD-STE100 sentence discipline, register matched to the venue, and none of the sentence shapes that mark text as machine-written. Use whenever drafting or editing prose in any language for any audience - code comments, docstrings, READMEs, docs, commit messages, PR and issue text, design notes, reports, analyses, research summaries, essays, emails, forum and social posts, and chat replies, including text drafted for someone else to send under their own name. Load it before drafting, not after - it is cheaper to write this way than to strip the tells out afterwards.
 ---
 
 # Writing Guidelines
@@ -115,7 +115,72 @@ speech.
 Test: does the sentence survive deleting its first four words? Then those four words were
 throat-clearing.
 
-## 4. Other Languages
+## 4. Simplified Technical English (ASD-STE100)
+
+**ASD-STE100 is the aerospace-industry controlled-language standard. Its structural rules
+kill the two main sources of misreading: a word with more than one meaning, and a sentence
+with more than one possible shape.**
+
+The official dictionary (~900 approved words) is licensed by ASD and not reproduced here.
+The plain-language rule in *Write for a Human Reader* and the one-term rule below carry
+the principle.
+
+### Rules
+
+- One instruction per sentence. Condition first, then command, comma between:
+  `If the check fails, stop.`
+- Sentence caps: 20 words for instructions and procedures, 25 for descriptions.
+- Active voice. Passive stays only where the actor is unknown or irrelevant, as in
+  `the connection is never closed`.
+- Simple tenses: simple present, simple past, simple future, imperative. Write `the job
+  completed`, not `the job has completed`. Exception: keep a compound tense that carries
+  meaning the simple form loses - `the request may have failed` is a different claim from
+  `the request failed`.
+- No semicolons. Two sentences instead.
+- No phrasal verbs: spin up, kick off, reach out, dive into become start, begin, contact,
+  read.
+- No nominalizations: `perform an analysis of` becomes `analyze`. `provides assistance to`
+  becomes `helps`.
+- Noun clusters of 3 words max. Beyond that, add prepositions or split the sentence:
+  `high pressure fuel pump inlet valve assembly` does not survive.
+- One term per thing for the whole document. Pick `the user` or `the customer` once and
+  keep it. Never rotate synonyms for the same object.
+- One action, one verb. Standard pairs: make sure (not check, verify, confirm, ensure -
+  the dictionary rejects all four as verbs. Route by intent: `examine` to look for
+  faults, `measure` to get a value), start (not initiate, launch), use (not utilize,
+  leverage), show (not display, present), operate (not run, execute), need (not
+  require). `validate` and `delete` are legal technical verbs in computer contexts.
+  These pairs are defaults, not a lockdown - a domain meaning overrides them.
+- Drop `-ing` forms where the simple form works: `before you commit`, not `before
+  committing`.
+- Keep every word. `The files that are not backed up will be lost` is clear. `Files not
+  backed up will be lost` leaves "which files" open.
+- No `should` in agent prompts and rules. A model reads `should` as optional. Write
+  `must` or delete the rule. One instruction per sentence also keeps each rule quotable
+  and hard to half-follow.
+- Warnings run command, hazard, result: `Remove both entries. The pipeline loses its
+  change history.`
+
+### Modes
+
+- **STE-flavored** - chat replies, PR and issue text, plans, reports. The rules above,
+  with natural voice and contractions kept, and the length caps applied to first drafts
+  rather than enforced past the point of clarity.
+- **Strict** - procedures, tool and function descriptions, error messages, anything a
+  reader or an agent must parse with no chance to ask a question. Every rule, including
+  no contractions and the hard caps.
+
+### Before posting a PR or issue body
+
+- [ ] STE discipline holds: one instruction per sentence, no semicolons, simple tenses,
+      20/25-word caps
+- [ ] One term per thing throughout. No synonym rotation for the same object
+
+The structural rules carry across languages unchanged. The verb pairs are English-only -
+*Other languages* makes the same split for the tell lists. The full 53-rule summary of
+Issue 9 is in `references/ste100-rules.md`.
+
+## 5. Other Languages
 
 The word lists above are English. Padding is language-specific, so find the local
 equivalents rather than translating this list.
@@ -128,7 +193,7 @@ The structural tells carry across languages unchanged - throat-clearing, rhetori
 meta-commentary, vague declaratives, hidden actors. Check for those in any language; check
 the word list only in English.
 
-## 5. Corrections
+## 6. Corrections
 
 **When the text has to admit an error, the admission goes first and goes short.**
 

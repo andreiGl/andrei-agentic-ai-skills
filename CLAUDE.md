@@ -14,7 +14,10 @@ single clause. Don't restate them here.
 
 - Invoke the writing-guidelines skill with the Skill tool before drafting any prose a
   person will read, in any language. If a person will read it, the rules apply. Invoke
-  it before drafting, not after.
+  it before drafting, not after. Apply ASD-STE100 Simplified Technical English
+  principles: one word, one meaning, active voice, simple tenses, short sentences
+  (20 words for instructions, 25 for descriptions), one instruction per sentence,
+  consistent terminology. Use the mode the skill sets for each text type.
 - Commit messages carry no Co-Authored-By line and no mention of Claude or Anthropic.
 
 ## Git
