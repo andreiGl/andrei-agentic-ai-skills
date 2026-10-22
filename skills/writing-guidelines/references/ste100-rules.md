@@ -215,7 +215,7 @@ parsed dictionary and the community-audited summary in
 - The verb rulings and the approved-verb list were parsed from the official Issue 9 PDF
   (Andrei's own copy - the extraction script and `dict.json` stay local, since ASD's
   license forbids redistribution of dictionary content). The parser lives in
-  `~/tmp/simpleenglish/parse_dict.py`. The same rulings were cross-checked against the
+  `~/tmp/simpleenglish/parse_dict.py` on the work machine only. The same rulings were cross-checked against the
   community-audited [AminBlg/SimpleEnglish](https://github.com/AminBlg/SimpleEnglish)
   strict-vocabulary tables (MIT). To re-extract after a dictionary update:
   `pdftotext`-equivalent via pdfminer into a flat dump, then `parse_dict.py` - the

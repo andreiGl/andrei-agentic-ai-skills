@@ -13,7 +13,7 @@ For how to carry out the underlying task, see the **behavioral-guidelines** skil
 ## 1. Write for a Human Reader
 
 **Code comments, docstrings, commit messages, PR and issue text, plans, reports,
-analyses, posts, emails, and chat replies should all read as if one person wrote them
+analyses, posts, emails, and chat replies must all read as if one person wrote them
 for another to read.**
 
 - Plain language. If a common word says the same thing, use the common word, and use no
@@ -165,7 +165,8 @@ the principle.
 
 - **STE-flavored** - chat replies, PR and issue text, plans, reports. The rules above,
   with natural voice and contractions kept, and the length caps applied to first drafts
-  rather than enforced past the point of clarity.
+  rather than enforced past the point of clarity. The verb pairs do not apply. Write the
+  verb the reader's field uses: `run the tests`, `check the logs`.
 - **Strict** - procedures, tool and function descriptions, error messages, anything a
   reader or an agent must parse with no chance to ask a question. Every rule, including
   no contractions and the hard caps.
@@ -213,6 +214,6 @@ comments, a status update, a rebuttal.
 Bad:  We should note that some figures in the previous section may warrant revisiting.
       The methodology was sound at the time, and the discrepancy is minor, but it turns
       out the 2015 baseline came from an edition that has since been superseded.
-Good: The 2015 baseline was wrong; it came from a superseded edition. Corrected figures
+Good: The 2015 baseline was wrong. It came from a superseded edition. Corrected figures
       below.
 ```
