@@ -1303,7 +1303,22 @@ def _replace_checks(conn: sqlite3.Connection, note_id: str):
     made_here = "data-upnote-mcp=" in body and (r["updatedAt"] or 0) - (r["createdAt"] or 0) < 60000  # untouched since this server made it
     if r["updatedAt"] and time.time() * 1000 - r["updatedAt"] < RECENT_EDIT_MINUTES * 60000 and not made_here:
         warnings.append(f"It was edited in the last {RECENT_EDIT_MINUTES} minutes. If someone is typing in it, those changes stay in the original.")
+    if text is not None and _literal_breaks_in_code(text):
+        warnings.append(
+            "The new text holds literal backslash-n sequences inside code blocks (a JSON-escaped "
+            "line break pasted back in?). They will show as visible \\n text instead of line breaks."
+        )
     return r, nbs, notebook_ids, blockers, warnings
+
+
+def _literal_breaks_in_code(text: str) -> bool:
+    """True when a backslash-n pair sits inside a <code>/<pre> block. A JSON encoder writes a real
+    line break as \\n; feeding escaped text back in as an edit turns it into visible \\n characters
+    in the note's code blocks, so the preview flags it before it lands."""
+    if "\\" not in text:
+        return False
+    blocks = re.finditer(r"<(code|pre)\b[^>]*>(.*?)</\1>", text, re.S | re.I)
+    return any("\\" + "n" in block.group(2) for block in blocks)
 
 
 def _tag_anchor(tag: str) -> str:
