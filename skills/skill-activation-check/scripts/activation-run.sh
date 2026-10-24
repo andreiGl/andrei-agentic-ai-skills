@@ -47,8 +47,7 @@ for k in ("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL"):
 ')" || { echo "activation-run: cannot read gateway env" >&2; exit 2; }
 if [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
   echo "activation-run: no ANTHROPIC_AUTH_TOKEN in ~/.claude/settings.json env block." >&2
-  echo "  This runner needs a gateway-token login; a subscription login cannot serve" >&2
-  echo "  a sandboxed session with a temp CLAUDE_CONFIG_DIR. See SKILL.md, Safety section." >&2
+  echo "activation-run: this runner needs a gateway-token login; a subscription login cannot serve a sandboxed session with a temp CLAUDE_CONFIG_DIR. See SKILL.md, Safety section." >&2
   exit 3
 fi
 export ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_MODEL

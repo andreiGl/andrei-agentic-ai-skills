@@ -183,8 +183,12 @@ def run_row(row: dict, staging: Path, keep_dir: Path | None, repeat: int) -> tup
                 # no-token): no transcript, so the is_error check below never runs.
                 # Surface the runner's stderr and stop - never score this as a miss.
                 stderr = (proc.stderr or "").strip()
-                detail = stderr.replace("\n", " ") if stderr \
-                    else f"(exit {proc.returncode})"
+                # Drop the runner's own "activation-run: " prefixes; the wrapper
+                # below adds one, and doubled prefixes read as an error in the error.
+                detail = " ".join(
+                    line.split("activation-run: ", 1)[-1]
+                    for line in stderr.splitlines() if line.strip()
+                ) if stderr else f"(exit {proc.returncode})"
                 raise RuntimeError(
                     f"runner failed for row '{row['id']}': {detail}"
                     f" - measurement failure, not a miss; fix the login/harness and re-run")
