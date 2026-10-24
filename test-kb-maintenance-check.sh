@@ -8,6 +8,15 @@ trap 'rm -rf "$TEST_ROOT"' EXIT
 KB_ROOT="$TEST_ROOT/knowledge"
 mkdir -p "$KB_ROOT/experiences/archive"
 
+# Dates relative to today, so "fresh" stays fresh. The check script reads the
+# limits: verification 14 days, synthesis 61 days. python3 for portable date math.
+days_ago() {
+    python3 -c "import datetime,sys;print(datetime.date.today()-datetime.timedelta(days=int(sys.argv[1])))" "$1"
+}
+TODAY=$(days_ago 0)
+OLD_CHECK=$(days_ago 60)
+OLD_SYNTH=$(days_ago 100)
+
 run() {
     printf '%s\n' '{}' | KB_ROOT="$KB_ROOT" python3 "$ROOT/kb-maintenance-check.py"
 }
@@ -48,11 +57,11 @@ expect_line 'Last synthesized is never'
 # Synth is fresh so the age trigger stays quiet and the typo is what nags.
 # The strict scan discards the malformed value, so the check fires via its
 # missing-stamp path; assert the check fires and no raw None leaks into the note.
-set_dates "2026-10-07T10:00:00Z" "2026-10-07"
+set_dates "${TODAY}T10:00:00Z" "$TODAY"
 expect_line 'check-knowledge'
 
 # Fresh dates, five experience entries: synthesize due on the count trigger.
-set_dates 2026-10-07 2026-10-07
+set_dates "$TODAY" "$TODAY"
 add_entries 5
 expect_line 'experiences/ holds 5 entries'
 
@@ -67,15 +76,15 @@ for i in $(seq 3 7); do rm -f "$KB_ROOT/experiences/e$i.md"; done
 grep -v '^## ' "$KB_ROOT/learnings.md" > "$KB_ROOT/learnings.md.tmp"
 printf '\n## 2026-09-01 - one entry\n' >> "$KB_ROOT/learnings.md.tmp"
 mv "$KB_ROOT/learnings.md.tmp" "$KB_ROOT/learnings.md"
-set_dates 2026-10-07 2026-07-01
-expect_line 'last synthesized 2026-07-01'
+set_dates "$TODAY" "$OLD_SYNTH"
+expect_line "last synthesized $OLD_SYNTH"
 
 # Everything current: silent.
-set_dates 2026-10-07 2026-10-07
+set_dates "$TODAY" "$TODAY"
 expect_silent
 
 # Synthesis current, verification old: check-knowledge due.
-set_dates 2026-08-01 2026-10-07
+set_dates "$OLD_CHECK" "$TODAY"
 expect_line 'check-knowledge'
 
 printf '%s\n' 'Synthetic maintenance checks passed.'
