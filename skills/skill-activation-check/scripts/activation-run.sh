@@ -29,6 +29,11 @@ mkdir -p "$SANDBOX/home" "$SANDBOX/config"
 trap 'rm -rf "$SANDBOX"' EXIT
 
 # Gateway credentials pass by env only - never printed, never written to disk.
+# A subscription-login machine has no ANTHROPIC_* keys in settings.json; the sandboxed
+# session would then fail to log in and every row would read as a miss. Fail loudly here.
+# Unset first: the check must verify what settings.json provides, not a token inherited
+# from the caller's environment.
+unset ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_MODEL
 eval "$(python3 -I -c '
 import json, shlex, sys
 from pathlib import Path
@@ -40,6 +45,12 @@ for k in ("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL"):
     if env.get(k):
         print("export %s=%s" % (k, shlex.quote(env[k])))
 ')" || { echo "activation-run: cannot read gateway env" >&2; exit 2; }
+if [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
+  echo "activation-run: no ANTHROPIC_AUTH_TOKEN in ~/.claude/settings.json env block." >&2
+  echo "  This runner needs a gateway-token login; a subscription login cannot serve" >&2
+  echo "  a sandboxed session with a temp CLAUDE_CONFIG_DIR. See SKILL.md, Safety section." >&2
+  exit 3
+fi
 export ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_MODEL
 
 PROMPT=$(cat "$PROMPT_FILE")

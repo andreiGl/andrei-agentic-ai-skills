@@ -153,6 +153,10 @@ def run_row(row: dict, staging: Path, keep_dir: Path | None, repeat: int) -> tup
 
     Each element of per_run_invoked_lists is the skill names one session invoked.
     Callers aggregate: a strict pass is every run carrying the expected verdict.
+
+    A session whose transcript reports is_error (failed login, harness failure) is
+    a measurement failure, not a miss - it raises RuntimeError and stops the suite
+    rather than scoring as a silent zero.
     """
     per_run_invoked, per_run_costs = [], []
     for run_index in range(repeat):
@@ -181,7 +185,7 @@ def run_row(row: dict, staging: Path, keep_dir: Path | None, repeat: int) -> tup
             if keep_dir:
                 suffix = f".run{run_index + 1}" if repeat > 1 else ""
                 shutil.copy(transcript, keep_dir / f"{row['id']}{suffix}.jsonl")
-            invoked, cost = [], 0.0
+            invoked, cost, is_error, error_text = [], 0.0, False, ""
             for line in transcript.read_text(encoding="utf-8").splitlines():
                 try:
                     event = json.loads(line)
@@ -198,6 +202,12 @@ def run_row(row: dict, staging: Path, keep_dir: Path | None, repeat: int) -> tup
                                 invoked.append(skill)
                 if event.get("type") == "result":
                     cost = float(event.get("total_cost_usd") or 0.0)
+                    is_error = bool(event.get("is_error"))
+                    error_text = str(event.get("result") or "")[:200]
+            if is_error:
+                raise RuntimeError(
+                    f"session for row '{row['id']}' errored: {error_text or '(no text)'}"
+                    f" - measurement failure, not a miss; fix the login/harness and re-run")
             per_run_invoked.append(invoked)
             per_run_costs.append(cost)
     return per_run_invoked, per_run_costs
