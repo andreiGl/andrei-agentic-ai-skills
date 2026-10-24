@@ -75,7 +75,9 @@ to the user for every decision.
 
 A plan is the set of decisions the implementer cannot make alone. A "TBD" or "figure
 out X later" line is a plan defect - resolve it before handing the plan over. Each task
-carries its own test cycle: what to write, what to run, what result means done.
+carries its own test cycle: what to write, what to run, what result means done. List the
+input classes or failure modes the spec implies but no task's tests exercise, and pin
+each with a test in the owning task.
 
 ## 5. Read Before You Write
 
@@ -160,6 +162,8 @@ Running the tests has a counterpart outside code, and this is it.
   systematic cause. When the artifact can be inspected, inspect it. `strings` on a binary,
   an xattr, a config value: seconds to check, and it replaces an argument with a fact.
 - Don't stack inference on inference. Two uncertain steps make one worthless conclusion.
+- Close no research task without at least one source that contradicts the emerging
+  conclusion. A case built only from agreeing sources is one datum repeated.
 
 ## 9. Write for a Human Reader
 

@@ -166,9 +166,48 @@ the structural causes before building any suite:
 
 Only when all three are clear does a labelled suite add information.
 
+## Description optimization loop (measure - rewrite - measure)
+
+When a suite shows real failures and wording is confirmed as the culprit (diagnose
+mode clear, description inside the cap), the loop can propose and test rewrites
+instead of hand-editing:
+
+```bash
+python3 ~/.claude/skills/skill-activation-check/scripts/optimize-description.py \
+  <skill-dir> <eval-set.json> [--iterations 3] [--runs-per-query 1]
+```
+
+Mechanism (adapted from anthropics/skills skill-creator's Description Optimization):
+
+- The eval set splits 60/40 stratified by label - positives and negatives divided
+  separately, seeded, so the split is reproducible. Best candidate is selected by
+  **test-only** score, which keeps the description from fitting the queries it was
+  tuned on.
+- Each iteration: measure failures on the full set -> `claude -p` proposes a rewrite
+  from the failures plus the negative rows (its output is parsed as JSON data, never
+  executed) -> measure the candidate -> restore the best-known description
+  immediately, so a crash mid-loop never leaves a candidate in place.
+- A query counts as passing only when it passed in **every** run
+  (`--runs-per-query N`): one flake means a flaky trigger, not a pass.
+- Negatives must be **near misses** - requests sharing vocabulary with the
+  description but needing something else. Obviously-irrelevant negatives test
+  nothing; the script refuses a set with fewer than 3 negatives for that reason.
+- Sibling-labelled rows are rejected here: optimization tunes one description
+  against one boundary, and a sibling row would tune the pair by accident.
+
+Cost is real and compounding: roughly `rows x runs-per-query x (1 + iterations)`
+sessions. Confirm the budget before starting. After the loop: review the SKILL.md
+diff, keep or revert, and re-run the plain suite on the full set to confirm the
+numbers before trusting them - the loop's split is small, and a description that
+wins on 12 train rows has not proven itself on the language the suite never asked.
+
 ## Attribution
 
 Design adapted from UiPath/coder-eval's check-skill (Apache-2.0,
 https://github.com/UiPath/coder_eval) - row design, scoring definitions, and the
 truncation/eviction findings are theirs; the sandboxed runner and scorer are an
-independent implementation that runs without the coder-eval CLI.
+independent implementation that runs without the coder-eval CLI. The description
+optimization loop adapts anthropics/skills skill-creator's Description Optimization
+(https://github.com/anthropics/skills) - near-miss negative discipline, stratified
+train/test split, and test-score selection are theirs; the sandboxed measurement and
+crash-safe description restore are ours.

@@ -127,8 +127,11 @@ The sandbox stages only the skill under test (plus any sibling a routing row nam
 temp `HOME` with no hooks, no MCP servers, and no other skills, and locks the session's
 tools to Skill plus read-only - a test row cannot touch anything real. When a skill
 "stops firing", its diagnose mode checks the two silent causes first: the 1,536-character
-description cap, and the listing budget that drops least-invoked skills first. Design
-adapted from UiPath/coder-eval's check-skill (Apache-2.0).
+description cap, and the listing budget that drops least-invoked skills first. When
+wording is confirmed as the culprit, `optimize-description.py` closes the loop: it
+proposes description rewrites from measured failures and tests each candidate against a
+held-out split, selecting by test score. Design adapted from UiPath/coder-eval's
+check-skill and anthropics/skills skill-creator (both Apache-2.0).
 
 ### Knowledge base
 

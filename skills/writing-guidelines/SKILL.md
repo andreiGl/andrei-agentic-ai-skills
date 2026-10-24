@@ -217,3 +217,24 @@ Bad:  We should note that some figures in the previous section may warrant revis
 Good: The 2015 baseline was wrong. It came from a superseded edition. Corrected figures
       below.
 ```
+
+## 7. Reader Test (long documents)
+
+For documents long enough that a reader works through them in stages - a plan, a
+report, a spec, a design doc - the rules above check how the text reads, not whether
+it works. Before handing the document over, test it the way it will be read:
+
+1. Write down 5-10 questions a real reader would ask while trying to use the
+   document - discovery questions ("where does it say who approves this?"), usage
+   questions ("what do I run first?"), and skeptical questions ("why not X?").
+2. Give a fresh agent the document text and the questions - no conversation context,
+   none of what you know. Ask it to answer each question from the document alone.
+3. Every question the fresh agent answers wrong, answers with an assumption it had
+   to invent, or cannot answer is a document defect, not a reader failure. Fix the
+   document; do not explain the answer in the handoff message.
+4. One more fresh-agent pass for ambiguity, false assumptions, and contradictions
+   between sections - the things the author cannot see because they already know
+   the intent.
+
+A document that survives its reader test works for readers who were not in this
+conversation. One that needs the author's commentary attached does not.
