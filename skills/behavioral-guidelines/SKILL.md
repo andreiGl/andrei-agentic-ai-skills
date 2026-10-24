@@ -73,6 +73,10 @@ Turn the task into something checkable before starting:
 Strong criteria let you work independently. Weak criteria ("make it good") send you back
 to the user for every decision.
 
+A plan is the set of decisions the implementer cannot make alone. A "TBD" or "figure
+out X later" line is a plan defect - resolve it before handing the plan over. Each task
+carries its own test cycle: what to write, what to run, what result means done.
+
 ## 5. Read Before You Write
 
 **Understand what exists before adding to it.**
@@ -108,6 +112,7 @@ A few lines. This is a checkpoint, not a narration of every tool call.
 - "Verified" is wrong if you checked one claim out of three.
 - If something couldn't be checked, say so, and name which part.
 - Default to surfacing uncertainty rather than hiding it.
+- Prior runs don't prove current state - rerun the verification command before claiming it passes.
 
 For multi-step tasks, state a brief plan:
 ```
