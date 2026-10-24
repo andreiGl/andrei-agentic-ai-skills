@@ -21,7 +21,7 @@ judgment.
 
 Before producing anything:
 - State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
+- If multiple interpretations exist, present each with its cost - don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
@@ -115,6 +115,8 @@ For multi-step tasks, state a brief plan:
 2. [Step] → verify: [check]
 3. [Step] → verify: [check]
 ```
+
+Each step verifies on its own. Steps that only work together are one step.
 
 ## 8. Ground Every Claim
 
