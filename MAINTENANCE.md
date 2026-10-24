@@ -158,12 +158,18 @@ five links broken by the round-1 flatten.
 
 ```bash
 git ls-files '*.md' | while read f; do d=$(dirname "$f")
-  grep -oE '\]\([^)h#][^)]*\)' "$f" | sed 's/](\(.*\))/\1/' | while read l; do
+  grep -oE '`?\]\([^)h#][^)]*\)`?' "$f" | sed 's/[`]//g; s/](\(.*\))/\1/' | while read l; do
+    case "$l" in upnote://*) continue;; esac
     [ -e "$d/${l%%#*}" ] || echo "BROKEN $f -> $l"
   done
 done
 echo "scanned: $(git ls-files '*.md' | wc -l | tr -d ' ') files"
 ```
+
+Two guards against false positives, both proven by real hits: a bare `](` with no
+closing paren on the line (a grep pattern quoted in this file once matched into its own
+text), and `upnote://` schemes in prose examples - neither is a link this repository
+should resolve. Re-check both classes when adding files that quote shell or URLs.
 
 **Expected:** no `BROKEN` lines, and a scanned count matching the tracked Markdown files.
 
