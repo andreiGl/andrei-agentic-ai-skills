@@ -79,6 +79,12 @@ carries its own test cycle: what to write, what to run, what result means done. 
 input classes or failure modes the spec implies but no task's tests exercise, and pin
 each with a test in the owning task.
 
+Builder check: before handing a draft plan or design over, run a fresh subagent against
+it with one brief - attack it, list everything wrong, missing, or unanswerable. Sort what
+comes back: answered (cite where), minor (fix inline), theirs (genuinely the asker's
+call). Return only the "theirs" list in one message. The draft survives only what the
+subagent could not break.
+
 ## 5. Read Before You Write
 
 **Understand what exists before adding to it.**
