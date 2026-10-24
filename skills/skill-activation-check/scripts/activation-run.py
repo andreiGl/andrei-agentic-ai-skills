@@ -182,8 +182,9 @@ def run_row(row: dict, staging: Path, keep_dir: Path | None, repeat: int) -> tup
                 # The shell runner failed before starting claude (exit 2 setup, exit 3
                 # no-token): no transcript, so the is_error check below never runs.
                 # Surface the runner's stderr and stop - never score this as a miss.
-                stderr = (proc.stderr or "").strip().splitlines()
-                detail = stderr[-1] if stderr else f"(exit {proc.returncode})"
+                stderr = (proc.stderr or "").strip()
+                detail = stderr.replace("\n", " ") if stderr \
+                    else f"(exit {proc.returncode})"
                 raise RuntimeError(
                     f"runner failed for row '{row['id']}': {detail}"
                     f" - measurement failure, not a miss; fix the login/harness and re-run")
@@ -380,6 +381,11 @@ def main() -> None:
             results.append({"id": row["id"], "expected": row["expected_skill"],
                             "runs": runs, "costs": costs})
         score(rows, results, name, repeat)
+    except RuntimeError as e:
+        # A measurement failure (bad login, setup error, timeout, errored session)
+        # must read as an error, not a traceback: the suite has no verdict to give.
+        print(f"activation-run: {e}", file=sys.stderr)
+        sys.exit(1)
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
 
