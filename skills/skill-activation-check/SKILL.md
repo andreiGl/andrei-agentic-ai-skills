@@ -83,8 +83,17 @@ tier, more on larger models).
 
 Write the rows as JSONL, one object per line:
 `{"id": "pos-1", "expected_skill": "<name>", "prompt": "..."}`
-Distractors carry `"expected_skill": ""`. Put the file somewhere gitignored or in
-`/tmp` - it is test data, not product.
+Distractors carry `"expected_skill": ""`. A **sibling-owned row** sets
+`expected_skill` to a different, named skill whose subject matter overlaps the
+target's: in a multi-skill setup, misrouting between two adjacent skills is the
+common failure, and a plain distractor shows only *that* a misfire happened, not
+*where it went*. The row passes when the sibling fires; the target firing is a
+misroute, and misroutes concentrated on one sibling mean a boundary dispute between
+two descriptions - fix both, saying what each skill is *not* for. Siblings resolve
+next to the target, then in `~/.claude/skills`, then `./.claude/skills`, and are
+staged alongside the target. Add sibling rows only when two skills genuinely overlap:
+they cost extra sessions, on top of the 8-12 + 8-12 baseline. Put the rows file
+somewhere gitignored or in `/tmp` - it is test data, not product.
 
 ## Step 3 - Plan, then run
 
@@ -101,13 +110,22 @@ python3 ~/.claude/skills/skill-activation-check/scripts/activation-run.py \
 Confirm the row count and cost estimate with the user before `--run`. Rows run
 sequentially; a 16-row suite takes several minutes.
 
-The runner stages a minimal plugin root (only the skill under test), sandboxes each
-session, and scores from the transcript: a row triggers when the session emits a
+Before any run the runner scans the installed skill directories for bare-name
+collisions with every skill the suite names. A collision does not error at activation
+time - it silently measures whichever skill fires - so the runner refuses to proceed;
+resolve the collision (rename, or test where it is absent) or pass
+`--allow-collision` to override deliberately.
+
+The runner stages a minimal plugin root (the target plus any named siblings, nothing
+else), sandboxes each session, and scores from the transcript: a row triggers when
+the session emits a
 Skill tool_use call naming the skill (plugin-namespace prefixes are stripped).
 
 ## Step 4 - Report and interpret
 
-Present recall, precision, F1, and the confusion matrix, then:
+The runner prints recall, precision, F1, the confusion matrix, the sibling-routing
+breakdown (correct / misrouted to target / missed), and a suite gate: PASS when
+recall >= 0.7 and precision >= 0.7, FAIL otherwise. Interpret then:
 
 - **Low recall** (misses positives): rule out truncation and listing eviction before
   concluding the description under-claims. Both look identical to bad wording.
@@ -118,6 +136,10 @@ Present recall, precision, F1, and the confusion matrix, then:
   that should trigger it.
 - **Low precision** (fires on distractors): the description over-claims. Narrow it
   and say explicitly what the skill is *not* for.
+- **Misroutes concentrated on one sibling** (sibling rows present): a boundary
+  dispute between the two descriptions, not one vague description. Fixing the target
+  alone moves the failure instead of removing it - state what **each** of the two
+  skills is not for, and re-run.
 - **Both high**: report the numbers and row count, and note a small suite says
   little - offer to widen it.
 

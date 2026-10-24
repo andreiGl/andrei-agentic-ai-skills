@@ -3,26 +3,34 @@
 
 Design adapted from UiPath/coder-eval's check-skill skill (Apache-2.0), reduced to
 what runs without the coder-eval CLI: each row is one headless `claude -p` session
-in a sandbox that stages ONLY the skill under test; the criterion is the presence of
-a Skill tool_use call naming that skill in the session's stream-json transcript.
+in a sandbox that stages ONLY the labelled skills (the target plus any sibling a
+routing row names); the criterion is the Skill tool_use calls in the session's
+stream-json transcript.
 
 Usage:
   activation-run.py <skill-dir> <rows.jsonl> [--run] [--keep-transcripts DIR]
+                    [--allow-collision]
 
   <skill-dir>   directory containing the target SKILL.md (name read from frontmatter)
   <rows.jsonl>  one JSON object per line: {"id", "expected_skill", "prompt"};
-                expected_skill "" marks a distractor row
+                expected_skill "" marks a distractor row; a sibling skill's name
+                marks a routing row (the request belongs to that sibling)
   --run         actually spawn sessions (default: dry plan - print what would run)
   --keep-transcripts DIR  copy raw transcripts here instead of deleting them
+  --allow-collision     proceed despite an installed-name collision (rarely right)
 
-Scoring (same definitions as coder-eval):
-  recall    = of the rows that should engage the skill, the fraction that did
-  precision = of the rows where the skill engaged, the fraction that should have
-Prints per-row verdicts, then recall / precision / F1 and a confusion matrix.
+Row semantics:
+  expected = target   -> PASS iff the target fired
+  expected = sibling  -> PASS iff the sibling fired; firing the target is a misroute
+  expected = ""       -> PASS iff nothing fired (distractor)
+
+Scoring (target-centric, coder-eval definitions):
+  recall    = of the rows that expect the target, the fraction where it fired
+  precision = of the rows where the target fired, the fraction that expected it
+Suite gate: recall >= 0.7 and precision >= 0.7 (printed as PASS/FAIL).
 """
 
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -32,6 +40,8 @@ from pathlib import Path
 
 RUNNER = Path(__file__).with_name("activation-run.sh")
 TIMEOUT_S = 300
+RECALL_GATE = 0.7
+PRECISION_GATE = 0.7
 
 
 def skill_name_from(skill_dir: Path) -> str:
@@ -41,6 +51,12 @@ def skill_name_from(skill_dir: Path) -> str:
     if not match:
         sys.exit(f"activation-run: no 'name:' in {skill_dir}/SKILL.md frontmatter")
     return match.group(1)
+
+
+def description_from(skill_dir: Path) -> str:
+    text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+    match = re.search(r"^description:\s*(.+?)$", text, re.MULTILINE)
+    return match.group(1).strip() if match else ""
 
 
 def load_rows(rows_path: Path):
@@ -57,30 +73,71 @@ def load_rows(rows_path: Path):
     return rows
 
 
-def stage_plugin_root(skill_dir: Path, staging: Path) -> None:
-    """Copy ONLY the skill under test into staging/skills/<name>/."""
-    name = skill_name_from(skill_dir)
-    dest = staging / "skills" / name
-    shutil.copytree(skill_dir, dest)
+def resolve_sibling(name: str, target_dir: Path) -> Path:
+    """Find a sibling skill dir: next to the target, then user, then project skills."""
+    for base in (target_dir.parent, Path.home() / ".claude" / "skills",
+                 Path.cwd() / ".claude" / "skills"):
+        candidate = base / name
+        if (candidate / "SKILL.md").is_file():
+            return candidate
+    sys.exit(f"activation-run: sibling skill '{name}' not found next to the target, "
+             f"in ~/.claude/skills, or in ./.claude/skills - cannot stage it")
+
+
+def scan_installed_collisions(wanted: list) -> list:
+    """Scan user and project skill dirs for bare-name collisions with the suite's
+    skills. A collision means the real environment may activate the wrong skill, so
+    a sandbox result would not transfer."""
+    seen = {}
+    for base in (Path.home() / ".claude" / "skills", Path.cwd() / ".claude" / "skills"):
+        if not base.is_dir():
+            continue
+        for child in sorted(base.iterdir()):
+            skill_md = child / "SKILL.md"
+            if not skill_md.is_file():
+                continue
+            match = re.search(r"^name:\s*(\S+)\s*$", skill_md.read_text(encoding="utf-8"),
+                              re.MULTILINE)
+            if match:
+                seen.setdefault(match.group(1), []).append(str(child))
+    warnings = []
+    for name in wanted:
+        paths = seen.get(name, [])
+        if len(paths) > 1:
+            warnings.append(f"'{name}' installed at {len(paths)} locations: "
+                            f"{', '.join(paths)}")
+    return warnings
+
+
+def stage_plugin_root(skill_dirs: list, staging: Path) -> None:
+    """Copy ONLY the labelled skills into staging/skills/<name>/."""
+    for skill_dir in skill_dirs:
+        name = skill_name_from(skill_dir)
+        dest = staging / "skills" / name
+        shutil.copytree(skill_dir, dest)
     # A plugin root loads everything beside skills/ - nothing else is copied, so
-    # the sandboxed agent sees exactly one skill and no hooks, agents, or commands.
+    # the sandboxed agent sees exactly the staged skills and no hooks, agents, or
+    # commands.
 
 
-def run_row(row: dict, staging: Path, keep_dir: Path | None) -> tuple[bool, str, float]:
-    """Run one row; return (triggered, invoked_name, cost_usd)."""
+def run_row(row: dict, staging: Path, keep_dir: Path | None) -> tuple:
+    """Run one row; return (invoked_skill_names, cost_usd)."""
     with tempfile.TemporaryDirectory(prefix="act-row-") as tmp:
         prompt_file = Path(tmp) / "prompt.txt"
         prompt_file.write_text(row["prompt"], encoding="utf-8")
         transcript = Path(tmp) / "stream.jsonl"
-        proc = subprocess.run(
-            ["bash", str(RUNNER), str(staging), str(prompt_file), str(transcript)],
-            capture_output=True, text=True, timeout=TIMEOUT_S + 60,
-        )
+        try:
+            proc = subprocess.run(
+                ["bash", str(RUNNER), str(staging), str(prompt_file), str(transcript)],
+                capture_output=True, text=True, timeout=TIMEOUT_S + 60,
+            )
+        except subprocess.TimeoutExpired:
+            return [], 0.0
         if proc.returncode != 0 and not transcript.exists():
-            return False, "", 0.0
+            return [], 0.0
         if keep_dir:
             shutil.copy(transcript, keep_dir / f"{row['id']}.jsonl")
-        triggered, name, cost = False, "", 0.0
+        invoked, cost = [], 0.0
         for line in transcript.read_text(encoding="utf-8").splitlines():
             try:
                 event = json.loads(line)
@@ -93,90 +150,143 @@ def run_row(row: dict, staging: Path, keep_dir: Path | None) -> tuple[bool, str,
                         skill = str(block.get("input", {}).get("skill", ""))
                         # plugin-dir skills are namespaced <dirname>:<name>
                         skill = skill.split(":")[-1]
-                        if skill:
-                            name = skill
-                            if skill == row["expected_skill"] or not row["expected_skill"]:
-                                triggered = True
+                        if skill and skill not in invoked:
+                            invoked.append(skill)
             if event.get("type") == "result":
                 cost = float(event.get("total_cost_usd") or 0.0)
-        return triggered, name, cost
+        return invoked, cost
 
 
-def score(rows: list[dict], results: list[dict]) -> None:
-    tp = sum(1 for r in results if r["expected"] and r["triggered"])
-    fn = sum(1 for r in results if r["expected"] and not r["triggered"])
-    fp = sum(1 for r in results if not r["expected"] and r["triggered"])
-    tn = sum(1 for r in results if not r["expected"] and not r["triggered"])
-    positives, negatives = tp + fn, fp + tn
+def row_kind(row: dict, target: str) -> str:
+    if not row["expected_skill"]:
+        return "neg"
+    return "pos" if row["expected_skill"] == target else "sib"
+
+
+def score(rows: list, results: list, target: str) -> None:
+    tp = sum(1 for r in results if r["expected"] == target and target in r["invoked"])
+    fn = sum(1 for r in results if r["expected"] == target and target not in r["invoked"])
+    fp = sum(1 for r in results if r["expected"] != target and target in r["invoked"])
+    negatives = [r for r in results if r["expected"] == ""]
+    siblings = [r for r in results if r["expected"] not in ("", target)]
+    positives = tp + fn
+    target_fires = tp + fp
     recall = tp / positives if positives else float("nan")
-    precision = tp / (tp + fp) if (tp + fp) else float("nan")
+    precision = tp / target_fires if target_fires else float("nan")
     f1 = (2 * precision * recall / (precision + recall)
-          if positives and negatives and (precision + recall) else float("nan"))
+          if positives and target_fires and (precision + recall) else float("nan"))
+
     print("\n=== Results ===")
     for r in results:
-        mark = "HIT " if r["triggered"] else "miss"
-        via = f" via {r['invoked']}" if r["invoked"] and r["invoked"] != r.get("expected_or_blank") else ""
-        print(f"  [{mark}] {r['id']:<12} {'pos' if r['expected'] else 'neg'}{via}  ${r['cost']:.3f}")
-    print(f"\nrecall={recall:.2f} ({tp}/{positives} positives)  "
-          f"precision={precision:.2f} ({fp} false fires)  F1={f1:.2f}")
-    print(f"confusion: TP={tp} FN={fn} FP={fp} TN={tn}")
-    if positives and recall < 0.7:
+        expected = r["expected"]
+        if not expected:
+            ok = not r["invoked"]
+        else:
+            ok = expected in r["invoked"]
+        mark = "PASS" if ok else "MISS"
+        kind = row_kind({"expected_skill": expected}, target)
+        via = f" via {r['invoked'][0]}" if r["invoked"] else ""
+        print(f"  [{mark}] {r['id']:<12} {kind:<4}{via}  ${r['cost']:.3f}")
+
+    tn = sum(1 for r in negatives if not r["invoked"])
+    fp_neg = len(negatives) - tn
+    routed = sum(1 for r in siblings if r["expected"] in r["invoked"])
+    misrouted = sum(1 for r in siblings if r["expected"] not in r["invoked"]
+                    and target in r["invoked"])
+    sib_missed = len(siblings) - routed - misrouted
+    print(f"\nrecall={recall:.2f} ({tp}/{positives} target rows)  "
+          f"precision={precision:.2f} ({fp} false target fires)  F1={f1:.2f}")
+    print(f"confusion: TP={tp} FN={fn} FP={fp} (distractor fires {fp_neg}) TN={tn}")
+    if siblings:
+        print(f"sibling routing: {routed} correct, {misrouted} misrouted to target, "
+              f"{sib_missed} missed")
+
+    checks = []
+    gate = True
+    if positives:
+        checks.append(f"recall {recall:.2f} {'>=' if recall >= RECALL_GATE else '<'} "
+                      f"{RECALL_GATE:.2f}")
+        gate = gate and recall >= RECALL_GATE
+    if target_fires:
+        checks.append(f"precision {precision:.2f} "
+                      f"{'>=' if precision >= PRECISION_GATE else '<'} "
+                      f"{PRECISION_GATE:.2f}")
+        gate = gate and precision >= PRECISION_GATE
+    if checks:
+        print(f"suite gate ({RECALL_GATE:.2f}/{PRECISION_GATE:.2f}): "
+              f"{'PASS' if gate else 'FAIL'} - {', '.join(checks)}")
+    if positives and recall < RECALL_GATE:
         print("NOTE: low recall - rule out listing eviction before blaming wording;")
         print("      run the diagnose mode on the real environment first.")
+    if misrouted:
+        print("NOTE: misroutes concentrated on a sibling = boundary dispute between")
+        print("      two descriptions; state what EACH skill is not for, fix both.")
 
 
 def main() -> None:
     args = sys.argv[1:]
     do_run = "--run" in args
+    allow_collision = "--allow-collision" in args
     keep_dir = None
     if "--keep-transcripts" in args:
-        keep_dir = Path(args[args.index("--keep-transcripts") + 1])
+        idx = args.index("--keep-transcripts")
+        keep_dir = Path(args[idx + 1])
         keep_dir.mkdir(parents=True, exist_ok=True)
-    positional = [a for a in args if not a.startswith("--") and a != (str(keep_dir) if keep_dir else None)]
+        del args[idx:idx + 2]
+    positional = [a for a in args if not a.startswith("--")]
     if len(positional) != 2:
         sys.exit(__doc__)
     skill_dir, rows_path = Path(positional[0]), Path(positional[1])
     name = skill_name_from(skill_dir)
     rows = load_rows(rows_path)
 
-    desc = ""
-    front = re.search(r"^description:\s*(.+?)$", (skill_dir / "SKILL.md").read_text(encoding="utf-8"), re.MULTILINE)
-    if front:
-        desc = front.group(1).strip()
+    desc = description_from(skill_dir)
     if len(desc) > 1536:
         print(f"WARNING: description is {len(desc)} chars - past the 1536-char listing "
               f"cap; trigger text past it cannot affect activation. Shorten it.")
 
-    print(f"skill: {name}   rows: {len(rows)} "
-          f"({sum(1 for r in rows if r['expected_skill'])} pos / "
-          f"{sum(1 for r in rows if not r['expected_skill'])} neg)")
+    # Validate row labels and resolve every sibling to a stageable directory.
+    expected_names = sorted({r["expected_skill"] for r in rows if r["expected_skill"]})
+    bad = [n for n in expected_names if n != name and not n.isidentifier()]
+    sibling_names = [n for n in expected_names if n != name]
+    sibling_dirs = {n: resolve_sibling(n, skill_dir) for n in sibling_names}
+
+    collisions = scan_installed_collisions([name] + sibling_names)
+    if collisions:
+        for warning in collisions:
+            print(f"COLLISION: {warning}")
+        if not allow_collision:
+            sys.exit("activation-run: an installed-name collision means the suite may "
+                     "measure the wrong skill; resolve it, or pass --allow-collision "
+                     "to proceed anyway")
+
+    n_pos = sum(1 for r in rows if r["expected_skill"] == name)
+    n_neg = sum(1 for r in rows if not r["expected_skill"])
+    n_sib = len(rows) - n_pos - n_neg
+    print(f"skill: {name}   rows: {len(rows)} ({n_pos} pos / {n_neg} neg / {n_sib} sib)")
+    if sibling_dirs:
+        for sib, path in sibling_dirs.items():
+            print(f"  stages sibling '{sib}' from {path}")
+
     if not do_run:
         print("\nDRY PLAN (no sessions spawned). Rows to run:")
         for r in rows:
-            kind = "pos" if r["expected_skill"] else "neg"
+            kind = row_kind(r, name)
             print(f"  [{kind}] {r['id']}: {r['prompt'][:90]}")
         print("\nEach row is one full headless session (~$0.03-0.07 at flash tier).")
         print("Re-run with --run to execute. Add --keep-transcripts DIR to keep raw output.")
         return
 
-    collisions = [r["id"] for r in rows if r["expected_skill"] and r["expected_skill"] != name]
-    if collisions:
-        sys.exit(f"activation-run: expected_skill must be '{name}' (or blank); "
-                 f"mismatched rows: {collisions}")
-
     staging_root = Path(tempfile.mkdtemp(prefix="act-stage-"))
-    stage_plugin_root(skill_dir, staging_root)
+    stage_plugin_root([skill_dir] + list(sibling_dirs.values()), staging_root)
     try:
         results = []
         for i, row in enumerate(rows, 1):
             print(f"row {i}/{len(rows)}: {row['id']} ...", flush=True)
-            triggered, invoked, cost = run_row(row, staging_root, keep_dir)
-            results.append({
-                "id": row["id"], "expected": bool(row["expected_skill"]),
-                "expected_or_blank": row["expected_skill"],
-                "triggered": triggered, "invoked": invoked, "cost": cost,
-            })
-        score(rows, results)
+            invoked, cost = run_row(row, staging_root, keep_dir)
+            results.append({"id": row["id"], "expected": row["expected_skill"],
+                            "invoked": invoked, "cost": cost})
+        score(rows, results, name)
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
 

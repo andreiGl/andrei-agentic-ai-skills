@@ -52,12 +52,26 @@ Rows are JSONL, one object per line:
 ```jsonl
 {"id": "pos-1", "expected_skill": "my-skill", "prompt": "..."}
 {"id": "neg-1", "expected_skill": "", "prompt": "..."}
+{"id": "sib-1", "expected_skill": "other-skill", "prompt": "..."}
 ```
 
 Positives paraphrase the description (never quote it - that tests string matching).
 Distractors are adjacent requests the skill should NOT claim; a suite without them is
 refused, because precision is 1.0 by definition. Never name the skill inside a prompt -
 that tests obedience, not activation.
+
+A **sibling-owned row** names a different overlapping skill. The row passes when that
+sibling fires; the target firing is a misroute. This localizes boundary disputes: a
+plain distractor shows that a misfire happened, sibling rows show where it went. Named
+siblings are staged in the sandbox alongside the target.
+
+Before any run the runner scans user and project skill directories for bare-name
+collisions with every skill the suite names - a collision silently measures whichever
+skill fires, so the runner refuses to proceed (`--allow-collision` overrides
+deliberately).
+
+Results gate at recall >= 0.7 and precision >= 0.7, printed as PASS/FAIL next to the
+confusion matrix and the sibling-routing breakdown.
 
 ## Diagnose mode
 
