@@ -175,13 +175,18 @@ def run_row(row: dict, staging: Path, keep_dir: Path | None, repeat: int) -> tup
                     capture_output=True, text=True, timeout=TIMEOUT_S + 60,
                 )
             except subprocess.TimeoutExpired:
-                per_run_invoked.append([])
-                per_run_costs.append(0.0)
-                continue
+                raise RuntimeError(
+                    f"session for row '{row['id']}' timed out after {TIMEOUT_S + 60}s"
+                    f" - measurement failure, not a miss; fix the harness and re-run")
             if proc.returncode != 0 and not transcript.exists():
-                per_run_invoked.append([])
-                per_run_costs.append(0.0)
-                continue
+                # The shell runner failed before starting claude (exit 2 setup, exit 3
+                # no-token): no transcript, so the is_error check below never runs.
+                # Surface the runner's stderr and stop - never score this as a miss.
+                stderr = (proc.stderr or "").strip().splitlines()
+                detail = stderr[-1] if stderr else f"(exit {proc.returncode})"
+                raise RuntimeError(
+                    f"runner failed for row '{row['id']}': {detail}"
+                    f" - measurement failure, not a miss; fix the login/harness and re-run")
             if keep_dir:
                 suffix = f".run{run_index + 1}" if repeat > 1 else ""
                 shutil.copy(transcript, keep_dir / f"{row['id']}{suffix}.jsonl")
