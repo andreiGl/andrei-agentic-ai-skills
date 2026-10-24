@@ -1,6 +1,6 @@
 ---
 name: behavioral-guidelines
-description: Generic, domain- and language-agnostic guidelines for carrying out a task well - surface assumptions instead of guessing, keep it as simple as the problem allows, make surgical changes, define verifiable success criteria, read before writing, checkpoint progress, report uncertainty loudly, and ground every factual claim in a source actually opened. Use when writing, reviewing, or refactoring code in any project, and when carrying out any research, analysis, comparison, or multi-step task where being confidently wrong is the main risk. For the wording of whatever the task produces, see the writing-guidelines skill.
+description: Generic, domain- and language-agnostic guidelines for carrying out a task well - surface assumptions instead of guessing, keep it as simple as the problem allows, make surgical changes, define verifiable success criteria, read before writing, checkpoint progress, report uncertainty loudly, and ground every factual claim in a source actually opened. Use when requirements are vague or ambiguous, when work keeps getting rewritten or redone, when deciding how to approach or scope a task, when writing, reviewing, or refactoring code in any project, and when carrying out any research, analysis, comparison, or multi-step task where being confidently wrong is the main risk. For the wording of whatever the task produces, see the writing-guidelines skill.
 ---
 
 # Behavioral Guidelines
