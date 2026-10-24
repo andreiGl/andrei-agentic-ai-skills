@@ -6,17 +6,20 @@
 # --plugin-dir. Tools are locked to Skill + read-only; every write, exec, network,
 # and MCP tool is disallowed. The suite runner (activation-run.py) calls this per row.
 #
-# Usage: activation-run.sh <plugin-root> <prompt-file> <out-json>
+# Usage: activation-run.sh <plugin-root> <prompt-file> <out-json> [files-dir]
 #   <plugin-root>  dir holding skills/<name>/SKILL.md (the minimal staged root)
 #   <prompt-file>  file holding the row prompt (read as stdin source)
 #   <out-json>     where the raw stream-json transcript is written
+#   <files-dir>    optional; copied into the sandbox home before the session starts
+#                  (rows that test a task on an existing artifact stage it here)
 # Exit: 0 session ran (check the transcript for the verdict), nonzero on setup error.
 
 set -u
 
-PLUGIN_ROOT="${1:?usage: activation-run.sh <plugin-root> <prompt-file> <out-json>}"
-PROMPT_FILE="${2:?usage: activation-run.sh <plugin-root> <prompt-file> <out-json>}"
-OUT_JSON="${3:?usage: activation-run.sh <plugin-root> <prompt-file> <out-json>}"
+PLUGIN_ROOT="${1:?usage: activation-run.sh <plugin-root> <prompt-file> <out-json> [files-dir]}"
+PROMPT_FILE="${2:?usage: activation-run.sh <plugin-root> <prompt-file> <out-json> [files-dir]}"
+OUT_JSON="${3:?usage: activation-run.sh <plugin-root> <prompt-file> <out-json> [files-dir]}"
+FILES_DIR="${4:-}"
 
 [ -d "$PLUGIN_ROOT/skills" ] || { echo "activation-run: no skills/ under $PLUGIN_ROOT" >&2; exit 2; }
 [ -r "$PROMPT_FILE" ] || { echo "activation-run: cannot read $PROMPT_FILE" >&2; exit 2; }
@@ -42,6 +45,10 @@ export ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_MODEL
 PROMPT=$(cat "$PROMPT_FILE")
 
 cd "$SANDBOX/home" || exit 2
+if [ -n "$FILES_DIR" ]; then
+  [ -d "$FILES_DIR" ] || { echo "activation-run: files-dir '$FILES_DIR' is not a directory" >&2; exit 2; }
+  cp -R "$FILES_DIR"/. "$SANDBOX/home"/
+fi
 HOME="$SANDBOX/home" CLAUDE_CONFIG_DIR="$SANDBOX/config" \
   gtimeout 300 claude -p "$PROMPT" \
   --output-format stream-json --verbose \

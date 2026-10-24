@@ -14,7 +14,10 @@ Usage:
   <skill-dir>   directory containing the target SKILL.md (name read from frontmatter)
   <rows.jsonl>  one JSON object per line: {"id", "expected_skill", "prompt"};
                 expected_skill "" marks a distractor row; a sibling skill's name
-                marks a routing row (the request belongs to that sibling)
+                marks a routing row (the request belongs to that sibling).
+                Optional "files": {relative-path: content} staged into the sandbox
+                home for rows whose task works on an existing artifact (a draft
+                plan, a doc to review); without it the session works in an empty dir
   --run         actually spawn sessions (default: dry plan - print what would run)
   --keep-transcripts DIR  copy raw transcripts here instead of deleting them
   --allow-collision     proceed despite an installed-name collision (rarely right)
@@ -72,6 +75,9 @@ def load_rows(rows_path: Path):
         for field in ("id", "expected_skill", "prompt"):
             if field not in row:
                 sys.exit(f"activation-run: row {lineno} missing '{field}'")
+        if "files" in row and not isinstance(row["files"], dict):
+            sys.exit(f"activation-run: row {lineno} 'files' must be an object of "
+                     f"{{relative-path: content}}")
         rows.append(row)
     return rows
 
@@ -123,6 +129,25 @@ def stage_plugin_root(skill_dirs: list, staging: Path) -> None:
     # commands.
 
 
+def stage_row_files(row: dict, tmp: Path) -> str | None:
+    """Write the row's optional \"files\" ({relative-path: content}) into a per-run
+    dir; return its path, or None when the row stages no files. The shell runner
+    copies the dir into the sandbox home before the session starts."""
+    files = row.get("files")
+    if not files:
+        return None
+    files_dir = tmp / "files"
+    for rel, content in files.items():
+        rel_path = Path(rel)
+        if rel_path.is_absolute() or ".." in rel_path.parts:
+            sys.exit(f"activation-run: row files path must be relative and inside "
+                     f"the sandbox: {rel}")
+        dest = files_dir / rel_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(str(content), encoding="utf-8")
+    return str(files_dir)
+
+
 def run_row(row: dict, staging: Path, keep_dir: Path | None, repeat: int) -> tuple:
     """Run one row `repeat` times; return (per_run_invoked_lists, per_run_costs).
 
@@ -134,11 +159,15 @@ def run_row(row: dict, staging: Path, keep_dir: Path | None, repeat: int) -> tup
         with tempfile.TemporaryDirectory(prefix="act-row-") as tmp:
             prompt_file = Path(tmp) / "prompt.txt"
             prompt_file.write_text(row["prompt"], encoding="utf-8")
+            files_dir = stage_row_files(row, Path(tmp))
             transcript = Path(tmp) / "stream.jsonl"
+            cmd = ["bash", str(RUNNER), str(staging), str(prompt_file),
+                   str(transcript)]
+            if files_dir:
+                cmd.append(files_dir)
             try:
                 proc = subprocess.run(
-                    ["bash", str(RUNNER), str(staging), str(prompt_file),
-                     str(transcript)],
+                    cmd,
                     capture_output=True, text=True, timeout=TIMEOUT_S + 60,
                 )
             except subprocess.TimeoutExpired:
