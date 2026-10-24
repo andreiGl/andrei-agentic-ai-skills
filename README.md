@@ -16,6 +16,7 @@ a custom status line, and an MCP server for the UpNote notes app.
   - [What deliberately stays out of the symlinks](#what-deliberately-stays-out-of-the-symlinks)
 - [Skills](#skills)
   - [Working and writing](#working-and-writing)
+  - [Skill evaluation](#skill-evaluation)
   - [Knowledge base](#knowledge-base)
   - [Session persistence](#session-persistence)
   - [Where triggers live](#where-triggers-live)
@@ -115,6 +116,19 @@ carries a description for its own kind of work; they compose, and each points at
 
 The writing half applies to any prose, in any language, whether or not code is involved -
 comments and commit messages, and equally reports, emails, and forum posts.
+
+### Skill evaluation
+
+| Skill | What it does |
+| :--- | :--- |
+| [`skill-activation-check`](skills/skill-activation-check) | Measures whether a skill triggers: a labelled set of positive, distractor, and sibling requests, one sandboxed headless session per row, scored as recall/precision/F1 with a 0.7/0.7 gate |
+
+The sandbox stages only the skill under test (plus any sibling a routing row names) into a
+temp `HOME` with no hooks, no MCP servers, and no other skills, and locks the session's
+tools to Skill plus read-only - a test row cannot touch anything real. When a skill
+"stops firing", its diagnose mode checks the two silent causes first: the 1,536-character
+description cap, and the listing budget that drops least-invoked skills first. Design
+adapted from UiPath/coder-eval's check-skill (Apache-2.0).
 
 ### Knowledge base
 
