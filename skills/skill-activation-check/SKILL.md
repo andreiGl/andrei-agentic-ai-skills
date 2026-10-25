@@ -171,6 +171,30 @@ the structural causes before building any suite:
 
 Only when all three are clear does a labelled suite add information.
 
+## Suite-runner options
+
+```bash
+python3 ~/.claude/skills/skill-activation-check/scripts/activation-run.py \
+  <skill-dir> <rows.jsonl> --run [--repeat N] [--keep-transcripts DIR]
+```
+
+- `--repeat N` runs N sessions per row and the row passes only if **every** run
+  passed. A failing row prints its fire rate (`fired 1/2`) - the one-pass way to
+  tell a flake (fired 1/2) from a real miss (fired 0/2). Recall counts a positive
+  only when all runs fired the target; precision counts a false fire if any run
+  fired it. Cost multiplies by N.
+- A row may carry `"files": {relative-path: content}` - staged into the sandbox
+  home before the session starts. Rows whose task works on an existing artifact (a
+  draft plan to attack, a doc to review) need this: without the artifact the session
+  spends its turns reporting the file is missing, and the row measures the sandbox's
+  honesty, not the trigger. Absolute paths and `..` escapes are rejected.
+- Login and error handling: the shell runner exits before any session spawns when
+  `~/.claude/settings.json` has no `ANTHROPIC_AUTH_TOKEN` (gateway-token logins
+  only; a subscription login cannot serve a sandboxed session). An errored session
+  (failed login, harness failure, timeout) raises and stops the suite with the
+  runner's stderr - it is never scored as a miss. A "recall 0" result therefore
+  means a real measurement, not a broken login.
+
 ## Description optimization loop (measure - rewrite - measure)
 
 When a suite shows real failures and wording is confirmed as the culprit (diagnose

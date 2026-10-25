@@ -121,7 +121,7 @@ comments and commit messages, and equally reports, emails, and forum posts.
 
 | Skill | What it does |
 | :--- | :--- |
-| [`skill-activation-check`](skills/skill-activation-check) | Measures whether a skill triggers: a labelled set of positive, distractor, and sibling requests, one sandboxed headless session per row, scored as recall/precision/F1 with a 0.7/0.7 gate |
+| [`skill-activation-check`](skills/skill-activation-check) | Measures whether a skill triggers: a labelled set of positive, distractor, and sibling requests, one sandboxed headless session per row, scored as recall/precision/F1 with a 0.7/0.7 gate; `--repeat N` gives strict all-runs verdicts with per-row fire rates (flake vs real miss in one pass); rows can stage files into the sandbox for artifact-dependent tasks; setup/login failures stop the suite instead of scoring as misses (gateway-token logins only); `optimize-description.py` closes the loop by proposing and testing description rewrites |
 
 The sandbox stages only the skill under test (plus any sibling a routing row names) into a
 temp `HOME` with no hooks, no MCP servers, and no other skills, and locks the session's
