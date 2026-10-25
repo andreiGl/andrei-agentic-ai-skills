@@ -15,8 +15,8 @@ Icon?
 !knowledge/**/.gitkeep
 !knowledge/raw/README.md
 
-# Personal skills that must never be published. They live in a private repo
-# and are symlinked into ~/.claude/skills, never into this one. The rule is
+# Personal skills that must never be published. They live in a private local
+# folder and are symlinked into ~/.claude/skills, never into this repo. The rule is
 # here in case one gets copied by mistake.
 skills/write-as-agnostic/
 
