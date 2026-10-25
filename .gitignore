@@ -15,10 +15,9 @@ Icon?
 !knowledge/**/.gitkeep
 !knowledge/raw/README.md
 
-# Personal skills that must never be published. write-as-agnostic carries a
-# forum style profile, 40 of my own posts and my nicks; it lives in
-# ~/IdeaProjects/vipvip-style-corpus/skill/ and is symlinked into ~/.claude/skills,
-# never into this repo. The rule is here in case it gets copied by mistake.
+# Personal skills that must never be published. They live in a private repo
+# and are symlinked into ~/.claude/skills, never into this one. The rule is
+# here in case one gets copied by mistake.
 skills/write-as-agnostic/
 
 # Python bytecode
