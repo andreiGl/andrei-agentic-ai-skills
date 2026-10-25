@@ -12,8 +12,8 @@ Usage:
 
   <skill-dir>     directory containing the target SKILL.md (edited in place; git
                   recommended - the loop rewrites the description repeatedly)
-  <eval-set.json> [{"id", "expected_skill", "prompt"}, ...] (activation-run.py row
-                  format; the docstring below says "query" but rows use "prompt")
+  <eval-set.json> [{"id", "expected_skill", "prompt"}, ...] (same row format
+                  activation-run.py takes)
                   same row format activation-run.py takes; write it with activation-
                   check's row discipline: positives paraphrase, negatives are NEAR MISSES
                   that share vocabulary with the description, not obviously irrelevant
@@ -254,30 +254,31 @@ def main() -> None:
 
     # Baseline measurement on the current description
     current = read_description(skill_dir)
-    print(f"[baseline] measuring current description ...")
-    m = measure(train + test, skill_dir, runs_per_query)
-    recall, precision, failures = score(train + test, m["passed"], name)
-    best = {"description": current, "recall": recall, "precision": precision,
-            "score": recall + precision}
-    print(f"[baseline] recall={recall:.2f} precision={precision:.2f} "
-          f"({len(failures)} failures)   cumulative cost ${m['cost']:.2f}\n")
-
-    for it in range(1, iterations + 1):
-        print(f"[iter {it}/{iterations}] proposing rewrite from "
-              f"{len(failures)} failure(s) ...")
-        candidate = propose_description(name, body, best["description"], failures,
-                                        train, None)
-        if candidate == best["description"]:
-            print(f"[iter {it}] no usable proposal; stopping early")
-            break
-        write_description(skill_dir, candidate)
-        try:
-            m = measure(train + test, skill_dir, runs_per_query)
-        finally:
-            # Never leave a candidate description in place on a crash mid-measurement;
-            # restore the best-known description immediately after measuring.
-            write_description(skill_dir, best["description"])
+    try:
+        print(f"[baseline] measuring current description ...")
+        m = measure(train + test, skill_dir, runs_per_query)
         recall, precision, failures = score(train + test, m["passed"], name)
+        best = {"description": current, "recall": recall, "precision": precision,
+                "score": recall + precision}
+        print(f"[baseline] recall={recall:.2f} precision={precision:.2f} "
+              f"({len(failures)} failures)   cumulative cost ${m['cost']:.2f}\n")
+
+        for it in range(1, iterations + 1):
+            print(f"[iter {it}/{iterations}] proposing rewrite from "
+                  f"{len(failures)} failure(s) ...")
+            candidate = propose_description(name, body, best["description"], failures,
+                                            train, None)
+            if candidate == best["description"]:
+                print(f"[iter {it}] no usable proposal; stopping early")
+                break
+            write_description(skill_dir, candidate)
+            try:
+                m = measure(train + test, skill_dir, runs_per_query)
+            finally:
+                # Never leave a candidate description in place on a crash mid-measurement;
+                # restore the best-known description immediately after measuring.
+                write_description(skill_dir, best["description"])
+            recall, precision, failures = score(train + test, m["passed"], name)
         print(f"[iter {it}] recall={recall:.2f} precision={precision:.2f} "
               f"({len(failures)} failures)   cumulative cost ${m['cost']:.2f}")
         # Select by test performance: re-score on the test rows only
@@ -295,6 +296,11 @@ def main() -> None:
         else:
             print(f"[iter {it}] not better than baseline; discarded")
         print()
+    except RuntimeError as e:
+        # A measurement failure must read as an error, not a traceback - and never
+        # reach the proposal step, which would spend sessions on fake failures.
+        print(f"optimize-description: {e}", file=sys.stderr)
+        sys.exit(1)
 
     write_description(skill_dir, best["description"])
     print("=== Done ===")
