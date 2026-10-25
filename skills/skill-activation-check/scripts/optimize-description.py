@@ -12,7 +12,8 @@ Usage:
 
   <skill-dir>     directory containing the target SKILL.md (edited in place; git
                   recommended - the loop rewrites the description repeatedly)
-  <eval-set.json> [{"query": "...", "expected_skill": "<name>"|"", "id": "..."}, ...]
+  <eval-set.json> [{"id", "expected_skill", "prompt"}, ...] (activation-run.py row
+                  format; the docstring below says "query" but rows use "prompt")
                   same row format activation-run.py takes; write it with activation-
                   check's row discipline: positives paraphrase, negatives are NEAR MISSES
                   that share vocabulary with the description, not obviously irrelevant
@@ -105,6 +106,15 @@ def measure(rows: list, skill_dir: Path, runs_per_query: int) -> dict:
                  "--run"],
                 capture_output=True, text=True, timeout=600 * len(rows),
             )
+            if proc.returncode != 0:
+                # The runner exits 1 on any measurement failure (no gateway token,
+                # setup error, errored session). Continuing would score the batch as
+                # all-miss and feed fake failures to the proposal step - stop instead.
+                stderr = (proc.stderr or "").strip()
+                raise RuntimeError(
+                    f"activation runner failed (exit {proc.returncode}): "
+                    f"{stderr.splitlines()[-1] if stderr else '(no stderr)'}"
+                    f" - measurement failure, not a miss; fix the login/harness and re-run")
             # Parse the per-row verdict lines: "  [PASS] <id> ..." / "  [MISS] <id> ..."
             for line in proc.stdout.splitlines():
                 match = re.match(r"\s+\[(PASS|MISS)\]\s+(\S+)", line)
@@ -112,8 +122,11 @@ def measure(rows: list, skill_dir: Path, runs_per_query: int) -> dict:
                     continue
                 verdict, row_id = match.group(1), match.group(2)
                 results.setdefault(row_id, []).append(verdict == "PASS")
-            cost_match = re.search(r"\$([0-9.]+)$", proc.stdout.strip().splitlines()[-1]) \
-                if proc.stdout.strip() else None
+            missing = [r["id"] for r in rows if r["id"] not in results]
+            if missing:
+                raise RuntimeError(
+                    f"activation runner printed no verdict for rows {missing} "
+                    f"- measurement failure, not a miss; fix the harness and re-run")
             # Per-row costs printed as "...  $0.123"; sum them all
             total_cost += sum(
                 float(m) for m in re.findall(r"\$([0-9.]+)", proc.stdout))
@@ -124,17 +137,22 @@ def measure(rows: list, skill_dir: Path, runs_per_query: int) -> dict:
 
 
 def score(rows: list, passed: dict, name: str) -> tuple:
-    """Return (recall, precision, failures). Failures carry row id + kind."""
+    """Return (recall, precision, failures). Failures carry row id + kind.
+
+    The runner's [PASS]/[MISS] verdict means "the row's own check passed": a
+    distractor row PASSES when the skill correctly did NOT fire. So for negatives
+    a false fire is a row that did NOT pass - not the reverse.
+    """
     positives = [r for r in rows if r["expected_skill"]]
     negatives = [r for r in rows if not r["expected_skill"]]
     tp = sum(1 for r in positives if passed.get(r["id"]))
-    fp = sum(1 for r in negatives if passed.get(r["id"]))
+    fp = sum(1 for r in negatives if not passed.get(r["id"], True))
     recall = tp / len(positives) if positives else float("nan")
     precision = tp / (tp + fp) if (tp + fp) else float("nan")
     failures = ([{"id": r["id"], "kind": "miss", "query": r["prompt"]}
                  for r in positives if not passed.get(r["id"])]
                 + [{"id": r["id"], "kind": "false-fire", "query": r["prompt"]}
-                   for r in negatives if passed.get(r["id"])])
+                   for r in negatives if not passed.get(r["id"], True)])
     return recall, precision, failures
 
 

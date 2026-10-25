@@ -269,9 +269,14 @@ def score(rows: list, results: list, target: str, repeat: int = 1) -> None:
         via = f" via {r['runs'][0][0]}" if r["runs"] and r["runs"][0] else ""
         rate = ""
         if repeat > 1 and not ok:
-            fired = sum(1 for inv in r["runs"]
-                        if (r["expected"] in inv if r["expected"] else not inv))
-            rate = f"  fired {fired}/{repeat}"
+            # For a distractor row a run "passes" when nothing fired, so the count
+            # is runs that behaved correctly - label it passed X/N, not fired X/N.
+            if not r["expected"]:
+                behaved = sum(1 for inv in r["runs"] if not inv)
+                rate = f"  passed {behaved}/{repeat} (stayed quiet)"
+            else:
+                fired = sum(1 for inv in r["runs"] if r["expected"] in inv)
+                rate = f"  fired {fired}/{repeat}"
         print(f"  [{mark}] {r['id']:<12} {kind:<4}{via}  "
               f"${sum(r['costs']):.3f}{rate}")
 
