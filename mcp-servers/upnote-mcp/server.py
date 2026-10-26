@@ -11,6 +11,13 @@ UpNote app itself through its upnote://x-callback-url/note/new link, so they
 sync like notes typed by hand.
 """
 
+import fcntl
+import functools
+import pwd
+import stat
+import threading
+from contextlib import contextmanager
+
 import html as html_lib
 import bisect
 import collections
@@ -1205,12 +1212,22 @@ def open_in_upnote(
     (kind, value), = given.items()
     value = value.strip()
 
+    reset_url = None
     # Every target is checked in the database first, so UpNote only receives ones that exist.
     with closing(_connect()) as conn:
         if kind == "note_id":
             r = conn.execute("SELECT title, trashed FROM notes WHERE id = ? AND deleted = 0", (value,)).fetchone()
             if r is None:
                 raise ToolError(f"No note with id {value!r}. Find ids with search_notes or list_notes.")
+            # UpNote can retain stale selection after trash/restore. Re-enter the
+            # containing view before opening the note; one combined view/note URL
+            # still left the editor blank in the observed desktop build.
+            if r["trashed"]:
+                reset_url = "upnote://x-callback-url/view?mode=trash"
+            else:
+                members = _membership(conn, _notebooks(conn)).get(value, [])
+                reset_url = (f"upnote://x-callback-url/openNotebook?notebookId={quote(sorted(members)[0], safe='')}"
+                             if members else "upnote://x-callback-url/view?mode=all_notes")
             url = f"upnote://x-callback-url/openNote?noteId={quote(value, safe='')}"
             shown = {"note": r["title"] or "", **({"trashed": True} if r["trashed"] else {})}
         elif kind == "notebook":
@@ -1230,6 +1247,8 @@ def open_in_upnote(
             url = f"upnote://x-callback-url/view?action=search&query={quote(value, safe='')}"
             shown = {"search": value}
 
+    if reset_url is not None:
+        _open_link(reset_url, background=True)
     _open_link(url, background=False)
     return {"sent": True, "showing": shown}
 
@@ -1240,9 +1259,105 @@ def open_in_upnote(
 LONG_HISTORY_REVISIONS = 20
 RECENT_EDIT_MINUTES = 10
 PENDING_SECONDS = 300
-# Notes whose apply sent a create link that hadn't shown up: note id -> (marker, when). A second apply
-# checks for the late copy first, so a retry can't make a third note.
-_PENDING: dict[str, tuple[str, float]] = {}
+# Cross-process operation state. HOME can differ between client profiles, so the
+# default is based on the OS user database, as the launcher is. Tests explicitly
+# override the state directory; no note content is stored here.
+_OPERATION_THREADS: dict[str, threading.RLock] = {}
+_OPERATION_THREADS_GUARD = threading.Lock()
+_OPERATION_ACTIVE = threading.local()
+
+
+def _operation_path(note_id: str, suffix: str) -> Path:
+    root = Path(os.environ.get("UPNOTE_MCP_STATE_DIR", str(
+        Path(pwd.getpwuid(os.getuid()).pw_dir) / ".local/state/upnote-mcp"))).expanduser()
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    info = root.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise ToolError("UpNote operation-state directory must be a private directory owned by this user.")
+    key = hashlib.sha256((str(DB_PATH.resolve()) + "\0" + note_id.strip()).encode()).hexdigest()
+    return root / (key + suffix)
+
+
+@contextmanager
+def _note_operation(note_id: str):
+    path = _operation_path(note_id, ".lock")
+    key = str(path)
+    with _OPERATION_THREADS_GUARD:
+        thread_lock = _OPERATION_THREADS.setdefault(key, threading.RLock())
+    with thread_lock:
+        active = getattr(_OPERATION_ACTIVE, "keys", set())
+        if key in active:  # _replace calls _set_trashed while holding this lock
+            yield
+            return
+        fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                raise ToolError("Unsafe UpNote operation lock; no app change was requested.")
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise ToolError("Another operation for this note is running. Wait for its result, then read the latest note before retrying.") from None
+            _OPERATION_ACTIVE.keys = active | {key}
+            try:
+                yield
+            finally:
+                _OPERATION_ACTIVE.keys = active
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+
+def _locked_note_operation(fn):
+    @functools.wraps(fn)
+    def run(note_id, *args, **kwargs):
+        with _note_operation(note_id):
+            return fn(note_id, *args, **kwargs)
+    return run
+
+
+def _pending_get(note_id: str):
+    path = _operation_path(note_id, ".json")
+    if not path.exists():
+        return None
+    if path.is_symlink():
+        raise ToolError("Unsafe UpNote operation journal; no app change was requested.")
+    try:
+        value = json.loads(path.read_text())
+        marker, sent_at = value["marker"], value["sent_at"]
+        if not re.fullmatch(r"[0-9a-f]{32}", marker) or not isinstance(sent_at, (int, float)) or not math.isfinite(sent_at):
+            raise ValueError("invalid journal values")
+        return marker, sent_at
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise ToolError(f"Cannot verify an earlier UpNote operation: {e}. Check the original and any new copy before retrying.") from e
+
+
+def _pending_set(note_id: str, marker: str):
+    path = _operation_path(note_id, ".json")
+    temporary = path.with_name(path.name + "." + uuid.uuid4().hex + ".tmp")
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            json.dump({"marker": marker, "sent_at": time.time()}, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def _pending_delete(note_id: str):
+    _operation_path(note_id, ".json").unlink(missing_ok=True)
+
+
+# Internal trash calls share the same reentrant per-note operation lock.
+_set_trashed = _locked_note_operation(_set_trashed)
 
 
 def _replace_checks(conn: sqlite3.Connection, note_id: str):
@@ -1303,11 +1418,6 @@ def _replace_checks(conn: sqlite3.Connection, note_id: str):
     made_here = "data-upnote-mcp=" in body and (r["updatedAt"] or 0) - (r["createdAt"] or 0) < 60000  # untouched since this server made it
     if r["updatedAt"] and time.time() * 1000 - r["updatedAt"] < RECENT_EDIT_MINUTES * 60000 and not made_here:
         warnings.append(f"It was edited in the last {RECENT_EDIT_MINUTES} minutes. If someone is typing in it, those changes stay in the original.")
-    if text is not None and _literal_breaks_in_code(text):
-        warnings.append(
-            "The new text holds literal backslash-n sequences inside code blocks (a JSON-escaped "
-            "line break pasted back in?). They will show as visible \\n text instead of line breaks."
-        )
     return r, nbs, notebook_ids, blockers, warnings
 
 
@@ -1430,6 +1540,7 @@ def _words(text: str) -> set[str]:
     return {w for w in re.findall(r"[^\W_]{3,}", _fold(text))}  # split on _, as UpNote's text keeps my_var whole
 
 
+@_locked_note_operation
 def _replace(
     note_id: NoteId,
     text: Annotated[str | None, Field(description=_TEXT_DOC)] = None,
@@ -1453,6 +1564,11 @@ def _replace(
     with closing(_connect()) as conn:
         r, nbs, notebook_ids, blockers, warnings = _replace_checks(conn, note_id)
     warnings += extra_warnings or []
+    if text is not None and _literal_breaks_in_code(text):
+        warnings.append(
+            "The new text holds literal backslash-n sequences inside code blocks (a JSON-escaped "
+            "line break pasted back in?). They will show as visible \\n text instead of line breaks."
+        )
     if text is None and keep_lines is None:
         _current_body(note_id)  # refuses a body it can't rebuild here, at the preview rather than the apply
     with closing(_connect()) as conn:
@@ -1552,27 +1668,28 @@ def _replace(
     expected_tags = {_tag_key(t) for t in tags}
     sent_words = _words(" ".join(_visible_lines(_sanitize_html(_MARKER.sub("", body)))))
 
-    if pending := _PENDING.get(note_id):  # an earlier apply whose new version hadn't appeared
+    if pending := _pending_get(note_id):  # an earlier apply whose new version hadn't appeared
         with closing(_connect()) as conn:
             late = conn.execute("SELECT id, trashed FROM notes WHERE deleted = 0 AND instr(html, ?) > 0 ORDER BY trashed",
                                 (f'data-upnote-mcp="{pending[0]}"',)).fetchone()
         if late and late["trashed"]:  # the late copy came and was rejected: nothing is outstanding
-            del _PENDING[note_id]
+            _pending_delete(note_id)
         elif late:
             raise ToolError(
                 f"An earlier call's new version did appear later: note {late['id']}. Show it to the user with "
                 f"get_note; if it is right, move the original {note_id} to Trash with move_note_to_trash after they "
                 "confirm. Don't call this tool again for this note."
             )
-        elif time.monotonic() - pending[1] < PENDING_SECONDS:
+        elif time.time() - pending[1] < PENDING_SECONDS:
             raise ToolError(
                 f"An earlier call's new version may still appear. Wait {PENDING_SECONDS // 60} minutes from that call, "
                 "then call again: the server checks for it first."
             )
         else:
-            del _PENDING[note_id]
+            _pending_delete(note_id)
     marker = _new_marker()
     members_before = _notebook_members(target) if target else []
+    _pending_set(note_id, marker)  # durable before dispatch, including ambiguous delivery/crash
     _open_link(_create_url(new_title, body, notebook_title, markdown, marker))
     new_note = None
     trashing = False
@@ -1586,7 +1703,7 @@ def _replace(
     try:
         new_note = _find_created_note(marker, notebook_path)
         if new_note is None:
-            _PENDING[note_id] = (marker, time.monotonic())
+            _pending_set(note_id, marker)
             return kept_both(
                 f"The new version didn't appear within {CONFIRM_SECONDS:.0f} seconds, so the original was left "
                 "unchanged. UpNote may still create it. To find it, run_select: SELECT id, title FROM notes WHERE "
@@ -1655,7 +1772,7 @@ def _replace(
         trash = _set_trashed(note_id, True)
     except (sqlite3.Error, ToolError) as e:
         if new_note is None:
-            _PENDING[note_id] = (marker, time.monotonic())
+            _pending_set(note_id, marker)
         where = ("The original may already be in Trash" if trashing else "The original was left in place")
         return kept_both(
             f"Something failed after the new version was requested: {e} {where}"
@@ -1664,6 +1781,8 @@ def _replace(
             "want to Trash with move_note_to_trash."
         )
 
+    if trash.get("confirmed"):
+        _pending_delete(note_id)
     result: dict[str, Any] = {
         "done": bool(trash.get("confirmed")),
         "new_note": new_note,

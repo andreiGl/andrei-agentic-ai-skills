@@ -6,7 +6,11 @@
 
 Claude Code skills - a persistent cross-project knowledge base, guidelines for how work
 gets carried out, and guidelines for how the result reads - plus session save/restore,
-a custom status line, and an MCP server for the UpNote notes app.
+a custom status line, and an UpNote MCP server shared by Claude and Codex.
+
+The UpNote server has been validated locally in both clients, including their desktop
+apps. The skills, knowledge-base hooks, status line and mods retain their Claude-specific
+installation below; this does not claim that the whole repository is portable to Codex.
 
 ## Contents
 
@@ -70,10 +74,15 @@ ln -sfn "$REPO"/kb-autocommit.sh ~/.claude/kb-autocommit.sh
 ln -sfn "$REPO"/knowledge/CLAUDE.md ~/.claude/knowledge/CLAUDE.md
 ln -sfn "$REPO"/knowledge/raw/README.md ~/.claude/knowledge/raw/README.md
 ln -sfn "$REPO"/knowledge/presentation ~/.claude/knowledge/presentation
-mkdir -p ~/.claude/mcp-servers && ln -sfn "$REPO"/mcp-servers/upnote-mcp ~/.claude/mcp-servers/upnote-mcp
 ```
 
 Editing a skill now edits the repo, and `git status` shows the change.
+
+Install UpNote separately using [its instructions](mcp-servers/upnote-mcp/README.md#install).
+For a server shared by Claude and Codex, keep the active code in a versioned copy
+outside the working checkout. Repository edits and pulls then cannot change a running
+server unexpectedly. Test both clients before switching that copy, and reconnect their
+MCP sessions after a switch.
 
 Claude Code discovers skills at `~/.claude/skills/<name>/SKILL.md`, one level deep.
 Nesting them in subdirectories stops them being registered.
@@ -720,14 +729,26 @@ session hooks.
 
 ## UpNote MCP server
 
-[`mcp-servers/upnote-mcp`](mcp-servers/upnote-mcp) connects Claude Code and Claude Desktop to the
-UpNote desktop app on macOS. Claude can search and read notes, create formatted and tagged
+[`mcp-servers/upnote-mcp`](mcp-servers/upnote-mcp) connects Claude Code, Claude Desktop and Codex to the
+UpNote desktop app on macOS. Both clients can search and read notes, create formatted and tagged
 notes, edit a note, add to its end, move it to another notebook, turn a heading into a
 collapsible section, change its tags, move notes to Trash and back, and open notes in the app.
 UpNote can't change a note in place, so an edit creates a checked new version and only then
 moves the original to Trash. Text sent to UpNote is cleaned of anything that could run code,
 load remote content or change other notes. Setup, tools and limits are in
 [its README](mcp-servers/upnote-mcp/README.md).
+
+The same server exposes fifteen tools to both clients, using separate client registrations
+and their normal approval rules. Rebuild/trash operations use shared per-note locks and
+pending markers across server processes, so a second client or restarted server can detect
+an uncertain rebuild before dispatching another copy. A create is still not idempotent;
+read the result before retrying an uncertain operation.
+
+Local validation covered both clients' CLI and desktop sessions, disposable real notes,
+and synthetic failure cases. The open-in-app fix was visually verified for a restored
+note in a notebook; `sent=true` alone confirms link dispatch. Unfiled and Trash navigation
+branches have synthetic coverage. See [tests](mcp-servers/upnote-mcp/README.md#test) and
+[shared operation state](mcp-servers/upnote-mcp/README.md#shared-operation-state).
 
 ## License
 

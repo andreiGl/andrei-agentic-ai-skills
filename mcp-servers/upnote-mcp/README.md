@@ -1,7 +1,7 @@
 # UpNote MCP server
 
-An MCP server that connects Claude Code and Claude Desktop to the [UpNote](https://getupnote.com)
-desktop app on macOS. Claude can search and read your notes, create formatted and tagged notes,
+An MCP server that connects Claude Code, Claude Desktop and Codex to the [UpNote](https://getupnote.com)
+desktop app on macOS. Both clients can search and read your notes, create formatted and tagged notes,
 edit a note, add to its end, move it to another notebook, turn a heading into a collapsible
 section, change its tags, move notes to Trash and back, and open notes in the app.
 
@@ -21,9 +21,21 @@ by hand.
 
 ## Install
 
-Link this folder into `~/.claude` as shown in the [root README](../../README.md). Then build a
-venv for the server and the launcher that starts it, and register the launcher with Claude Code
-for all projects:
+The launcher uses `~/.claude/mcp-servers/upnote-mcp/server.py` for both clients.
+For a fresh install, put a versioned copy of this folder outside your working checkout,
+then create a symlink at `~/.claude/mcp-servers/upnote-mcp` pointing to that copy.
+Create the parent directory first, and leave any existing installation intact until you
+have recorded its target and validated the replacement with both clients. Direct links
+to a working checkout are useful for development but pick up every edit and pull.
+
+For an existing installation, keep its launcher, signing identity and venv. A Python-only
+server update does not require rebuilding or resigning the launcher. Pause calls in both
+clients before switching the package link, use a temporary sibling symlink and an atomic
+rename, then reconnect the affected MCP servers. Roll back only the changed link and
+client entry; do not restore a database or unrelated settings.
+
+For a fresh install, build the venv and launcher, then register with Claude Code for all
+projects:
 
 ```bash
 /Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12 -m venv ~/.claude/mcp-servers/upnote-mcp-venv
@@ -48,9 +60,41 @@ For Claude Desktop, add the launcher by its absolute path to
 }
 ```
 
-Last, add `~/.claude/mcp-servers/upnote-mcp-launcher` under System Settings, Privacy & Security,
-Full Disk Access, and restart Claude. A running Claude Code session keeps the tools it started
-with, so start a new one after changing the server.
+### Codex
+
+Register the same stable launcher with Codex, using your absolute path:
+
+```bash
+codex mcp add upnote -- /Users/you/.claude/mcp-servers/upnote-mcp-launcher
+```
+
+Alternatively, add this entry to `~/.codex/config.toml`. Merge it with an existing
+`upnote` entry rather than adding a duplicate or replacing unrelated settings:
+
+```toml
+[mcp_servers.upnote]
+command = "/Users/you/.claude/mcp-servers/upnote-mcp-launcher"
+startup_timeout_sec = 20
+tool_timeout_sec = 30
+enabled_tools = ["search_notes", "list_notes", "get_note", "list_notebooks", "list_tags", "run_select", "check_upnote_setup", "create_note", "replace_note", "append_to_note", "move_note", "make_section", "move_note_to_trash", "restore_note", "open_in_upnote"]
+```
+
+These are the server's fifteen tools. Keep the client's normal approval policy; no
+blanket automatic approval is needed. A project-only test can instead use
+`.codex/config.toml` in a trusted project. See [OpenAI's MCP configuration](https://learn.chatgpt.com/docs/extend/mcp).
+
+### macOS access and reconnecting
+
+The stable launcher may need the [Full Disk Access](#full-disk-access) grant described
+below. The host app's permissions also matter: during local Codex desktop validation,
+its ChatGPT app needed **Files & Folders → UpNote** enabled even though the launcher
+already had access. That narrow grant resolved the denial; the host app did not need
+Full Disk Access. Inspect the actual setup error and grant only the access needed.
+
+Run `check_upnote_setup` before reading or changing notes. Reconnect MCP servers or start
+fresh client sessions after a source/configuration change. A running session can retain
+its old server process and tool catalog. Client registrations and permissions remain
+separate even when they launch the same implementation.
 
 ## Tools
 
@@ -366,4 +410,64 @@ running, takes about ten seconds, and only runs with `--live`. Run it after an U
 
 ```bash
 ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_live.py --live
+```
+
+
+## Shared operation state
+
+Rebuild/trash operations serialize per original note with a cross-process lock. A
+private pending marker is journaled before dispatch, so another process or a restarted
+server checks for the same in-flight copy before requesting another. Journals contain
+only a marker and timestamp, not note content. This also fixes an undefined-variable
+error in preview warning generation; all public tool arguments are unchanged.
+
+Default state is `.local/state/upnote-mcp` under the OS account home, independent of a
+client profile's `HOME`. An explicit `UPNOTE_MCP_STATE_DIR` override must be the same
+for every client operating on the same database. The directory must be owned by the
+user and private (0700); pending files and lock files are private (0600). Fixtures use
+isolated state. All affected MCP processes must use this version before concurrent
+writes are enabled; older processes ignore these locks.
+
+The existing five-minute pending window remains, and `create_note` is not idempotent.
+Never blindly retry an uncertain create or apply: read the original and any new copy
+first. These checks coordinate requests; they do not make UpNote's URL interface a
+transaction or eliminate app-side failures.
+
+## Opening notes after restore
+
+UpNote can leave the editor blank when an `openNote` link targets a restored note.
+The server now opens its containing notebook first, then opens the note. For an
+unfiled note it resets to All Notes; for a trashed note it resets to Trash. The
+notebook path was visually verified with disposable notes through Claude and Codex
+CLI and desktop clients. The unfiled and Trash reset branches have synthetic test
+coverage, rather than live visual acceptance.
+
+The tool still returns `sent=true` only for successful URL dispatch. It cannot verify
+what the editor displays. Notebook, tag and search modes retain their existing
+behavior; active app searches can still constrain navigation. These links change the
+visible view and foreground app, so use the tool when the user asks to see content.
+
+### Synthetic protocol and navigation tests
+
+From the repository root, with Python 3.12+ and `mcp==2.2.0` installed:
+
+```bash
+python -m unittest discover -s tests/upnote -p 'test_*.py' -v
+```
+
+The suite creates isolated synthetic SQLite data and intercepts every app URL. It
+checks the eight non-read tool paths, previews and invalid applies without side
+effects, cross-process contention, pending state across restart, ambiguous dispatch,
+corrupt journals, literal-backslash warnings, and note navigation/error handling.
+It does not launch UpNote or read/write your notes. Successful fake-app tests do not
+prove compatibility with every UpNote build or editor state.
+
+`UPNOTE_TEST_SERVER` can select a different server file. `UPNOTE_TEST_OUT` can retain
+fixtures for debugging; its path must contain a directory named
+`upnote-write-validation`. Without overrides, the suite uses this checkout's server
+and a temporary directory. Existing formatting checks remain available:
+
+```bash
+python mcp-servers/upnote-mcp/test_make_section.py
+python mcp-servers/upnote-mcp/test_nested_lists.py
 ```
