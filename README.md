@@ -78,6 +78,15 @@ ln -sfn "$REPO"/knowledge/presentation ~/.claude/knowledge/presentation
 
 Editing a skill now edits the repo, and `git status` shows the change.
 
+Three skills are the exception on my machine: `argue-from-sources`,
+`behavioral-guidelines` and `writing-guidelines`. Their links in `~/.claude/skills/`
+point to a fixed copy in
+`~/.local/share/andrei-agentic-ai-skills/releases/<sha256>/skills/`, not to the repo.
+Codex reads the same copy through `~/.agents/skills/`, so both agents run the same
+version. A repo edit in progress does not change it. `manifest.json` in that directory
+lists each file with its hash. To update the copies, make a new release directory and
+move both sets of links to it. Repo edits to these three skills do nothing until then.
+
 Install UpNote separately using [its instructions](mcp-servers/upnote-mcp/README.md#install).
 For a server shared by Claude and Codex, keep the active code in a versioned copy
 outside the working checkout. Repository edits and pulls then cannot change a running
