@@ -23,6 +23,7 @@ installation below; this does not claim that the whole repository is portable to
   - [Skill evaluation](#skill-evaluation)
   - [Knowledge base](#knowledge-base)
   - [Session persistence](#session-persistence)
+  - [Mailbox](#mailbox)
   - [Where triggers live](#where-triggers-live)
 - [How the knowledge base works](#how-the-knowledge-base-works)
 - [Status line](#status-line)
@@ -127,6 +128,7 @@ rather than erroring.
 | :--- | :--- |
 | [`behavioral-guidelines`](skills/behavioral-guidelines) | How to carry out a task: surface assumptions, keep it simple, make surgical changes, define checkable success criteria, ground every claim in a source actually opened |
 | [`writing-guidelines`](skills/writing-guidelines) | How the result reads: plain language, no invented terms, register matched to the venue, none of the sentence shapes that mark text as machine-written |
+| [`argue-from-sources`](skills/argue-from-sources) | Holding a position against an opponent who checks your work: use their own numbers against their conclusion, record concessions when they are made, never escalate tone or overstate a claim |
 
 These were one file until its description, which named code in every clause, stopped
 matching a long piece of research and argument that had no code in it. Split so each half
@@ -178,6 +180,14 @@ Two skills for moving a set of live sessions across an IDE or machine restart.
 Both have a script next to the SKILL.md, and the SKILL.md says to run the script first -
 the manual procedure is the fallback. They need `tmux` on the resume side (it degrades to
 printed commands without it) and read session transcripts under `~/.claude/projects/`.
+
+### Mailbox
+
+| Skill | What it does |
+| :--- | :--- |
+| [`mailbox-session-pair`](skills/mailbox-session-pair) | Connects a new pair of named sessions, one per lane, to a thread in the [claude-mailbox](https://github.com/andreiGl/claude-mailbox) so they can send mail to each other |
+
+The `mailbox-band` mod does the same steps from a button when it is installed.
 
 ### Where triggers live
 
