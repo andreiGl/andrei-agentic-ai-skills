@@ -8,12 +8,11 @@ real headless sessions, and selects by held-out test score so the description fi
 queries it was not tuned on.
 
 Usage:
-  optimize-description.py <skill-dir> <eval-set.json> [--iterations N] [--runs-per-query N]
+  optimize-description.py <skill-dir> <eval-set.jsonl> [--iterations N] [--runs-per-query N]
 
   <skill-dir>     directory containing the target SKILL.md (edited in place; git
                   recommended - the loop rewrites the description repeatedly)
-  <eval-set.json> [{"id", "expected_skill", "prompt"}, ...] (same row format
-                  activation-run.py takes)
+  <eval-set.jsonl> one {"id", "expected_skill", "prompt"} object per line - the
                   same row format activation-run.py takes; write it with activation-
                   check's row discipline: positives paraphrase, negatives are NEAR MISSES
                   that share vocabulary with the description, not obviously irrelevant

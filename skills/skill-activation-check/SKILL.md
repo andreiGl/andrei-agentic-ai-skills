@@ -203,7 +203,7 @@ instead of hand-editing:
 
 ```bash
 python3 ~/.claude/skills/skill-activation-check/scripts/optimize-description.py \
-  <skill-dir> <eval-set.json> [--iterations 3] [--runs-per-query 1]
+  <skill-dir> <eval-set.jsonl> [--iterations 3] [--runs-per-query 1]
 ```
 
 Mechanism (adapted from anthropics/skills skill-creator's Description Optimization):
