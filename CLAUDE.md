@@ -2,19 +2,22 @@
 
 This file names skills and how to invoke them. Trigger conditions live inside the
 skills - in a When to run section, or in the description where the condition is a
-single clause. Don't restate them here.
+single clause. Don't restate them here. The two guideline skills are the exception:
+this file sets when they run, and their descriptions do not narrow it.
 
 ## Doing the work
 
-- Invoke the behavioral-guidelines skill with the Skill tool before starting work of any
-  substance. Its description states where it applies. A path reference on its own leaves
-  the rules out of context.
+- Invoke the behavioral-guidelines skill with the Skill tool at the start of every task
+  that edits files, runs commands, or does research, review, or analysis. Invoke it even
+  if its description does not list the task. Skip it only for pure conversation. Task
+  size and effort level are not reasons to skip it.
 
 ## Writing
 
 - Invoke the writing-guidelines skill with the Skill tool before drafting any prose a
   person will read, in any language. If a person will read it, the rules apply. Invoke
-  it before drafting, not after. Apply ASD-STE100 Simplified Technical English
+  it before drafting, not after. A short answer is not a reason to skip it. Apply
+  ASD-STE100 Simplified Technical English
   principles: one word, one meaning, active voice, simple tenses, short sentences
   (20 words for instructions, 25 for descriptions), one instruction per sentence,
   consistent terminology. Use the mode the skill sets for each text type.
