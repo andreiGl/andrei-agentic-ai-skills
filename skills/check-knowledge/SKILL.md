@@ -129,7 +129,7 @@ for f in pages/*/*.md; do
 done
 grep -n 'recheck by [0-9]' gotchas.md 2>/dev/null | while IFS= read -r line; do
   d=$(printf '%s' "$line" | grep -oE 'recheck by [0-9]{4}-[0-9]{2}-[0-9]{2}' | grep -oE '[0-9-]{10}')
-  [[ "$d" < "$today" ]] && echo "RECHECK DUE $d gotchas.md:${line%%:*}"
+  if [[ "$d" < "$today" ]]; then echo "RECHECK DUE $d gotchas.md:${line%%:*}"; fi
 done
 ```
 
