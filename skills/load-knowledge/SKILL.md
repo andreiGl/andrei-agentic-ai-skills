@@ -34,16 +34,20 @@ This list is authoritative; no other file restates it.
    **Rule extracted** line:
 
    ```bash
-   awk '/^## /{print; next} /^\*\*Rule extracted/{f=1} /^$/{f=0} f' ~/.claude/knowledge/learnings.md
+   F=~/.claude/knowledge/learnings.md
+   if [ -f "$F" ]; then awk '/^## /{print; next} /^\*\*Rule extracted/{f=1} /^$/{f=0} f' "$F"; else echo "missing: $F"; fi
    ```
 
 5. The rules of `~/.claude/knowledge/pages/shared/patterns.md`, if it exists - every
    pattern heading, its **Area** line and its **Preventive rule**:
 
    ```bash
-   awk 'BEGIN{RS="";ORS="\n\n"} /^## Pattern|^\*\*Preventive rule/' ~/.claude/knowledge/pages/shared/patterns.md
-   grep '^\*\*Area' ~/.claude/knowledge/pages/shared/patterns.md
+   F=~/.claude/knowledge/pages/shared/patterns.md
+   if [ -f "$F" ]; then awk 'BEGIN{RS="";ORS="\n\n"} /^## Pattern|^\*\*Preventive rule/' "$F"; grep '^\*\*Area' "$F"; else echo "missing: $F"; fi
    ```
+
+   The `if` keeps the exit status at 0 when a file is missing, so a batched call does
+   not fail.
 
 Gotchas stay whole. Each one is a single line, and a keyword filter can drop the line
 that bites.
