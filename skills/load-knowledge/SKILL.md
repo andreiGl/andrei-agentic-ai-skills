@@ -27,14 +27,38 @@ and the empty case costs one line (see the end of this file).
 
 This list is authoritative; no other file restates it.
 
-1. `~/.claude/knowledge/learnings.md` - rules and surprises from past sessions
-2. `~/.claude/knowledge/INDEX.md` - every page, with tags and covered paths
-3. `~/.claude/knowledge/gotchas.md` - sharp facts, fast to scan
-4. `~/.claude/knowledge/active-context.md` - open work and areas in flux
-5. `~/.claude/knowledge/pages/shared/patterns.md` - recurring patterns, if it exists
+1. `~/.claude/knowledge/INDEX.md` - every page, with tags and covered paths
+2. `~/.claude/knowledge/gotchas.md` - sharp facts, fast to scan
+3. `~/.claude/knowledge/active-context.md` - open work and areas in flux
+4. The rules of `~/.claude/knowledge/learnings.md` - every entry heading and its
+   **Rule extracted** line:
 
-Skip anything already in the current context. If a file is missing, note it and move
-on - that part of the KB just hasn't been built yet.
+   ```bash
+   awk '/^## /{print; next} /^\*\*Rule extracted/{f=1} /^$/{f=0} f' ~/.claude/knowledge/learnings.md
+   ```
+
+5. The rules of `~/.claude/knowledge/pages/shared/patterns.md`, if it exists - every
+   pattern heading, its **Area** line and its **Preventive rule**:
+
+   ```bash
+   awk 'BEGIN{RS="";ORS="\n\n"} /^## Pattern|^\*\*Preventive rule/' ~/.claude/knowledge/pages/shared/patterns.md
+   grep '^\*\*Area' ~/.claude/knowledge/pages/shared/patterns.md
+   ```
+
+Gotchas stay whole. Each one is a single line, and a keyword filter can drop the line
+that bites.
+
+Then read the full text of a `learnings.md` entry or a pattern in two cases:
+
+- Its heading, rule or **Area** overlaps the task.
+- You are about to act against its rule, or you cannot tell if the rule applies.
+
+Name the entries and patterns you read in full. The full files are about three times
+the size of the rules alone. Most tasks need only the rules.
+
+Count the headings and the rules in the output. If the two counts differ, the file
+format changed. Read the whole file instead, and say so. Skip anything already in the current context. If a file is
+missing, note it and move on - that part of the KB just hasn't been built yet.
 
 ## 2. Then load by tag match
 

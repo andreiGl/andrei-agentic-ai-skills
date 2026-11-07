@@ -13,7 +13,8 @@ first step, and the empty case costs one line.
 
 ## What it does
 
-Reads a fixed set of always-load files, then any page whose **Project** matches the
+Reads a fixed set of always-load files (only the rule lines of `learnings.md` and
+`patterns.md`, with full entries on demand), then any page whose **Project** matches the
 current repo (or `shared`) and whose **Tags** overlap the task or whose **Covers**
 globs match files in play.
 
