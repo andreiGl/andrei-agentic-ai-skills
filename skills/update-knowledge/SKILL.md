@@ -86,6 +86,11 @@ be filled in later:
 A page with an empty `Covers` is invisible to staleness checks. Confirm a glob matches
 something real before writing it; an invented one is worse than `—`.
 
+If the fact rests on a decision or system outside the repository, add **Source** and
+**Recheck by** as `~/.claude/knowledge/CLAUDE.md` says under "Facts that live outside
+the code". This applies to a `gotchas.md` line too. Without the date, nothing flags
+the fact when it changes.
+
 ### Source material handed to you this session
 
 If the task involved a pasted document, exported guide, or anything else you didn't
@@ -111,6 +116,9 @@ nothing.
 - Decisions made and why - especially ones a future session would otherwise re-litigate
 - What surprised you, if anything
 - `Updated pages:` list, or `Updated pages: none`
+- `KB effect:` the KB entry that changed what you did this session, and what it
+  changed, or `KB effect: none`. Name only an entry that changed an action. An entry
+  that you read and then ignored does not count.
 
 Keep it short on a quiet session. Three lines is a perfectly good entry.
 

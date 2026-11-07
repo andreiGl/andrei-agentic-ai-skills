@@ -50,6 +50,17 @@ entries out of the count, so a run actually clears the condition it fired on.
 Three occurrences is the threshold. Two is a coincidence, and naming it as a pattern
 gives it more weight than it has earned.
 
+Count the `KB effect:` lines in the entries you read:
+
+```bash
+grep -h '^- `\?KB effect:' ~/.claude/knowledge/experiences/*.md 2>/dev/null
+```
+
+Note how many sessions name an entry, and which entries they name. Entries that
+`learnings.md` and `gotchas.md` hold but no session names are candidates for deletion.
+Report both in step 7. Entries written before 2026-11-07 have no such line. Count only
+the entries that have one.
+
 ## 3. Name each pattern
 
 ```markdown
@@ -101,4 +112,5 @@ Archive, don't delete. A pattern that later turns out to be wrong needs its evid
 ## YYYY-MM-DD - synthesis run
 **What worked:** N patterns identified from M sessions
 **Rule extracted:** (list the pattern names)
+**KB effect:** K of M sessions named an entry; most named: (entries); never named: (entries)
 ```

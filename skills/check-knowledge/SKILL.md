@@ -115,6 +115,28 @@ An unmarked file reads as awaiting extraction. That is correct for genuinely pen
 material and wrong for anything already extracted or never extractable, and the difference
 is invisible without this. See `raw/README.md` for what each marker means.
 
+### Facts outside the code are past their recheck date
+
+```bash
+today=$(date +%F)
+n=$(grep -c 'recheck by [0-9]' gotchas.md 2>/dev/null)
+echo "inspecting $(grep -l '^\*\*Source:\*\*' pages/*/*.md 2>/dev/null | wc -l | tr -d ' ') pages and ${n:-0} gotchas with a recheck date"
+for f in pages/*/*.md; do
+  grep -q '^\*\*Source:\*\*' "$f" || continue
+  d=$(grep '^\*\*Recheck by:\*\*' "$f" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')
+  if [ -z "$d" ]; then echo "NO RECHECK DATE $f"
+  elif [[ "$d" < "$today" ]]; then echo "RECHECK DUE $d $f"; fi
+done
+grep -n 'recheck by [0-9]' gotchas.md 2>/dev/null | while IFS= read -r line; do
+  d=$(printf '%s' "$line" | grep -oE 'recheck by [0-9]{4}-[0-9]{2}-[0-9]{2}' | grep -oE '[0-9-]{10}')
+  [[ "$d" < "$today" ]] && echo "RECHECK DUE $d gotchas.md:${line%%:*}"
+done
+```
+
+`Covers` cannot catch these. The fact changed outside the repository, so no commit
+touched it. For each line printed, check the fact against its **Source**, then act as
+`CLAUDE.md` says under "Facts that live outside the code".
+
 ### If the layout differs
 
 These globs assume pages under `pages/`. An install that puts them elsewhere adjusts the

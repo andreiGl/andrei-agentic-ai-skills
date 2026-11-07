@@ -94,6 +94,24 @@ value, not a blank to be filled in later: it tells `check-knowledge` to skip the
 rather than invent globs for it. **Tags**, by contrast, are never optional - a page
 without them will never be loaded by anything.
 
+### Facts that live outside the code
+
+A page can rest on a decision or a system outside the repository: a team rule, a
+vendor's behavior, a policy. That fact can change with no commit, so `Covers` never
+flags it. Add two header fields to such a page:
+
+```markdown
+**Source:** who or what decides it - a team, a person, a system, a document URL
+**Recheck by:** YYYY-MM-DD
+```
+
+Set **Recheck by** 60 days ahead unless the source gives a better date. A gotcha line of
+this kind ends with the same two facts: `(source: <who>; recheck by YYYY-MM-DD)`.
+
+When the date passes, `check-knowledge` lists the page or the line. Check the fact
+against its source. If it holds, set a new date. If it changed, fix the text and add a
+`learnings.md` entry.
+
 **Status:**
 - `verified` - checked against the live codebase; trust it
 - `inferred` - written from exploration, not verified; spot-check any specific class
