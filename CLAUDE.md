@@ -2,8 +2,8 @@
 
 This file names skills and how to invoke them. Trigger conditions live inside the
 skills - in a When to run section, or in the description where the condition is a
-single clause. Don't restate them here. The two guideline skills and the rebuttal
-route below are exceptions. This file sets when they run, and their descriptions
+single clause. Don't restate them here. The two guideline skills, load-knowledge and
+the rebuttal route below are exceptions. This file sets when they run, and their descriptions
 do not narrow those rules.
 
 ## Doing the work
@@ -13,6 +13,10 @@ do not narrow those rules.
   if its description does not list the task. Skip it only for pure conversation -
   a turn with no task behind it (a preference, a fact, small talk) never needs a skill
   call. Task size and effort level are not reasons to skip it.
+- Invoke the load-knowledge skill with the Skill tool right after behavioral-guidelines,
+  for the same tasks. Invoke it before the first file read, search, edit or web fetch.
+  Skip it only when it already ran in this session. The skill exits in one line when
+  there is nothing to load.
 
 ## Writing
 

@@ -5,8 +5,9 @@ starting work.
 
 ## When to use
 
-The trigger lives in [`SKILL.md`](SKILL.md) and only there. In short: before the first
-substantive tool call of a task, rather than whenever the task starts to feel big.
+The trigger lives in [`SKILL.md`](SKILL.md), and the global `CLAUDE.md` names the skill
+too, right after behavioral-guidelines. In short: before the first substantive tool
+call of a task, rather than whenever the task starts to feel big.
 
 Don't check whether the project has pages before running it - that check is the skill's
 first step, and the empty case costs one line.

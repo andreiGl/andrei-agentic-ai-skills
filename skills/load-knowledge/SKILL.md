@@ -10,8 +10,10 @@ before the first tool call. Conventions live in `~/.claude/knowledge/CLAUDE.md`.
 
 ## When to run
 
-This section is the single source for this trigger. `CLAUDE.md` and the other skills
-point here rather than restating it.
+The global `CLAUDE.md` also names this skill, as it names the two guideline skills.
+It runs right after behavioral-guidelines. Measured 2026-11-07: when only this section
+carried the trigger, the skill ran in about 1 of 6 home sessions with tool work.
+The other skills point here rather than restating the trigger.
 
 Run before the first substantive tool call of a task - the first file read, search,
 edit, or web fetch that goes beyond answering a one-line question.
