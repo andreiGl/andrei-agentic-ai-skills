@@ -36,7 +36,7 @@ This list is authoritative; no other file restates it.
    **Rule extracted** line:
 
    ```bash
-   F=~/.claude/knowledge/learnings.md
+   F="$HOME/.claude/knowledge/learnings.md"
    if [ -f "$F" ]; then awk '/^## /{print; next} /^\*\*Rule extracted/{f=1} /^$/{f=0} f' "$F"; else echo "missing: $F"; fi
    ```
 
@@ -44,7 +44,7 @@ This list is authoritative; no other file restates it.
    pattern heading, its **Area** line and its **Preventive rule**:
 
    ```bash
-   F=~/.claude/knowledge/pages/shared/patterns.md
+   F="$HOME/.claude/knowledge/pages/shared/patterns.md"
    if [ -f "$F" ]; then awk 'BEGIN{RS="";ORS="\n\n"} /^## Pattern|^\*\*Preventive rule/' "$F"; grep '^\*\*Area' "$F"; else echo "missing: $F"; fi
    ```
 
