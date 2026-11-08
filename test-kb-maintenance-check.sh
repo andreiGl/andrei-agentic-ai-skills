@@ -53,6 +53,16 @@ echo "# first" > "$KB_ROOT/experiences/e1.md"
 expect_line 'synthesize-knowledge'
 expect_line 'Last synthesized is never'
 
+# The notice is one JSON object: a message for the user, and context telling the
+# model that the user decides.
+run | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+assert "synthesize-knowledge" in d["systemMessage"], d
+assert d["hookSpecificOutput"]["hookEventName"] == "SessionStart", d
+assert "Do not run" in d["hookSpecificOutput"]["additionalContext"], d
+'
+
 # A datetime stamp (typo) reads as missing, not as a value to parse a prefix from.
 # Synth is fresh so the age trigger stays quiet and the typo is what nags.
 # The strict scan discards the malformed value, so the check fires via its

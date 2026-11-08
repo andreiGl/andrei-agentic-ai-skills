@@ -105,6 +105,10 @@ Use the entry format from `~/.claude/knowledge/CLAUDE.md`. Include **Prevented**
 when a `gotchas.md` bullet visibly caught something during this session - that field is
 the evidence a bullet is earning its place.
 
+Write **Rule extracted** so it stands alone, as `CLAUDE.md` says under "Rule lines stand
+alone": its condition in the same sentence, condition first. `load-knowledge` loads it
+without the rest of the entry.
+
 Nothing surprising happened? No entry. A journal of "went fine" tells the next session
 nothing.
 

@@ -87,6 +87,11 @@ Load the whole page, not an excerpt - pages are small by design. When more than 
 pages match, load the ones whose Covers globs are closest to the files in play, and
 say which ones you skipped.
 
+Before you say the KB has nothing on a topic, read the file that would hold it in full.
+A keyword search is not enough. A fact worded differently from your search terms does
+not match, and the search then reports an absence that is not there. Name the files you
+read when you report the absence.
+
 ## 3. Act on the Status field
 
 `~/.claude/knowledge/CLAUDE.md` defines what the three values mean. What to do with a

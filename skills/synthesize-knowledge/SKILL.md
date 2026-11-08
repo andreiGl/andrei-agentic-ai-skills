@@ -80,6 +80,10 @@ the entries that have one.
 The preventive rule is the point of the entry. A pattern without one is an
 observation, and observations don't change what happens next time.
 
+Write the preventive rule so it stands alone, as `~/.claude/knowledge/CLAUDE.md` says
+under "Rule lines stand alone": its condition in the same sentence, condition first.
+`load-knowledge` loads it without the rest of the pattern.
+
 ## 4. Write `pages/shared/patterns.md`
 
 Create `~/.claude/knowledge/pages/shared/` if it doesn't exist yet. Use the standard

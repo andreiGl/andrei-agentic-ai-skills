@@ -2,10 +2,11 @@
 """SessionStart check for knowledge-base maintenance triggers.
 
 Evaluates the "Run when any of these holds" conditions of synthesize-knowledge
-and check-knowledge against the knowledge base and prints one context line when
-either is due. Plain stdout from a SessionStart hook is injected into model
-context; silence when nothing is due. KB_ROOT overrides the knowledge base for
-testing.
+and check-knowledge against the knowledge base. When either is due it prints one
+JSON object: systemMessage shows the notice to the user, and additionalContext
+tells the model that the user decides. A plain context line was ignored by the
+model in practice (2026-11-07), so the decision moved to the user. Silence when
+nothing is due. KB_ROOT overrides the knowledge base for testing.
 """
 import json
 import os
@@ -65,6 +66,24 @@ def days_since(value):
         return None
 
 
+def notify(skill, detail):
+    """Show the notice to the user and keep the model from acting on it alone."""
+    print(json.dumps({
+        "systemMessage": (
+            f"Knowledge base maintenance due - {skill}: {detail}. "
+            f"To run it, say \"run {skill}\"."
+        ),
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": (
+                f"Knowledge base maintenance due - {skill}: {detail}. "
+                "The user sees this notice and decides when to run it. "
+                f"Do not run {skill} unless the user asks for it."
+            ),
+        },
+    }))
+
+
 def main():
     # Consume the hook stdin JSON so the pipe never blocks.
     try:
@@ -114,11 +133,7 @@ def main():
         synth_reasons.append(f"last synthesized {synthesized} ({synth_age} days ago)")
 
     if synth_reasons:
-        print(
-            "Knowledge base maintenance due - synthesize-knowledge: "
-            + "; ".join(synth_reasons)
-            + ". Run the synthesize-knowledge skill before starting other work."
-        )
+        notify("synthesize-knowledge", "; ".join(synth_reasons))
         return
 
     if check_age is None or check_age < 0 or check_age > CHECK_MAX_AGE_DAYS:
@@ -133,10 +148,7 @@ def main():
             when = f"{verified} (not a real date - typo?)"
         else:
             when = f"{verified} ({check_age} days ago)"
-        print(
-            f"Knowledge base maintenance due - check-knowledge: last verified {when}. "
-            "Run the check-knowledge skill before starting a large task."
-        )
+        notify("check-knowledge", f"last verified {when}")
 
 
 if __name__ == "__main__":

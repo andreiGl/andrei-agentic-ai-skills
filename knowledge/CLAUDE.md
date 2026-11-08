@@ -209,6 +209,15 @@ Include **Prevented** only when a `gotchas.md` bullet visibly caught something d
 the session. Bullets that never appear in a Prevented entry across many sessions are
 candidates for deletion - that's the signal they aren't earning their place.
 
+### Rule lines stand alone
+
+`load-knowledge` loads the **Rule extracted** line of each entry, and the **Preventive
+rule** of each pattern, without the text around them. So each rule carries its own
+condition, in the same sentence, condition first: "If a figure comes from a superseded
+edition, take both endpoints from the newest edition." A qualifier that sits in another
+line is lost, and the rule gets applied where it does not hold. Keep every word that
+limits where the rule applies.
+
 `synthesize-knowledge` owns distillation, and its own "When to run" section is the only
 place the thresholds are stated. Don't restate them here or in the other skills - that
 is how three slightly different versions of one rule end up in three files.
