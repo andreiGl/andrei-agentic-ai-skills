@@ -188,12 +188,36 @@ class Contract(unittest.TestCase):
         s=await self.client();n=await self.seeded_note(s)
         big='x'*(self.srv.MCP_TEXT_LIMIT+1)
         before=self.event_count('create-request')
-        for name,args in [('replace_note',dict(note_id=n,text=big)),('append_to_note',dict(note_id=n,text=big))]:
+        for name,args in [('replace_note',dict(note_id=n,text=big)),('append_to_note',dict(note_id=n,text=big)),('insert_after_heading',dict(note_id=n,heading='Other',text=big))]:
             err,d,text=await self.call(s,name,**args)
             self.assertTrue(err,text);self.assertIn('over the 30000-character MCP tool-input limit',text)
             self.assertIn('server_only',text)
         self.assertEqual(self.event_count('create-request'),before,'no app effect without a size-limit bypass')
         err,p,text=await self.call(s,'replace_note',note_id=n,text=big,server_only=True)
         self.assertFalse(err,text);self.assertEqual(p['stage'],'preview')
+    @async_test
+    async def test_insert_after_heading_lands_at_anchor(self):
+        s=await self.client();n=await self.seeded_note(s,'<h3>Anchor</h3><div>Original tail.</div>')
+        err,p,text=await self.call(s,'insert_after_heading',note_id=n,heading='Anchor',text='Inserted line.')
+        self.assertFalse(err,text)
+        self.assertEqual(p['structure']['sent']['collapsible_sections'],1,p)
+        self.assertEqual(p['inserted_at'],'after',p)
+        n2=await self.rebuild(s,'insert_after_heading',note_id=n,heading='Anchor',text='Inserted line.')
+        with sqlite3.connect(self.db) as c:
+            html=c.execute('SELECT html FROM notes WHERE id=?',(n2,)).fetchone()[0]
+            txt=c.execute('SELECT text FROM notes WHERE id=?',(n2,)).fetchone()[0]
+        i_anchor=html.find('</h3>');i_new=html.find('Inserted line.');i_tail=html.find('Original tail.')
+        self.assertTrue(0<i_anchor<i_new<i_tail,html[:300])
+        self.assertIn('Inserted line.',txt)
+        self.assertEqual(html.count('shine-collapsible-section'),1,'section must survive the insert rebuild')
+    @async_test
+    async def test_insert_before_heading_and_bad_anchor(self):
+        s=await self.client();n=await self.seeded_note(s,'<h3>Anchor</h3><div>Original tail.</div>')
+        err,p,text=await self.call(s,'insert_after_heading',note_id=n,heading='Anchor',text='Above line.',position='before')
+        self.assertFalse(err,text);self.assertEqual(p['inserted_at'],'before',p)
+        err,d,text=await self.call(s,'insert_after_heading',note_id=n,heading='No Such Heading',text='x')
+        self.assertTrue(err,text);self.assertIn('No heading in the note reads',text)
+        err,d,text=await self.call(s,'insert_after_heading',note_id=n,heading='Sec',text='x')
+        self.assertTrue(err,text);self.assertIn("collapsible section's title",text)
 
 if __name__=='__main__':unittest.main(verbosity=2)

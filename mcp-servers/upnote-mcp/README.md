@@ -294,6 +294,22 @@ nothing in it can be dropped or reworded on the way. It rebuilds the note throug
 with the same preview, warnings and checks, so the result has a new id and the original goes to
 Trash.
 
+`insert_after_heading` adds content next to a heading instead of at the end: `position="after"`
+(default) puts it under the heading named, `"before"` above it. The anchor must be a heading that
+is not a collapsible section's title. As with `append_to_note`, the caller sends only the new
+content, and the bytes already in the note pass through the rebuild unchanged.
+
+Which tool to reach for, by note:
+
+- A small note without collapsible sections: `replace_note` or `insert_after_heading` over MCP.
+- A note that holds collapsible sections: `make_section` or `append_to_note` over MCP, or
+  `insert_after_heading` for a mid-note insertion; the gate covers all three rebuilds. Avoid a
+  full-body `replace_note` - the fewer bytes re-parsed, the less UpNote's re-parser can drop.
+- A large note (over 20,000 characters): edit through a direct import of `server.py` regardless
+  of tool; MCP refuses bodies over 30,000 characters, and 20-30KB passes the size check but still
+  round-trips the whole body. The recipe is `reference_upnote_large_note_edits.md` in the project
+  memory folder.
+
 The existing HTML goes first, then a blank line, then the new Markdown. The blank line makes
 UpNote convert what follows as Markdown. If the note ends with a list and the new text starts
 with one, UpNote joins them into one list. Tag links are moved below the new content, so a

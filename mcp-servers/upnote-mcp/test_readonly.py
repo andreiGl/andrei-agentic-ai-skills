@@ -36,13 +36,13 @@ async def main():
         async with ClientSession(rd, wr) as s:
             await s.initialize()
             tools = {t.name: t for t in (await s.list_tools()).tools}
-            check("fifteen tools", sorted(tools) == sorted(["search_notes","list_notes","get_note","list_notebooks","list_tags","run_select","create_note","move_note_to_trash","restore_note","replace_note","open_in_upnote","check_upnote_setup","make_section","append_to_note","move_note"]), ",".join(sorted(tools)))
-            check("read tools marked read-only", all(tools[n].annotations.read_only_hint for n in tools if n not in ("create_note", "move_note_to_trash", "restore_note", "replace_note", "make_section", "append_to_note", "move_note", "open_in_upnote")))
+            check("sixteen tools", sorted(tools) == sorted(["search_notes","list_notes","get_note","list_notebooks","list_tags","run_select","create_note","move_note_to_trash","restore_note","replace_note","open_in_upnote","check_upnote_setup","make_section","append_to_note","move_note","insert_after_heading"]), ",".join(sorted(tools)))
+            check("read tools marked read-only", all(tools[n].annotations.read_only_hint for n in tools if n not in ("create_note", "move_note_to_trash", "restore_note", "replace_note", "make_section", "append_to_note", "move_note", "insert_after_heading", "open_in_upnote")))
             check("open_in_upnote isn't read-only, since it takes focus", tools["open_in_upnote"].annotations.read_only_hint is False)
             check("every tool that changes notes is marked as such",
-                  all(tools[n].annotations.read_only_hint is False for n in ("create_note", "move_note_to_trash", "restore_note", "replace_note", "make_section", "append_to_note", "move_note")))
+                  all(tools[n].annotations.read_only_hint is False for n in ("create_note", "move_note_to_trash", "restore_note", "replace_note", "make_section", "append_to_note", "move_note", "insert_after_heading")))
             check("  and the ones that trash a note as destructive", all(tools[n].annotations.destructive_hint for n in
-                  ("move_note_to_trash", "replace_note", "make_section", "append_to_note", "move_note")))
+                  ("move_note_to_trash", "replace_note", "make_section", "append_to_note", "move_note", "insert_after_heading")))
 
             err, d, _ = await call(s, "check_upnote_setup")
             check("setup check reports ok with no missing columns", not err and d["ok"] and d["missing_columns"] == {}, str(d)[:160])
@@ -432,7 +432,10 @@ async def main():
                   res.get("done") and srv._pending_get(nid) is None, str(res)[:100])
         srv._find_created_note = lambda marker, path=None: {"id": "fake-new", "trashed": False, "notebooks": [path] if path else [], "tags": []}
 
-        # UpNote's list wipe (2026-10-11): the notebook's list comes back holding only the new note
+        # UpNote's list wipe (2026-10-11): the notebook's list comes back holding only the new note.
+        # The stub returns the full list on the first call (before the link) and only the new note on
+        # the second (after it), counted from zero here - the call count before this block shifts with
+        # the library, so parity against it would flip as notes come and go.
         real_members = srv._notebook_members
         calls = []
         srv._notebook_members = lambda nb: (calls.append(nb) or (["a", "b", "c"] if len(calls) % 2 else ["fake-new"]))
@@ -443,6 +446,7 @@ async def main():
             stored["text"] = text or ""
             # name the notebook: the accepted note may be in none, and then no member list is read
             res = srv._replace(nid, title="Wipe test", notebook=nb["id"], expected_revision=rev, acknowledge_warnings=True)
+            srv._pending_delete(nid)
             check("a rebuild that wipes the notebook's list keeps the original and says so",
                   not res.get("done") and res.get("notebook_members_lost", {}).get("missing") == 3, str(res)[:120])
             res = srv.create_note("Wipe test", "x", notebook=nb["id"])

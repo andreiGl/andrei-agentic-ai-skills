@@ -2183,6 +2183,99 @@ def make_section(
     return result
 
 
+# ---------------------------------------------------------------- inserting
+
+
+def _plan_insert(source: str, heading: str, fragment: str, position: str) -> dict[str, Any]:
+    """Work out the note with `fragment` spliced next to the heading named.
+
+    The fragment lands at a byte offset and every other byte passes through
+    unchanged, so only the new content is exposed to UpNote's re-parser.
+    """
+    if position not in ("before", "after"):
+        raise ToolError(f"position must be 'before' or 'after', not {position!r}.")
+    tree = _NoteHtml(source)
+    wanted = _fold(heading.strip())
+    found = [n for n in _walk(tree.root) if n.tag in _HEADINGS and _fold(_node_text(source, n)) == wanted]
+    already_titles = [n for n in found if _is_section_title(n)]
+    found = [n for n in found if not _is_section_title(n)]
+    if not found:
+        if already_titles:
+            raise ToolError(
+                f"{heading!r} is a collapsible section's title. To add content inside that section, use "
+                "make_section on a heading inside it, or append_to_note at the end of the note."
+            )
+        raise ToolError(
+            f"No heading in the note reads {heading!r}. The anchor must be a heading (h1-h6); read the note with "
+            "get_note and format=\"html\" to see its headings. To add content at the end, use append_to_note."
+        )
+    if len(found) > 1:
+        raise ToolError(f"{len(found)} headings read {heading!r}. Make them distinct, or use replace_note instead.")
+    node = found[0]
+    at = node.start if position == "before" else node.end
+    rebuilt = source[:at] + "\n" + fragment + "\n" + source[at:]
+    return {
+        "inside_section": _enclosing_section(source, node),
+        "blocks_inserted": 1,
+        "inserted_at": position,
+        "html": rebuilt,
+    }
+
+
+@server.tool(annotations=REPLACE)
+def insert_after_heading(
+    note_id: NoteId,
+    heading: Annotated[str, Field(description="Text of the heading (h1-h6) the new content goes next to.")],
+    text: Annotated[str, Field(description=(
+        "Only the new content. Markdown, following the same rules as create_note's text, or raw HTML with "
+        "markdown=false. Don't repeat the note's existing content."
+    ))],
+    position: Annotated[str, Field(description='"after" (default) puts it under the heading, "before" above it.')] = "after",
+    markdown: Annotated[bool, Field(description="The text is Markdown, raw HTML allowed. Leave true.")] = True,
+    expected_revision: Annotated[int | None, Field(description="Omit to preview. To apply, pass the revision the preview returned.")] = None,
+    acknowledge_warnings: Annotated[bool, Field(description="Set true only after the user has seen and accepted the preview's warnings.")] = False,
+    server_only: Annotated[bool, Field(description="Direct server imports only: skips the MCP body-size limit. Never set this from an MCP client.")] = False,
+    preview_token: Annotated[str | None, Field(description=_TOKEN_DOC)] = None,
+) -> dict[str, Any]:
+    """Add content next to a heading, without resending the rest of the note. Use this instead of
+    replace_note when the existing content stays as it is and append_to_note is not enough because
+    the content belongs at a heading, not at the end. The bytes already in the note pass through
+    the rebuild unchanged, so only the new content is re-parsed by UpNote. The note is still rebuilt
+    through replace_note, so the result has a new id and the original goes to Trash. Two steps like
+    replace_note: call without expected_revision to preview, then again with it."""
+    note_id = note_id.strip()
+    if not text.strip():
+        raise ToolError("text is empty.")
+    if len(text) > MCP_TEXT_LIMIT and not server_only:
+        raise ToolError(_LARGE_BODY_MESSAGE.format(limit=MCP_TEXT_LIMIT, size=len(text)))
+    token = _preview_token("insert_after_heading", note_id, heading=heading, text=text, position=position, markdown=markdown)
+    if expected_revision is not None:
+        _check_token(preview_token, token)
+    body, plain = _current_body(note_id)
+    if markdown:
+        fragment = _encode_pre_breaks(_sanitize_html(_nested_lists_to_html(text)))
+    else:
+        fragment = _sanitize_html(text)
+    unsafe = [f"Would be removed as unsafe: {', '.join(sorted(set(r)))}."] if (r := _sanitize_report(text)[1]) else []
+    plan = _plan_insert(body, heading, fragment, position)
+
+    if expected_revision is None:
+        preview = _replace(note_id=note_id, extra_warnings=unsafe)
+        preview.update({k: plan[k] for k in ("inside_section", "blocks_inserted", "inserted_at")})
+        preview["preview_token"] = token
+        preview["next_step"] = (
+            "Show any warnings to the user, then call again with the same arguments, expected_revision and preview_token"
+            + (" and acknowledge_warnings=true." if preview["warnings"] else ".")
+        )
+        return preview
+
+    return _replace(
+        note_id=note_id, text=plan["html"], expected_revision=expected_revision,
+        acknowledge_warnings=acknowledge_warnings, keep_lines=_kept_lines(plain),
+        extra_warnings=unsafe,
+    )
+
+
 # ---------------------------------------------------------------- appending
 
 _BLOCK_TAGS = r"(?:div|p|ul|ol|li|h[1-6]|pre|blockquote|table|thead|tbody|tr|td|th|hr)"
