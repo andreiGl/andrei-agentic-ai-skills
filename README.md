@@ -238,6 +238,11 @@ If yes, it doesn't become a page. A knowledge base that restates the codebase go
 stale silently and stops being read - the discipline is discarding most of what you
 gather.
 
+A second question follows: "Would one web search, or a model's own knowledge, give this
+fact?" If yes, it isn't recorded either. In an A/B test on two models, the knowledge
+base paid off on private-system facts and added nothing on public ones. The full gate
+is in [`knowledge/CLAUDE.md`](knowledge/CLAUDE.md).
+
 Two header fields drive everything. `Tags` decides what `load-knowledge` pulls in for
 a given task; `Covers` (repo-relative path globs) lets `check-knowledge` map recent
 commits onto the pages that claim to describe them. A page with neither will never

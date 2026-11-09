@@ -42,7 +42,18 @@ Ask before creating any page:
 
 - **Yes** → don't write a page. Add a line to `gotchas.md` only if the fact is
   non-obvious or counterintuitive. Otherwise skip it entirely.
+- **No** → ask the second question.
+
+Then ask, for a page and for a `gotchas.md` line alike:
+
+> "Would one web search, or a model's own knowledge, give this fact?"
+
+- **Yes** → don't record it. If part of it is local to this setup (a path, a version,
+  a workaround that only worked here), record only that part.
 - **No** → record it.
+
+Measured 2026-11-08: on Opus, the KB tied on five public facts and won on the one fact
+about a private system. A public fact costs tokens on every load and gives nothing back.
 
 Things that pass the gate:
 - Behavior of an external system that the code can't tell you
