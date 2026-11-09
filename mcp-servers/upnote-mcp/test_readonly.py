@@ -316,11 +316,11 @@ async def main():
         def execute(self, sql, args=()):
             if args and args[0] == "fake-new":
                 q = parse_qs(urlsplit(sent[-1]).query)
-                body = q.get("text", [""])[0]
-                tags = [t.lower() for t in re.findall(r'data-upnote-tag="#([^"]+)"', body)]
-                body = re.sub(r"<(?:br|/?(?:div|p|li|ul|ol|h[1-6]|pre|blockquote|tr|td|th|table))\b[^>]*>", "\n", body, flags=re.I)
+                html = q.get("text", [""])[0]  # the body as saved: tags, wrappers and all
+                tags = [t.lower() for t in re.findall(r'data-upnote-tag="#([^"]+)"', html)]
+                body = re.sub(r"<(?:br|/?(?:div|p|li|ul|ol|h[1-6]|pre|blockquote|tr|td|th|table))\b[^>]*>", "\n", html, flags=re.I)
                 text = stored["text"] or q.get("title", [""])[0] + "\n" + srv.html_lib.unescape(re.sub(r"<[^<>]+>", "", body))
-                return types.SimpleNamespace(fetchone=lambda: {"text": text, "tagLinks": json.dumps(tags), "html": body})
+                return types.SimpleNamespace(fetchone=lambda: {"text": text, "tagLinks": json.dumps(tags), "html": html})
             return self.conn.execute(sql, args)
     srv._connect = FakeConn
     srv._find_created_note = lambda marker, path=None: {"id": "fake-new", "trashed": False, "notebooks": [path] if path else [], "tags": []}
@@ -339,6 +339,7 @@ async def main():
                 res = srv._replace(nid, remove_tags=[tag], expected_revision=rev, acknowledge_warnings=True)
             except srv.ToolError:
                 continue  # refused at preview, before anything would be sent
+            srv._pending_delete(nid)  # the stand-in never delivers a late copy, so nothing stays pending
             if not res.get("done"):
                 refused.append((nid, res.get("message", "")[:90]))
         check("removing a tag keeps the body and passes the checks after the copy", tagged and not refused,
@@ -362,6 +363,7 @@ async def main():
             stored["text"] = text or ""
             if not (res := srv._replace(nid, text=html, expected_revision=rev, acknowledge_warnings=True)).get("done"):
                 failed["own html"].append((nid, res.get("message", "")[:90]))
+            srv._pending_delete(nid)  # the stand-in never delivers a late copy, so nothing stays pending
             body = parse_qs(urlsplit(sent[-1]).query).get("text", [""])[0]
             if re.match(r"\s*[^<\s]", body) and re.search(r"<(?:br|div|p|ul|ol|li|pre)\b", body):
                 unwrapped.append(nid)
@@ -397,12 +399,13 @@ async def main():
                 ok = str(e)
             check(f"a title heading followed by another heading can be rebuilt: {title[:30]!r}", ok is True, str(ok)[:80])
         nid, html, text, rev = accepted
+        srv._pending_delete(nid)  # the stand-in never delivers a late copy, so nothing stays pending
         check("a rename's preview shows the new title", srv._replace(nid, title="Brand new title").get("new_title") == "Brand new title")
         prev = srv.append_to_note(nid, "<b onclick=x()>hi</b>")
         check("an append's unsafe-text warning asks for acknowledgement", "acknowledge_warnings" in prev["next_step"]
               and any("unsafe" in w for w in prev["warnings"]), prev["next_step"])
         try:
-            srv.append_to_note(nid, "<b onclick=x()>hi</b>", rev, False, prev["preview_token"])
+            srv.append_to_note(nid, "<b onclick=x()>hi</b>", rev, False, server_only=True, preview_token=prev["preview_token"])
             check("  and the apply needs it", False, "no error")
         except srv.ToolError as e:
             check("  and the apply needs it", "warnings" in str(e), str(e)[:80])
@@ -414,16 +417,19 @@ async def main():
             check("  and a retry doesn't send a second create link", False, "no error")
         except srv.ToolError as e:
             check("  and a retry doesn't send a second create link", "may still appear" in str(e), str(e)[:80])
+        # a late copy the user trashed doesn't block the note: a journal names a marker whose
+        # only matching note is in Trash, so the pending check clears it and the apply proceeds
         with srv.closing(real_connect()) as conn:
-            trashed_marker = conn.execute("SELECT html FROM notes WHERE trashed = 1 AND deleted = 0 AND html LIKE '%data-upnote-mcp=%'").fetchone()
-        if trashed_marker:
-            srv._PENDING[nid] = (re.search(r'data-upnote-mcp="([^"]*)"', trashed_marker[0]).group(1), time.monotonic())
-            srv._find_created_note = lambda marker, path=None: {"id": "fake-new", "trashed": False, "notebooks": [path] if path else [], "tags": []}
+            markers = [m for (h,) in conn.execute("SELECT html FROM notes WHERE trashed = 1 AND deleted = 0 AND html LIKE '%data-upnote-mcp=%'")
+                       for m in re.findall(r'data-upnote-mcp="([^"]*)"', h) if re.fullmatch(r"[0-9a-f]{32}", m)]
+        if markers:
+            srv._pending_set(nid, markers[0])
+            srv._find_created_note = lambda m, path=None: {"id": "fake-new", "trashed": False, "notebooks": [path] if path else [], "tags": []}
             stored["text"] = text or ""
             res = srv._replace(nid, expected_revision=rev, acknowledge_warnings=True)
             stored["text"] = None
-            check("  a late copy the user trashed doesn't block the note", res.get("done") and nid not in srv._PENDING, str(res)[:100])
-        srv._PENDING.clear()
+            check("  a late copy the user trashed doesn't block the note",
+                  res.get("done") and srv._pending_get(nid) is None, str(res)[:100])
         srv._find_created_note = lambda marker, path=None: {"id": "fake-new", "trashed": False, "notebooks": [path] if path else [], "tags": []}
 
         # UpNote's list wipe (2026-10-11): the notebook's list comes back holding only the new note
@@ -445,14 +451,17 @@ async def main():
             stored["text"] = None
         if bare:
             nid, html, text, rev = bare
+            srv._pending_delete(nid)  # the stand-in never delivers a late copy, so nothing stays pending
             stored["text"] = text or ""
             edited = re.sub(r"(<h2>.*?</h2>\s*)(\w)", r"\1EDITED\2", html, count=1, flags=re.S)
             srv._replace(nid, text=edited, expected_revision=rev, acknowledge_warnings=True)
+            srv._pending_delete(nid)
             stored["text"] = None
             body = parse_qs(urlsplit(sent[-1]).query).get("text", [""])[0]
             check("own HTML edited in its first line is still sent inside a <div>", body.startswith("<div>"), body[:60])
             stored["text"] = (text or "") + "\nSummary\nStatus: done"
             srv._replace(nid, text="## Summary\n\n**Status:** done\n\n" + html, expected_revision=rev, acknowledge_warnings=True)
+            srv._pending_delete(nid)
             stored["text"] = None
             body = parse_qs(urlsplit(sent[-1]).query).get("text", [""])[0]
             check("Markdown written before the note's own HTML stays Markdown", body.startswith("## Summary"), body[:60])
