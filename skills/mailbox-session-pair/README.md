@@ -1,5 +1,7 @@
 # mailbox-session-pair
 
+> **Retired 2026-11-07.** The mailbox channel to work is stopped; notes go through UpNote.
+
 Wire a new pair of named mailbox sessions (one per lane - e.g. TestWork on
 work, TestHome on home) to a mailbox thread so they can exchange
 session-addressed mail.

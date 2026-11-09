@@ -1,7 +1,10 @@
 ---
 name: mailbox-session-pair
-description: Wire a new pair of named mailbox sessions (one per lane, e.g. TestWork and TestHome) to a mailbox thread so they can exchange session-addressed mail. Use when the user asks to set up, connect, or register new mailbox sessions or a new session pair.
+description: Retired - the mailbox channel to work is stopped. Wire a new pair of named mailbox sessions to a mailbox thread. Use only when the user explicitly asks to set up mailbox sessions again.
 ---
+
+> **Retired 2026-11-07.** The claude-mail mailbox with work is stopped (corp policy). Notes to
+> and from work Claude go through UpNote. Run this only if the user restarts the mailbox.
 
 # Pair two named mailbox sessions on a thread
 

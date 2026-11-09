@@ -185,14 +185,16 @@ printed commands without it) and read session transcripts under `~/.claude/proje
 
 | Skill | What it does |
 | :--- | :--- |
-| [`mailbox-session-pair`](skills/mailbox-session-pair) | Connects a new pair of named sessions, one per lane, to a thread in the [claude-mailbox](https://github.com/andreiGl/claude-mailbox) so they can send mail to each other |
+| [`mailbox-session-pair`](skills/mailbox-session-pair) | **Retired 2026-11-07:** the mailbox channel to the work install is stopped, and notes now go through UpNote. Kept for reference: connects a new pair of named sessions, one per lane, to a thread in the [claude-mailbox](https://github.com/andreiGl/claude-mailbox) |
 
 The `mailbox-band` mod does the same steps from a button when it is installed.
 
 ### Where triggers live
 
 Every skill owns its trigger, and nothing outside it restates the condition. `CLAUDE.md`
-names the skills and how to invoke them, and carries no conditions at all.
+names the skills and how to invoke them. It carries conditions only for stated exceptions:
+when the two guideline skills and `load-knowledge` run, and the rebuttal route. For those,
+it says the skills' descriptions do not narrow its rules.
 
 Where inside the skill depends on the shape of the condition. The five knowledge skills
 each have a list of them - counts, dates, whether you asked - so each carries a
@@ -467,7 +469,9 @@ Merge those arrays with whatever is already configured rather than replacing the
 `jq`; both scripts exit quietly without it.
 
 The `timeout` of 10 is load-bearing. `SessionEnd` hooks default to a 1.5 second timeout, and
-the overall budget is raised to the highest per-hook timeout set in settings files. Reading a
+the overall budget is raised to the highest per-hook timeout set in settings files. It is one
+budget for the event, shared by every `SessionEnd` hook, and timeouts on plugin hooks don't
+raise it. Reading a
 very large transcript can outlast the default.
 
 ### Decision log
@@ -559,9 +563,10 @@ entries and re-verify pages against the code. `synthesize-knowledge` and `check-
 both carry "when to run" triggers, but nothing evaluates them unless a session thinks to -
 and a count of 57 entries against a threshold of 5 is what happens when none does.
 [`kb-maintenance-check.py`](kb-maintenance-check.py) is a `SessionStart` hook that evaluates
-both skills' triggers and prints one context line when either is due. Plain stdout from a
-`SessionStart` hook lands in the transcript as context Claude can see, so the note becomes
-the first thing the session reads. Silence means nothing is due.
+both skills' triggers and prints JSON when either is due: a `systemMessage` that you see, and
+`hookSpecificOutput.additionalContext` that tells the model the decision is yours. It used to
+print a plain context line, which the model ignored in practice (2026-11-07). Silence means
+nothing is due.
 
 Triggers, in priority order - `synthesize-knowledge` fires first: its count triggers
 (`experiences/` entries directly in the directory, archive/ excluded; `learnings.md` length)
@@ -672,7 +677,8 @@ ln -sfn "$REPO"/kb-autocommit.sh ~/.claude/kb-autocommit.sh
 
 Order matters only if a hook before it writes into the knowledge base; put this one last.
 The 30 second timeout is there because a push crosses the network, and because
-`SessionEnd`'s budget rises to the highest per-hook timeout configured. `GIT_TERMINAL_PROMPT`
+`SessionEnd`'s budget rises to the highest per-hook timeout configured. That budget is shared
+by every `SessionEnd` hook, so time another hook spends comes out of this one's. `GIT_TERMINAL_PROMPT`
 is forced off inside the script: a hook that blocks on a credential prompt hangs session
 exit rather than failing.
 
@@ -823,8 +829,7 @@ queues the fixing skill. Nothing shows when nothing is due.
 KB: !! 24 tools, no entry yet - run update-knowledge   ~ 3 KB uncommitted - commit
 ```
 
-Actions mirror the maintenance thresholds (5 experiences, 20 learnings, 61-day
-synthesis, 14-day verification) and read both KB layouts - nested `knowledge/INDEX.md`
+Actions mirror the maintenance thresholds (the skills' "When to run" sections own them) and read both KB layouts - nested `knowledge/INDEX.md`
 and flat `INDEX.md`. Urgency rides on a colored marker (`!!` red, `~` amber) beside
 each plain button; pressing queues the skill's prompt as your next turn.
 

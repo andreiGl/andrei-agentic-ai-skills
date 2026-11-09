@@ -213,7 +213,7 @@ Check specific, falsifiable claims. "The module handles retries" can't be verifi
 | Outcome | Action |
 | :--- | :--- |
 | Claim holds | Bump **Last updated**, set `Status: verified` |
-| Claim is wrong | Fix the content, set `Status: verified`, and add a line to `gotchas.md` if the change itself was surprising |
+| Claim is wrong | Fix the content, set `Status: verified`, and note the correction in `learnings.md` |
 | Can't verify now | Set `Status: stale` and note what specifically is in doubt |
 
 `stale` without a note is useless to the next session - always say what changed and

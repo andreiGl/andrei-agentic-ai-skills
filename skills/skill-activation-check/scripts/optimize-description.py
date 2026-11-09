@@ -52,7 +52,22 @@ def read_description(skill_dir: Path) -> str:
     match = re.search(r"^description:\s*(.+?)$", text, re.MULTILINE)
     if not match:
         sys.exit(f"optimize-description: no description in {skill_dir}/SKILL.md")
-    return match.group(1).strip()
+    value = match.group(1).strip()
+    if value.startswith('"'):  # written quoted by write_description
+        value = json.loads(value)
+    return value
+
+
+def yaml_scalar(description: str) -> str:
+    """Quote the description when plain YAML would misread it.
+
+    An unquoted value containing ': ' or ' #', or starting with a YAML indicator,
+    breaks the frontmatter block. Claude Code ignores the breakage, GitHub shows
+    'Error in user YAML'. A JSON string is a valid YAML double-quoted scalar.
+    """
+    if ": " in description or " #" in description or description[:1] in "\"'&*!|>%@`{[-?,#":
+        return json.dumps(description, ensure_ascii=False)
+    return description
 
 
 def write_description(skill_dir: Path, description: str) -> None:
@@ -66,7 +81,9 @@ def write_description(skill_dir: Path, description: str) -> None:
     text = path.read_text(encoding="utf-8")
     if not re.search(r"(?m)^description:", text):
         sys.exit("optimize-description: no description line in SKILL.md")
-    new = re.sub(r"(?m)^description:\s*.+?$", f"description: {description}", text, count=1)
+    line = f"description: {yaml_scalar(description)}"
+    # A function replacement keeps backslashes in the text literal.
+    new = re.sub(r"(?m)^description:\s*.+?$", lambda m: line, text, count=1)
     if new != text:
         path.write_text(new, encoding="utf-8")
 
@@ -178,7 +195,9 @@ Negative rows the description must NOT attract (near misses - shared vocabulary,
 Rules for the rewrite:
 - Keep it under {DESCRIPTION_CAP} characters. Keep every claim true to the skill body below.
 - Fix misses by naming the missed situations and phrasings explicitly.
-- Fix false-fires by stating what the skill is NOT for, plainly.
+- Fix false-fires by narrowing what the description claims. If you add a "not for" clause,
+  point to the other skill that handles it, or leave the case out. Never offer this skill's
+  own knowledge as a substitute ("not for X - answer X from ..."): that reads as "handles X".
 - Do not add meta-commentary, markdown, or quotes. One paragraph, plain text.
 
 Skill body (for grounding - do not describe what the body does not do):

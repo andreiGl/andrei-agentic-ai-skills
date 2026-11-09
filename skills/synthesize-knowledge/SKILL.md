@@ -53,7 +53,7 @@ gives it more weight than it has earned.
 Count the `KB effect:` lines in the entries you read:
 
 ```bash
-grep -h '^- `\?KB effect:' ~/.claude/knowledge/experiences/*.md 2>/dev/null
+grep -hiE '^[-*[:space:]`]*KB effect:' ~/.claude/knowledge/experiences/*.md 2>/dev/null
 ```
 
 Note how many sessions name an entry, and which entries they name. Entries that
@@ -115,6 +115,11 @@ Archive, don't delete. A pattern that later turns out to be wrong needs its evid
 ```markdown
 ## YYYY-MM-DD - synthesis run
 **What worked:** N patterns identified from M sessions
-**Rule extracted:** (list the pattern names)
+**Patterns:** (list the pattern names)
 **KB effect:** K of M sessions named an entry; most named: (entries); never named: (entries)
+**Rule extracted:** Before you work in an area that a named pattern covers, read that pattern's preventive rule in [[patterns]].
 ```
+
+Keep **Rule extracted** the last line of the entry. `load-knowledge` prints a rule line and
+every line after it up to the next blank line, so a line placed after the rule loads as part
+of the rule.

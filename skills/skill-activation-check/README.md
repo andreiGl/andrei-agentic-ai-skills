@@ -42,7 +42,7 @@ Every row is one full `claude -p` session, and the runner sandboxes each one:
 python3 ~/.claude/skills/skill-activation-check/scripts/activation-run.py \
   <skill-dir> <rows.jsonl>
 
-# Run (each row is one paid session; confirm count and model first):
+# Run (each row is one full session; confirm count and model first):
 python3 ~/.claude/skills/skill-activation-check/scripts/activation-run.py \
   <skill-dir> <rows.jsonl> --run --keep-transcripts /tmp/act-raw
 ```

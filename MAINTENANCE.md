@@ -100,7 +100,8 @@ being matched.
 Each numeric trigger has one owner: synthesis thresholds in `synthesize-knowledge`, the
 staleness window in `check-knowledge`, the update trigger in `update-knowledge`'s *When
 to run*, the load trigger in `load-knowledge`'s description. `CLAUDE.md` names the
-skills and none of their conditions, which is why it appears in both sweeps above.
+skills and none of their conditions, except its stated ones (when the guideline skills and
+`load-knowledge` run, and the rebuttal route), which is why it appears in both sweeps above.
 
 `README.md` is in the file list because it wasn't, and quietly held both thresholds in a
 "When it runs" table - the same omission Rule 7 documents. Shorthand spellings are in the

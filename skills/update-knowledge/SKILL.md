@@ -43,8 +43,13 @@ keeps coming up. Skip them on quiet sessions and that signal disappears.
 The gate is defined in `~/.claude/knowledge/CLAUDE.md` - apply it as written there.
 What it tends to catch in practice:
 
+The gate asks two questions: whether the code gives the fact, and whether one web search
+or a model's own knowledge gives it. A fact that fails either one is not recorded, except
+for the part that is local to this setup.
+
 Worth recording:
-- A gotcha that depends on external system behavior the code can't reveal
+- A gotcha that depends on external system behavior the code can't reveal, and that no
+  public source states
 - A correction to something a page currently gets wrong
 - A constraint that exists for reasons invisible in the code
 - A build or test behavior that contradicts reasonable expectations
@@ -67,8 +72,8 @@ actionable.
 ### A correction to an existing page
 
 Read the page, edit in place, bump **Last updated**. If the old content was wrong,
-replace it - don't append a contradiction. Set `Status: verified` when you checked
-against live code.
+replace it - don't append a contradiction, and note the correction in `learnings.md`.
+Set `Status: verified` when you checked against live code.
 
 ### A new page
 
@@ -107,7 +112,8 @@ the evidence a bullet is earning its place.
 
 Write **Rule extracted** so it stands alone, as `CLAUDE.md` says under "Rule lines stand
 alone": its condition in the same sentence, condition first. `load-knowledge` loads it
-without the rest of the entry.
+without the rest of the entry, and with every line after it up to the next blank line,
+so keep it the last line of the entry.
 
 Nothing surprising happened? No entry. A journal of "went fine" tells the next session
 nothing.

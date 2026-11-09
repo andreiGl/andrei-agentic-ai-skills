@@ -83,8 +83,9 @@ This step is the whole experiment. The rest is mechanics.
 
 Sizing: minimum 3 positive + 3 distractor; aim for 8-12 of each. Recall over 3 rows
 moves in 33-point jumps - too coarse to tell a regression from noise. State the row
-count before running: **every row is one full paid session** (~$0.03-0.07 at flash
-tier, more on larger models).
+count before running: **every row is one full headless session**. Where the model is
+billed, that is ~$0.03-0.07 per row at flash tier and more on larger models; where it is
+free, it still costs time.
 
 Write the rows as JSONL, one object per line:
 `{"id": "pos-1", "expected_skill": "<name>", "prompt": "..."}`
@@ -139,12 +140,13 @@ recall >= 0.7 and precision >= 0.7, FAIL otherwise. Interpret then:
   description is demonstrably in the listing and inside the 1,536-char cap is
   wording the culprit: it does not name the situations, file types, or phrasings
   that should trigger it.
-- **Low precision** (fires on distractors): the description over-claims. Narrow it
-  and say explicitly what the skill is *not* for.
+- **Low precision** (fires on distractors): the description over-claims. Narrow it.
+  A "not for" clause helps only when it points to the skill that does handle the case;
+  one that offers this skill's own knowledge as a substitute invites the trigger.
 - **Misroutes concentrated on one sibling** (sibling rows present): a boundary
   dispute between the two descriptions, not one vague description. Fixing the target
-  alone moves the failure instead of removing it - state what **each** of the two
-  skills is not for, and re-run.
+  alone moves the failure instead of removing it - state for **each** of the two
+  skills which cases belong to the other one, and re-run.
 - **Both high**: report the numbers and row count, and note a small suite says
   little - offer to widen it.
 
@@ -221,10 +223,12 @@ Mechanism (adapted from anthropics/skills skill-creator's Description Optimizati
 - Negatives must be **near misses** - requests sharing vocabulary with the
   description but needing something else. Obviously-irrelevant negatives test
   nothing; the script refuses a set with fewer than 3 negatives for that reason.
+  A near miss that another skill should handle is a sibling row, not a negative: as a
+  plain negative it scores that correct route as a miss. Leave such rows out of the set.
 - Sibling-labelled rows are rejected here: optimization tunes one description
   against one boundary, and a sibling row would tune the pair by accident.
 
-Cost is real and compounding: roughly `rows x runs-per-query x (1 + iterations)`
+Cost (money where billed, time everywhere) compounds: roughly `rows x runs-per-query x (1 + iterations)`
 sessions. Confirm the budget before starting. After the loop: review the SKILL.md
 diff, keep or revert, and re-run the plain suite on the full set to confirm the
 numbers before trusting them - the loop's split is small, and a description that
