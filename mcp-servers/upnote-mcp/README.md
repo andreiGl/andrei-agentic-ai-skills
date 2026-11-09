@@ -241,6 +241,9 @@ section may legitimately come back expanded, so `collapsed_sections` never gates
 `make_section` or `append_to_note` for notes that hold sections, and hand edits in the UpNote app
 for anything else.
 
+The trigger is not size alone: a 60KB note rebuilt cleanly the same day the 59KB one flattened,
+so the gate stays armed on every rebuild however large the note.
+
 The new version keeps the original's tags. UpNote stores a tag as a hashtag link inside the note,
 so the server adds one at the end for each tag the new text doesn't already carry, and waits until
 UpNote has recorded them. To drop a tag, name it in `remove_tags`: its links are taken out, and
