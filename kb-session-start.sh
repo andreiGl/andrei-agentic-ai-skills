@@ -2,12 +2,17 @@
 # Stamps a session marker and surfaces any pending experience-entry reminders.
 set -u
 
+HOOKS_ENV="${KB_HOOKS_ENV:-$HOME/.claude/kb-hooks.env}"
+# shellcheck disable=SC1090
+[ -f "$HOOKS_ENV" ] && . "$HOOKS_ENV"
+
 KB_ROOT="${KB_ROOT:-$HOME/.claude/knowledge}"
 STATE_ROOT="${KB_SESSION_STATE_ROOT:-$HOME/.claude/kb-session}"
 EXPERIENCES="$KB_ROOT/experiences"
 MARKERS="$STATE_ROOT/markers"
 DEBT="$STATE_ROOT/experience-debt"
 NOTICE="$STATE_ROOT/autocommit-notice"
+NOTICE_LOG="$STATE_ROOT/autocommit-notice.log"
 FALLBACK_NOTICE="${KB_AUTOCOMMIT_FALLBACK_NOTICE:-$HOME/.claude/kb-autocommit-notice}"
 
 # kb-autocommit.sh runs at SessionEnd, where nobody sees its output, so its failures
@@ -18,7 +23,18 @@ for f in "$NOTICE" "$FALLBACK_NOTICE"; do
     printf '%s\n' 'Knowledge base backup needs attention (kb-autocommit.sh):'
     cut -f2- "$f"
     if [ "$f" = "$NOTICE" ] || { mkdir -p "$STATE_ROOT" 2>/dev/null && [ -w "$STATE_ROOT" ]; }; then
-        cat "$f" >> "$STATE_ROOT/autocommit.log" 2>/dev/null && : > "$f"
+        cat "$f" >> "$NOTICE_LOG" 2>/dev/null && : > "$f"
+    fi
+done
+
+# The state logs only ever grow. Each is a diagnostic, not a record, so past 4000
+# lines it keeps its last 2000.
+for logfile in "$STATE_ROOT/autocommit.log" "$NOTICE_LOG" \
+    "$STATE_ROOT/experience-debt.log" "$STATE_ROOT/experience-decisions.log"; do
+    [ -f "$logfile" ] || continue
+    lines=$(wc -l < "$logfile" | tr -d ' ')
+    if [ "$lines" -gt 4000 ]; then
+        tail -n 2000 "$logfile" > "$logfile.tmp" && mv "$logfile.tmp" "$logfile"
     fi
 done
 
@@ -52,7 +68,8 @@ find "$MARKERS" -name '*.start' -mtime +7 -delete 2>/dev/null
 # The marker records what kb-session-end.sh compares against: the tool-use count so
 # far and the names of the entries that already exist. Comparing names rather than
 # file times means editing an old entry does not count as writing one, and a file
-# copied in with an old time still does.
+# copied in with an old time still does. Distillation files in archive/ are listed
+# too, since a synthesis-only session banks through one.
 #
 # A resumed or compacted session keeps an existing marker, so its work keeps adding
 # up from the original start. It gets a new one when there is none - after an earlier
@@ -69,4 +86,6 @@ fi
 {
     printf '#tool_uses %s\n' "$tool_uses"
     find "$EXPERIENCES" -maxdepth 1 -type f -name '*.md' -exec basename {} \; 2>/dev/null
+    find "$EXPERIENCES/archive" -maxdepth 1 -type f -name '*.md' -exec basename {} \; 2>/dev/null \
+        | sed 's#^#archive/#'
 } > "$marker"

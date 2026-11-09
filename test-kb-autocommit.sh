@@ -100,13 +100,13 @@ sleep 5
 out=$(start_hook)
 check "session start prints the notice" 'printf "%s" "$out" | grep -q "TIMED OUT"'
 check "notice cleared after printing" '[ ! -s "$STATE/autocommit-notice" ]'
-check "notice copied to the log" '[ "$(grep -c "TIMED OUT" "$STATE/autocommit.log")" -ge 2 ]'
+check "notice copied to the notice log" 'grep -q "TIMED OUT" "$STATE/autocommit-notice.log" && grep -q "TIMED OUT" "$STATE/autocommit.log"'
 
 # A failed push leaves a notice, and a later successful push clears it.
 mv "$REMOTE" "$REMOTE.away"
 echo "- third" >> "$KB_ROOT/gotchas.md"
 autocommit
-check "failed push leaves a notice" 'grep -q "PUSH FAILED" "$STATE/autocommit-notice"'
+check "unreachable remote leaves a notice" 'grep -q "fetch-failed" "$STATE/autocommit-notice"'
 mv "$REMOTE.away" "$REMOTE"
 autocommit
 check "later success clears the notice" '[ ! -s "$STATE/autocommit-notice" ]'
@@ -166,6 +166,72 @@ git -C "$KB_ROOT" reset -q
 rm -f "$STATE/autocommit-notice"
 autocommit
 check "normal run works again afterwards" '[ "$(remote_head)" = "$(git -C "$KB_ROOT" rev-parse HEAD)" ] && [ "$(remote_head)" != "$pushed" ]'
+
+# --- Per-machine settings (merged with the work install, 2026-11-09) ---
+
+# A notice appends: a second failure does not erase the first.
+printf '2026-01-01T00:00:00Z\tfirst: one\n' > "$STATE/autocommit-notice"
+(KB_AUTOCOMMIT_NETWORK_TIMEOUT=abc autocommit)
+check "notices append" 'grep -q "first: one" "$STATE/autocommit-notice" && grep -q "skipped-invalid-config" "$STATE/autocommit-notice"'
+rm -f "$STATE/autocommit-notice"
+
+# A pushurl on origin is refused, whatever the pin says.
+pushed=$(remote_head)
+git -C "$KB_ROOT" config remote.origin.pushurl "$TMP/elsewhere.git"
+echo "- pushurl" >> "$KB_ROOT/gotchas.md"
+autocommit
+check "pushurl refused" 'grep -q "skipped-remote" "$STATE/autocommit-notice" && [ "$(remote_head)" = "$pushed" ]'
+git -C "$KB_ROOT" config --unset remote.origin.pushurl
+rm -f "$STATE/autocommit-notice"
+
+# KB_APPROVED_REMOTE overrides the pin, and a mismatch commits nothing.
+(KB_APPROVED_REMOTE="$TMP/other.git" autocommit)
+check "approved-remote mismatch refused" 'grep -q "skipped-remote" "$STATE/autocommit-notice" && [ -n "$(git -C "$KB_ROOT" status --porcelain gotchas.md)" ]'
+rm -f "$STATE/autocommit-notice"
+(KB_APPROVED_REMOTE="$REMOTE" autocommit)
+check "approved remote pushes" '[ "$(remote_head)" = "$(git -C "$KB_ROOT" rev-parse HEAD)" ]'
+
+# The same settings work from the hooks env file.
+printf 'KB_APPROVED_REMOTE=%s/other.git\n' "$TMP" > "$HOME/.claude-env"
+echo "- envfile" >> "$KB_ROOT/gotchas.md"
+(KB_HOOKS_ENV="$HOME/.claude-env" autocommit)
+check "env file setting applied" 'grep -q "skipped-remote" "$STATE/autocommit-notice"'
+rm -f "$STATE/autocommit-notice" "$HOME/.claude-env"
+autocommit
+
+# KB_STAGE_PATHS: a path outside the list stops the run; inside it commits.
+echo "x" > "$KB_ROOT/scratch.txt"
+echo "- allow" >> "$KB_ROOT/gotchas.md"
+(KB_STAGE_PATHS="gotchas.md experiences" autocommit)
+check "path outside allowlist refused" 'grep -q "skipped-unapproved-path" "$STATE/autocommit-notice" && grep -q scratch.txt "$STATE/autocommit-notice"'
+rm -f "$KB_ROOT/scratch.txt" "$STATE/autocommit-notice"
+(KB_STAGE_PATHS="gotchas.md experiences" autocommit)
+check "allowlisted change pushed" '[ "$(remote_head)" = "$(git -C "$KB_ROOT" rev-parse HEAD)" ] && [ -z "$(git -C "$KB_ROOT" status --porcelain)" ]'
+
+# A KB pushed from another machine is fast-forwarded before the commit.
+other="$TMP/other-clone"
+git clone -q "$REMOTE" "$other"
+git -C "$other" config user.name t; git -C "$other" config user.email t@example.com
+echo "elsewhere" > "$other/from-elsewhere.md"
+git -C "$other" add -A && git -C "$other" commit -qm elsewhere && git -C "$other" push -q
+echo "- after" >> "$KB_ROOT/gotchas.md"
+autocommit
+check "behind KB fast-forwarded and pushed" '[ -f "$KB_ROOT/from-elsewhere.md" ] && [ "$(remote_head)" = "$(git -C "$KB_ROOT" rev-parse HEAD)" ]'
+
+# A read-only KB is skipped without a notice.
+chmod a-w "$KB_ROOT"
+autocommit
+check "read-only KB skipped quietly" '[ ! -s "$STATE/autocommit-notice" ] && grep -q skipped-readonly "$STATE/autocommit.log"'
+chmod u+w "$KB_ROOT"
+
+# KB_SESSION_END_AUTOCOMMIT=1 runs the commit from kb-session-end.sh.
+mkdir -p "$HOME/.claude"; ln -sf "$ROOT/kb-autocommit.sh" "$HOME/.claude/kb-autocommit.sh"
+echo "- from end" >> "$KB_ROOT/gotchas.md"
+printf '{"cwd":"/x/proj"}' | KB_SESSION_END_AUTOCOMMIT=1 sh "$ROOT/kb-session-end.sh"
+check "session end runs autocommit when set" '[ "$(remote_head)" = "$(git -C "$KB_ROOT" rev-parse HEAD)" ]'
+echo "- not from end" >> "$KB_ROOT/gotchas.md"
+printf '{"cwd":"/x/proj"}' | sh "$ROOT/kb-session-end.sh"
+check "session end leaves autocommit alone by default" '[ -n "$(git -C "$KB_ROOT" status --porcelain gotchas.md)" ]'
 
 if [ "$fails" -eq 0 ]; then
     echo "All kb-autocommit checks passed."

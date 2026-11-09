@@ -486,6 +486,7 @@ timestamp<TAB>project<TAB>tool-uses-since-marker<TAB>verdict
 | :--- | :--- |
 | `below-threshold` | The session did not reach the local cutoff. The marker stays, so later work adds to it. |
 | `no-marker` | The session began before the start hook was active, or has no usable marker. |
+| `flagged-no-marker` | No marker, but the session ran past five times the cutoff, so a reminder was queued anyway. |
 | `entry-written` | A new entry name appeared and the transcript mentions it. |
 | `already-banked` | The session wrote an entry earlier and ended again after a resume. |
 | `flagged` | A qualifying session ended without such an entry, and a reminder was queued. |
@@ -546,13 +547,10 @@ temp directory via the environment overrides. It covers a below-threshold sessio
 qualifying session with no entry, an archive-only entry, and a direct entry. It also covers
 marker preservation across `resume`, an edited old entry, another session's entry, a new
 marker after an earlier end, work adding up across resumes, a session that already wrote an
-entry, bad threshold values, an old-format marker, and the ten-line cap. A file under
-`experiences/archive/` deliberately does not satisfy the requirement, since a distilled entry
-moved there is not a new entry.
-
-One known false positive: a session whose only work was a `synthesize-knowledge` run moves
-entries out of `experiences/` and adds no new name there, so it will be flagged despite having
-done the right thing.
+entry, bad threshold values, an old-format marker, and the ten-line cap. A distilled entry moved into `experiences/archive/` does not satisfy the requirement, since it
+is not a new entry. A new distillation file there does, under the same two tests (new since
+the marker, named in the transcript): that is how a session whose only work was a
+`synthesize-knowledge` run banks.
 
 
 ## KB maintenance check
@@ -702,10 +700,12 @@ to get the second one.
 ### Where it will push
 
 An unattended push means nobody is at the keyboard to notice that `origin` now points
-somewhere else. The script checks the destination rather than assuming it: `KB_REMOTE` pins
-it explicitly, and otherwise the first run records whatever `origin` is and every later run
-must match. A mismatch refuses the push and keeps the commit, so nothing is lost but the
-upload.
+somewhere else. The script checks the destination rather than assuming it. With
+`KB_APPROVED_REMOTE` set, `origin` must be exactly that URL. Otherwise `KB_REMOTE` pins it,
+or the first run records whatever `origin` is and every later run must match. A `pushurl` on
+`origin` is always refused, because `git push` writes to every pushurl and `get-url` shows
+only the first. The KB must be on `main`, tracking `origin/main`, with no unmerged files. A
+failed check commits nothing, so the next run after a fix commits it all.
 
 The pin lives at `~/.claude/kb-session/remote.pin`, outside the repository, so a clone made
 elsewhere pins itself rather than inheriting an expectation from the machine it came from.
@@ -714,14 +714,38 @@ This exists because two installs of this setup ended up with identically named r
 under different accounts, both pushing automatically. Checking the remote costs four lines
 and the failure it prevents is not one you would notice afterwards.
 
+Before committing, the script fetches `origin/main`, with one retry, and fast-forwards when
+another machine pushed first. A KB that has diverged is left for you to merge.
+
+### Per-machine settings
+
+The four KB hook scripts (`kb-autocommit.sh`, `kb-session-start.sh`, `kb-session-end.sh`,
+`kb-maintenance-check.py`) are the same file on every install. What differs per machine
+comes from the environment or from `~/.claude/kb-hooks.env` (`KB_HOOKS_ENV` moves it), a
+plain `KEY=value` file the shell hooks source and the Python check parses:
+
+| Setting | Effect |
+|---|---|
+| `KB_APPROVED_REMOTE` | The only URL `origin` may have. Unset: the pin above. |
+| `KB_STAGE_PATHS` | Space-separated top-level paths that may be committed. Any other changed path, in the tree or in an unpushed commit, stops the run. Unset: everything is staged. |
+| `KB_SESSION_END_AUTOCOMMIT=1` | `kb-session-end.sh` runs the commit itself, after its own work, instead of a separate `SessionEnd` hook. |
+| `KB_SAFE_PATH=1` | Run with a system-only `PATH`. |
+| `KB_NEVER_STAMP_DUE=0` | A template `Last synthesized: never` stamp is not due. |
+| `KB_AUTOCOMMIT_NETWORK_TIMEOUT`, `KB_AUTOCOMMIT_STALE_LOCK_SECONDS`, `KB_EXPERIENCE_MIN_TOOL_USES` | As described in the sections here. |
+
+With the file absent, the defaults are this repository's own install.
+
 ### When it fails
 
 `SessionEnd` output reaches nobody, so the script cannot report anything itself. It appends
 to `~/.claude/kb-session/autocommit.log`, one line per run, recording the pushed SHA or what
 went wrong. Every failure - a failed or timed-out push, a refused remote, a failed commit -
-also writes `~/.claude/kb-session/autocommit-notice`, and
-[`kb-session-start.sh`](kb-session-start.sh) prints that into the next session as
-"Knowledge base backup needs attention", copies it to the log, and clears it.
+also appends a line to `~/.claude/kb-session/autocommit-notice`, starting with a short code
+such as `push-failed` or `skipped-remote`. [`kb-session-start.sh`](kb-session-start.sh)
+prints that into the next session as "Knowledge base backup needs attention", moves it to
+`autocommit-notice.log`, and clears it. A read-only KB, as in an A/B study batch, is
+skipped with a log line and no notice. The start hook also trims each state log to its
+last 2000 lines once it passes 4000.
 
 Only a successful push clears a notice. A later run with nothing to do leaves it, so a
 failure is always shown once even if the next run happens to be quiet. If the state
@@ -733,9 +757,9 @@ attempts the push when local commits are ahead of the remote. Without that the b
 wait for the next session that happened to edit the knowledge base, which is exactly the
 session where nobody is thinking about the backup.
 
-The push is capped at 15 seconds in total (`KB_AUTOCOMMIT_NETWORK_TIMEOUT`) on top of the
-stall check. The cap has to stay under the hook's 30 second timeout: a push killed by Claude
-Code instead never reaches the log or the notice.
+Each network call is capped at 8 seconds (`KB_AUTOCOMMIT_NETWORK_TIMEOUT`), and the push has a
+stall check on top. Two fetches, the pause between them and a push must fit under the hook's
+30 second timeout: a push killed by Claude Code instead never reaches the log or the notice.
 
 ### Two sessions ending together
 

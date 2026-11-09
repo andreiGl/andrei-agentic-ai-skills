@@ -7,6 +7,12 @@ JSON object: systemMessage shows the notice to the user, and additionalContext
 tells the model that the user decides. A plain context line was ignored by the
 model in practice (2026-11-07), so the decision moved to the user. Silence when
 nothing is due. KB_ROOT overrides the knowledge base for testing.
+
+Per-machine setting, from the environment or from $KB_HOOKS_ENV (default
+~/.claude/kb-hooks.env, the KEY=value file the shell hooks read):
+KB_NEVER_STAMP_DUE=0 treats a template "Last synthesized: never" stamp as not
+due, since synthesize-knowledge has no never-condition. The default, 1, nags.
+A missing stamp line always nags: that is an anomaly, not a scaffold.
 """
 import json
 import os
@@ -15,7 +21,26 @@ import sys
 from datetime import date
 from pathlib import Path
 
-KB = Path(os.environ.get("KB_ROOT") or Path.home() / ".claude" / "knowledge")
+
+
+def hooks_env():
+    """Settings from the environment, then from the shared KEY=value file."""
+    values = {}
+    path = Path(os.environ.get("KB_HOOKS_ENV") or Path.home() / ".claude" / "kb-hooks.env")
+    try:
+        for line in path.read_text().splitlines():
+            m = re.match(r"\s*(?:export\s+)?([A-Z_][A-Z0-9_]*)=(.*)$", line)
+            if m:
+                values[m.group(1)] = m.group(2).strip().strip("'\"")
+    except OSError:
+        pass
+    values.update({k: v for k, v in os.environ.items() if k.startswith("KB_")})
+    return values
+
+
+SETTINGS = hooks_env()
+KB = Path(SETTINGS.get("KB_ROOT") or Path.home() / ".claude" / "knowledge")
+NEVER_STAMP_DUE = SETTINGS.get("KB_NEVER_STAMP_DUE", "1") != "0"
 
 SYNTH_EXPERIENCE_THRESHOLD = 5
 SYNTH_LEARNINGS_THRESHOLD = 20
@@ -40,8 +65,8 @@ def status_dates():
         # First match wins - a duplicated stamp line must not change the
         # reading. Only a plain YYYY-MM-DD stamp counts; a datetime stamp is a
         # typo to flag, not a value to parse a prefix from. The literal
-        # template stamp "never" is reported as-is (this install nags on it -
-        # the work install exempts it), everything else reads as missing.
+        # template stamp "never" is reported as-is (KB_NEVER_STAMP_DUE decides
+        # whether it nags), everything else reads as missing.
         if verified is None:
             if re.match(r"\*\*Last verified:\*\* never$", line):
                 verified = "never"
@@ -91,13 +116,17 @@ def main():
     except Exception:
         pass
 
+    # No knowledge base here (a machine that only syncs skills): stay silent.
     experiences = KB / "experiences"
     if not experiences.is_dir():
         return
     exp_count = len(list(experiences.glob("*.md")))
     try:
+        learnings = KB / "knowledge" / "learnings.md"
+        if not learnings.exists():
+            learnings = KB / "learnings.md"
         learn_count = sum(
-            1 for line in (KB / "learnings.md").read_text().splitlines()
+            1 for line in learnings.read_text().splitlines()
             if line.startswith("## ")
         )
     except OSError:
@@ -121,7 +150,9 @@ def main():
         synth_reasons.append(
             f"learnings.md holds {learn_count} entries (threshold {SYNTH_LEARNINGS_THRESHOLD})"
         )
-    if synth_age is None:
+    if synthesized == "never" and not NEVER_STAMP_DUE:
+        pass
+    elif synth_age is None:
         synth_reasons.append(
             f"INDEX.md Last synthesized is {synthesized or 'missing'}"
         )

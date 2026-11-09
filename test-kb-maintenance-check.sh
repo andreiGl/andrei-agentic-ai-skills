@@ -18,7 +18,7 @@ OLD_CHECK=$(days_ago 60)
 OLD_SYNTH=$(days_ago 100)
 
 run() {
-    printf '%s\n' '{}' | KB_ROOT="$KB_ROOT" python3 "$ROOT/kb-maintenance-check.py"
+    printf '%s\n' '{}' | KB_ROOT="$KB_ROOT" KB_HOOKS_ENV="${KB_HOOKS_ENV:-/nonexistent}" python3 "$ROOT/kb-maintenance-check.py"
 }
 
 expect_silent() {
@@ -52,6 +52,13 @@ expect_silent
 echo "# first" > "$KB_ROOT/experiences/e1.md"
 expect_line 'synthesize-knowledge'
 expect_line 'Last synthesized is never'
+# KB_NEVER_STAMP_DUE=0 (set in the hooks env file) exempts the template stamp,
+# so the check-knowledge notice shows instead.
+printf 'KB_NEVER_STAMP_DUE=0\n' > "$KB_ROOT/hooks.env"
+out=$(KB_HOOKS_ENV="$KB_ROOT/hooks.env" run)
+! printf '%s\n' "$out" | grep -q 'synthesize-knowledge'
+printf '%s\n' "$out" | grep -q 'check-knowledge'
+rm -f "$KB_ROOT/hooks.env"
 
 # The notice is one JSON object: a message for the user, and context telling the
 # model that the user decides.

@@ -119,4 +119,19 @@ start '{"session_id":"cap","source":"startup"}' > "$TEST_ROOT/cap.out"
 grep -q '(12 entries total' "$TEST_ROOT/cap.out"
 [ "$(grep -c 'tool uses' "$STATE_ROOT/experience-debt.log")" -ge 12 ]
 
+# A synthesis session banks through a new distillation file it names.
+start "$(payload synth "$TEST_ROOT/none.jsonl")"
+touch "$KB_ROOT/experiences/archive/2026-11-09-distillation.md"
+{ cat "$TEST_ROOT/long.jsonl"; printf '%s\n' '{"input":"experiences/archive/2026-11-09-distillation.md"}'; } > "$TEST_ROOT/synth.jsonl"
+end "$(payload synth "$TEST_ROOT/synth.jsonl")" >/dev/null
+[ "$(last_decision)" = entry-written ]
+
+# Far past the threshold, a session with no marker is flagged anyway.
+tools 100 > "$TEST_ROOT/heavy.jsonl"
+end "$(payload heavy "$TEST_ROOT/heavy.jsonl")" >/dev/null
+[ "$(last_decision)" = flagged-no-marker ]
+tools 30 > "$TEST_ROOT/light.jsonl"
+end "$(payload light "$TEST_ROOT/light.jsonl")" >/dev/null
+[ "$(last_decision)" = no-marker ]
+
 printf '%s\n' 'Synthetic hook checks passed.'
