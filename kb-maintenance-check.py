@@ -10,8 +10,8 @@ nothing is due. KB_ROOT overrides the knowledge base for testing.
 
 Per-machine setting, from the environment or from $KB_HOOKS_ENV (default
 ~/.claude/kb-hooks.env, the KEY=value file the shell hooks read):
-KB_NEVER_STAMP_DUE=0 treats a template "Last synthesized: never" stamp as not
-due, since synthesize-knowledge has no never-condition. The default, 1, nags.
+KB_NEVER_STAMP_DUE=0 treats a template "never" stamp, on Last synthesized or Last
+verified, as not due: neither skill has a never-condition. The default, 1, nags.
 A missing stamp line always nags: that is an anomaly, not a scaffold.
 """
 import json
@@ -167,8 +167,12 @@ def main():
         notify("synthesize-knowledge", "; ".join(synth_reasons))
         return
 
+    if verified == "never" and not NEVER_STAMP_DUE:
+        return
     if check_age is None or check_age < 0 or check_age > CHECK_MAX_AGE_DAYS:
-        if not verified:
+        if verified == "never":
+            when = "never"
+        elif not verified:
             # Absent line, literal "never" stamp, or a malformed value (a
             # datetime typo): the stamp names which, when it has a value.
             when = verified or "never"

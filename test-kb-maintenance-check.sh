@@ -52,12 +52,15 @@ expect_silent
 echo "# first" > "$KB_ROOT/experiences/e1.md"
 expect_line 'synthesize-knowledge'
 expect_line 'Last synthesized is never'
-# KB_NEVER_STAMP_DUE=0 (set in the hooks env file) exempts the template stamp,
-# so the check-knowledge notice shows instead.
+# KB_NEVER_STAMP_DUE=0 (set in the hooks env file) exempts both template stamps.
 printf 'KB_NEVER_STAMP_DUE=0\n' > "$KB_ROOT/hooks.env"
 out=$(KB_HOOKS_ENV="$KB_ROOT/hooks.env" run)
-! printf '%s\n' "$out" | grep -q 'synthesize-knowledge'
-printf '%s\n' "$out" | grep -q 'check-knowledge'
+[ -z "$out" ]
+# Without the setting, a template verified stamp reads as never, not as a typo.
+set_dates never "$(date +%F)"
+expect_line 'last verified never\.'
+! expect_line 'typo'
+set_dates never never
 rm -f "$KB_ROOT/hooks.env"
 
 # The notice is one JSON object: a message for the user, and context telling the
