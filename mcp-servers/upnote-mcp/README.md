@@ -413,10 +413,13 @@ confirms that `run_select` refuses writes, and that the rebuild tools refuse a s
 unknown tag, an empty append and a move to the same notebook, all before anything is sent. It
 then runs a rebuild of every eligible note against a stand-in for UpNote, with no link sent: an
 append, a `replace_note` given the note's own HTML, and the removal of a tag. Each one has to
-pass the checks the server makes before it trashes the original. It changes nothing:
+pass the checks the server makes before it trashes the original. It changes no note, but it
+writes pending journals to the server's operation state (see Shared operation state). In the
+default folder, a journal it leaves blocks the next run, and the live server, for that note for
+5 minutes. Give it a private folder of its own:
 
 ```bash
-~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_readonly.py
+UPNOTE_MCP_STATE_DIR=$(mktemp -d) ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_readonly.py
 ```
 
 `test_live.py` checks the tools that change notes: create, append, `make_section`, replace with

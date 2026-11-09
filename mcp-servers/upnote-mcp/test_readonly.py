@@ -437,13 +437,14 @@ async def main():
         calls = []
         srv._notebook_members = lambda nb: (calls.append(nb) or (["a", "b", "c"] if len(calls) % 2 else ["fake-new"]))
         try:
-            nid, html, text, rev = accepted
-            stored["text"] = text or ""
-            res = srv._replace(nid, title="Wipe test", expected_revision=rev, acknowledge_warnings=True)
-            check("a rebuild that wipes the notebook's list keeps the original and says so",
-                  not res.get("done") and res.get("notebook_members_lost", {}).get("missing") == 3, str(res)[:120])
             with srv.closing(real_connect()) as conn:
                 nb = next(v for v in srv._notebooks(conn).values() if not srv._same_title_notebooks(srv._notebooks(conn), v["id"]))
+            nid, html, text, rev = accepted
+            stored["text"] = text or ""
+            # name the notebook: the accepted note may be in none, and then no member list is read
+            res = srv._replace(nid, title="Wipe test", notebook=nb["id"], expected_revision=rev, acknowledge_warnings=True)
+            check("a rebuild that wipes the notebook's list keeps the original and says so",
+                  not res.get("done") and res.get("notebook_members_lost", {}).get("missing") == 3, str(res)[:120])
             res = srv.create_note("Wipe test", "x", notebook=nb["id"])
             check("  and create_note reports it", res.get("notebook_members_lost", {}).get("missing_note_ids") == ["a", "b", "c"], str(res)[:120])
         finally:
