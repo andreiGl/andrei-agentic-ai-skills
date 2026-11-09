@@ -343,6 +343,13 @@ content, since rebuilding that would duplicate it.
 ## Limits
 
 - macOS only, and by default only the App Store build's database location.
+- `test_live.py --live` stays on hold: its move step rebuilds a note through a create link that
+  names a notebook, the exact action behind the 2026-10-11 membership wipe, which UpNote has not
+  fixed. Run it only with Andrei's say-so.
+- What makes UpNote's re-parser drop collapsible-section wrappers is unknown - a 59KB note
+  flattened on 2026-11-09 and a 60KB note rebuilt cleanly the same day, so it is not size alone.
+  A targeted experiment (a scratch note, one nested wrapper, growing sizes) would answer it; the
+  gate makes it low-stakes meanwhile.
 - The trash and restore links are undocumented, so an UpNote update could remove them.
 - A search left active in UpNote stays active when `open_in_upnote` shows a notebook or tag, and
   no link clears it.

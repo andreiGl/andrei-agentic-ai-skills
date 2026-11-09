@@ -65,7 +65,22 @@ for name, out in [
 ]:
     same(f"{name} keeps counts", srv._structure(out), srv._structure(marked))
 
-# 6. size-guard message shape
+# 6. _fragment_html: block constructs of a spliced markdown fragment (home's port-brief table)
+def frag(name, src, expected):
+    got = srv._encode_pre_breaks(srv._sanitize_html(srv._fragment_html(src)))
+    same(name, got, expected)
+
+frag("flat list items share one ul", "- a\n- b", "<ul><li>a</li><li>b</li></ul>")
+frag("ordered list becomes ol", "1. one\n2. two", "<ol><li>one</li><li>two</li></ol>")
+frag("fence becomes pre with language", "```python\nx = 1\ny = 2\n```", '<pre data-code-language="python">x = 1&#10;y = 2</pre>')
+frag("inline HTML passes through", "Text with <b>bold</b> here", "<div>Text with <b>bold</b> here</div>")
+frag("blockquote converts", "> quoted", "<blockquote>quoted</blockquote>")
+frag("nested list unchanged", "- one\n- two\n  - nested", "<ul><li>one</li><li>two</li><ul><li>nested</li></ul></ul>")
+frag("paragraphs become divs", "para one\n\npara two", "<div>para one</div><div>para two</div>")
+_mid = srv._tighten_html(srv._fragment_html("text\n```js\ncode\n```\ntail"))
+frag("fence between paragraphs", _mid, "<div>text</div><pre data-code-language=\"js\">code</pre><div>tail</div>")
+
+# 7. size-guard message shape
 msg = srv._LARGE_BODY_MESSAGE.format(limit=srv.MCP_TEXT_LIMIT, size=srv.MCP_TEXT_LIMIT + 1)
 check("message names the limit", str(srv.MCP_TEXT_LIMIT) in msg and "server_only" in msg)
 

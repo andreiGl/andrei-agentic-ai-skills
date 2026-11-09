@@ -2224,37 +2224,75 @@ def _plan_insert(source: str, heading: str, fragment: str, position: str) -> dic
 
 def _fragment_html(text: str) -> str:
     """The fragment as note HTML. UpNote converts a create link's markdown itself, but a fragment
-    spliced mid-body arrives inside HTML blocks, so the block constructs convert here: lists
-    (nested ones via _nested_lists_to_html, flat ones line-wise), headings, and paragraphs as
-    <div>. Inline markdown (bold, links) is not converted - send HTML for that."""
-    text = _nested_lists_to_html(text)
+    spliced mid-body arrives inside HTML blocks, so the block constructs convert here: fences as
+    <pre> (the same helper a create link runs), lists (nested ones via _nested_lists_to_html, flat
+    ones line-wise with consecutive items in one list and markers choosing <ul> or <ol>),
+    blockquotes, headings, and paragraphs as <div>. Inline markdown (bold, links) is not
+    converted - send HTML for that, which passes through in a paragraph line and is sanitised
+    with everything else."""
+    text = _fences_to_pre(_nested_lists_to_html(text))
     out: list[str] = []
     paragraph: list[str] = []
-    for line in text.split("\n"):
-        if m := _LIST_ITEM.match(_expand_indent(line)):
-            if paragraph:
-                out.append("<div>" + "<br>".join(paragraph) + "</div>")
-                paragraph = []
-            depth = min(len(m.group(1)) // 2, 5)
-            out.append(f"<ul><li>{html_lib.escape(m.group(4).strip())}</li></ul>" if not depth
-                       else f"{'<ul>' * (depth + 1)}<li>{html_lib.escape(m.group(4).strip())}</li>{'</ul>' * (depth + 1)}")
-        elif m := re.match(r"^ {0,3}(#{1,6})\s+(.*)$", line):
-            if paragraph:
-                out.append("<div>" + "<br>".join(paragraph) + "</div>")
-                paragraph = []
-            out.append(f"<h{len(m.group(1))}>{html_lib.escape(m.group(2).strip())}</h{len(m.group(1))}>")
-        elif line.strip().startswith("<"):
-            if paragraph:
-                out.append("<div>" + "<br>".join(paragraph) + "</div>")
-                paragraph = []
-            out.append(line)  # _nested_lists_to_html wrote it as HTML; pass it through
-        elif line.strip():
-            paragraph.append(html_lib.escape(line.strip()))
-        elif paragraph:
+    current_list: list[str] = []  # [tag, items] of the list being accumulated
+
+    def flush_list():
+        nonlocal current_list
+        if current_list:
+            out.append(f"<{current_list[0]}>" + "".join(current_list[1:]) + f"</{current_list[0]}>")
+            current_list = []
+
+    def flush_paragraph():
+        nonlocal paragraph
+        if paragraph:
             out.append("<div>" + "<br>".join(paragraph) + "</div>")
             paragraph = []
-    if paragraph:
-        out.append("<div>" + "<br>".join(paragraph) + "</div>")
+
+    in_pre = False
+    for i, line in enumerate(text.split("\n")):
+        newline = "\n" if i < text.count("\n") else ""
+        stripped = line.strip()
+        if in_pre:
+            out.append(line + newline)  # inside a <pre> a converter wrote: every byte is its content
+            if "</pre" in line.lower():
+                in_pre = False
+        elif stripped.startswith("<pre") and "</pre" not in line.lower():
+            flush_paragraph()
+            flush_list()
+            in_pre = True
+            out.append(line + newline)
+        elif stripped.startswith("<pre") or stripped.startswith("<ul") or stripped.startswith("<ol"):
+            flush_paragraph()
+            flush_list()
+            out.append(line + newline)  # HTML the converters above wrote; pass it through
+        elif m := _LIST_ITEM.match(_expand_indent(line)):
+            flush_paragraph()
+            marker, item = m.group(2), html_lib.escape(m.group(4).strip())
+            tag = "ol" if marker[0].isdigit() else "ul"
+            if not current_list or current_list[0] != tag:
+                flush_list()
+                current_list = [tag]
+            current_list.append(f"<li>{item}</li>")
+        elif m := re.match(r"^ {0,3}(#{1,6})\s+(.*)$", line):
+            flush_paragraph()
+            flush_list()
+            out.append(f"<h{len(m.group(1))}>{html_lib.escape(m.group(2).strip())}</h{len(m.group(1))}>")
+        elif m := re.match(r"^ {0,3}>\s?(.*)$", line):
+            flush_paragraph()
+            flush_list()
+            out.append(f"<blockquote>{html_lib.escape(m.group(1).strip())}</blockquote>")
+        elif line.strip().startswith("<"):
+            flush_paragraph()
+            flush_list()
+            out.append(line)  # HTML the caller or a converter wrote; pass it through
+        elif line.strip():
+            if paragraph:
+                pass
+            paragraph.append(stripped)
+        else:
+            flush_paragraph()
+            flush_list()
+    flush_paragraph()
+    flush_list()
     return "".join(out)
 
 
@@ -2276,7 +2314,9 @@ def insert_after_heading(
     """Add content next to a heading, without resending the rest of the note. Use this instead of
     replace_note when the existing content stays as it is and append_to_note is not enough because
     the content belongs at a heading, not at the end. The bytes already in the note pass through
-    the rebuild unchanged, so only the new content is re-parsed by UpNote. The note is still rebuilt
+    the rebuild unchanged, so only the new content is re-parsed by UpNote. Markdown block
+    constructs convert (lists, fences, quotes, headings, paragraphs); inline formatting like bold
+    needs markdown=false and raw HTML. The note is still rebuilt
     through replace_note, so the result has a new id and the original goes to Trash. Two steps like
     replace_note: call without expected_revision to preview, then again with it."""
     note_id = note_id.strip()
