@@ -54,6 +54,11 @@ DB_PATH = Path(
 # How long a tool that changes notes waits for UpNote to save the change, its notebook and its tags.
 CONFIRM_SECONDS = 10.0
 
+# Some MCP clients reject tool inputs past about 32KB; others pass them silently and the body can be
+# cut on the way. Larger note bodies go through a direct server import instead, so replace_note and
+# append_to_note refuse them over MCP.
+MCP_TEXT_LIMIT = 30_000
+
 # How long a run_select query may run before it is stopped, and the largest value it may build.
 SELECT_SECONDS = 10.0
 SELECT_MAX_BYTES = 20_000_000     # one value, aggregates included; the whole library's text was about 2.7 MB on 2026-10-10
@@ -1509,6 +1514,14 @@ _TEXT_DOC = (
 
 _TOKEN_DOC = "Omit to preview. To apply, pass the preview_token the preview returned, with expected_revision."
 
+_LARGE_BODY_MESSAGE = (
+    "This body is {size} characters, over the {limit}-character MCP tool-input limit. Bodies that size pass "
+    "through some MCP clients cut, which has written a truncated note. Call server.py directly instead: "
+    "import it with importlib (spec_from_file_location on this server.py, markdown=True), then call "
+    "replace_note with server_only=True and the same two-step preview and apply. The recipe is in "
+    "reference_upnote_large_note_edits.md in the project memory folder."
+)
+
 
 def _preview_token(tool: str, note_id: str, **args: Any) -> str:
     """A digest of a call's arguments, so an apply can only carry out what its preview showed."""
@@ -1622,6 +1635,11 @@ def _replace(
     if blockers:
         raise ToolError(f"Can't replace {r['title']!r}. " + " ".join(blockers))
     if expected_revision is None:
+        # The structure the caller sent, next to the note's current counts. The preview can't run
+        # the rebuild's transforms, so sent counts are projected, not measured; the apply's gate
+        # measures them after the transforms (11-09 taught that the flatten happens in UpNote).
+        current = _structure(r["html"] or "")
+        sent = _structure(_strip_title_heading(text, r["title"] or "")) if text is not None else current
         return {
             "stage": "preview",
             "note_id": note_id,
@@ -1632,6 +1650,7 @@ def _replace(
             **({"moving_from": [nbs[i]["path"] for i in notebook_ids]} if notebook else {}),
             "tags_kept": tags,
             **({"tags_removed": removed} if removed else {}),
+            "structure": {"current": current, "sent": sent},
             "warnings": warnings,
             "next_step": "Show any warnings to the user, then call again with the same arguments plus expected_revision "
             "and preview_token" + (" and acknowledge_warnings=true." if warnings else "."),
@@ -1663,6 +1682,10 @@ def _replace(
         raise ToolError("Give a title or some text.")
     # Line breaks between blocks would come back as empty <div>s; see _tighten_html.
     body = _with_tags(_tighten_html(_drop_tags(body, removed)), tags)
+    # UpNote rebuilds the body from the link, and its re-parser has dropped collapsible-section
+    # wrappers from large notes (11-09). The counts of what was sent gate the trash step below;
+    # the transforms above leave them unchanged.
+    sent_structure = _structure(body)
     notebook_title = nbs[target]["title"] if target else None
     notebook_path = nbs[target]["path"] if target else None
     expected_tags = {_tag_key(t) for t in tags}
@@ -1735,7 +1758,14 @@ def _replace(
         with closing(_connect()) as conn:
             if not tags:
                 time.sleep(1.5)  # no tag to wait for, so give UpNote a moment to record any tag at all
-            row = conn.execute("SELECT text, tagLinks FROM notes WHERE id = ?", (new_note["id"],)).fetchone()
+            row = conn.execute("SELECT text, tagLinks, html FROM notes WHERE id = ?", (new_note["id"],)).fetchone()
+        if dropped := _structure_dropped(sent_structure, _structure((row["html"] if row else "") or "")):
+            return kept_both(
+                f"The new version was created but UpNote dropped collapsible-section markup while saving it "
+                f"({', '.join(f'{k}: {sent_structure[k]} sent, {sent_structure[k] - v} saved' for k, v in dropped.items())}), "
+                "so the original was left in place. UpNote's re-parser has done this to large notes. Edit the note by "
+                "hand in UpNote, or wrap the part you need with make_section."
+            )
         new_note["tags"] = _json_list(row["tagLinks"]) if row else []
         if extra := sorted({_tag_key(t) for t in new_note["tags"]} - expected_tags):
             return kept_both(
@@ -1828,6 +1858,7 @@ def replace_note(
     expected_revision: Annotated[int | None, Field(description="Omit to preview. To replace, pass the revision the preview returned.")] = None,
     acknowledge_warnings: Annotated[bool, Field(description="Set true only after the user has seen and accepted the preview's warnings.")] = False,
     markdown: Annotated[bool, Field(description="The text is Markdown, raw HTML allowed. Leave true.")] = True,
+    server_only: Annotated[bool, Field(description="Direct server imports only: skips the MCP body-size limit. Never set this from an MCP client.")] = False,
     preview_token: Annotated[str | None, Field(description=_TOKEN_DOC)] = None,
 ) -> dict[str, Any]:
     """Edit a note by replacing it, since UpNote can't change a note in place. The new version gets a new id.
@@ -1837,6 +1868,8 @@ def replace_note(
     after the new one is confirmed with the right notebook, tags and text, and only if nobody changed the original
     meanwhile, so it stays recoverable with restore_note. A result with done=false means both notes may exist:
     don't call again, follow its message."""
+    if text is not None and len(text) > MCP_TEXT_LIMIT and not server_only:
+        raise ToolError(_LARGE_BODY_MESSAGE.format(limit=MCP_TEXT_LIMIT, size=len(text)))
     token = _preview_token("replace_note", note_id, text=text, title=title, notebook=notebook,
                            remove_tags=remove_tags, add_tags=add_tags, markdown=markdown)
     if expected_revision is not None:
@@ -1913,6 +1946,33 @@ class _NoteHtml(HTMLParser):
                 node.end = closing_end + 1 if closing_end >= 0 else len(self.source)
                 del self._stack[i:]
                 return
+
+
+_SECTION_CLASS = re.compile(r'class="[^"]*\bshine-collapsible-section\b')
+
+
+def _structure(text: str) -> dict[str, int]:
+    """The collapsible-section counts of a note body. The wrappers and their placeholders round-trip
+    unchanged when UpNote's re-parser is working (11-03: 16 -> 16 sections through a rebuild) and are
+    dropped when it is not (11-09: 16 -> 15 -> 0 over three round-trips of one note). A collapsed
+    wrapper may legitimately come back expanded, so collapsed_sections is shown in previews but never
+    gates a write. Counts read class attributes, so a plain mention of a class name doesn't count.
+    """
+    return {
+        "collapsible_sections": len(_SECTION_CLASS.findall(text)),
+        "collapsed_sections": text.count("shine-section-collapsed"),
+        "section_placeholders": text.count("data-upnote-placeholder-key"),
+    }
+
+
+# The counts a rebuild must not lose. Placeholder divs are a wrapper's children, so their count is
+# two per section in every note UpNote has written; a loss there means the wrapper's inside broke.
+_GATED_STRUCTURE = ("collapsible_sections", "section_placeholders")
+
+
+def _structure_dropped(old: dict[str, int], new: dict[str, int]) -> dict[str, int]:
+    """The gated counts that fell from old to new, as key -> number lost."""
+    return {k: old[k] - new[k] for k in _GATED_STRUCTURE if new[k] < old[k]}
 
 
 def _walk(node: _Node):
@@ -2096,6 +2156,13 @@ def make_section(
     if expected_revision is None:
         preview = _replace(note_id=note_id)
         preview.update({k: plan[k] for k in ("section_title", "inside_section", "blocks_moved", "first_blocks")})
+        # _plan_section wraps existing bytes, so the sent structure is the current one plus the new section.
+        sent = dict(preview["structure"]["current"])
+        sent["collapsible_sections"] += 1
+        sent["section_placeholders"] += 2
+        if collapsed:
+            sent["collapsed_sections"] += 1
+        preview["structure"]["sent"] = sent
         if until:
             preview["line_deleted"] = until
         preview["preview_token"] = token
@@ -2940,6 +3007,7 @@ def append_to_note(
     ))],
     expected_revision: Annotated[int | None, Field(description="Omit to preview. To apply, pass the revision the preview returned.")] = None,
     acknowledge_warnings: Annotated[bool, Field(description="Set true only after the user has seen and accepted the preview's warnings.")] = False,
+    server_only: Annotated[bool, Field(description="Direct server imports only: skips the MCP body-size limit. Never set this from an MCP client.")] = False,
     preview_token: Annotated[str | None, Field(description=_TOKEN_DOC)] = None,
 ) -> dict[str, Any]:
     """Add content to the end of a note and keep everything already in it. Use this instead of replace_note
@@ -2949,6 +3017,8 @@ def append_to_note(
     note_id = note_id.strip()
     if not text.strip():
         raise ToolError("text is empty.")
+    if len(text) > MCP_TEXT_LIMIT and not server_only:
+        raise ToolError(_LARGE_BODY_MESSAGE.format(limit=MCP_TEXT_LIMIT, size=len(text)))
     token = _preview_token("append_to_note", note_id, text=text)
     if expected_revision is not None:
         _check_token(preview_token, token)

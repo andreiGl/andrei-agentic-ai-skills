@@ -320,7 +320,7 @@ async def main():
                 tags = [t.lower() for t in re.findall(r'data-upnote-tag="#([^"]+)"', body)]
                 body = re.sub(r"<(?:br|/?(?:div|p|li|ul|ol|h[1-6]|pre|blockquote|tr|td|th|table))\b[^>]*>", "\n", body, flags=re.I)
                 text = stored["text"] or q.get("title", [""])[0] + "\n" + srv.html_lib.unescape(re.sub(r"<[^<>]+>", "", body))
-                return types.SimpleNamespace(fetchone=lambda: {"text": text, "tagLinks": json.dumps(tags)})
+                return types.SimpleNamespace(fetchone=lambda: {"text": text, "tagLinks": json.dumps(tags), "html": body})
             return self.conn.execute(sql, args)
     srv._connect = FakeConn
     srv._find_created_note = lambda marker, path=None: {"id": "fake-new", "trashed": False, "notebooks": [path] if path else [], "tags": []}
@@ -357,7 +357,7 @@ async def main():
             tried += 1
             accepted = (nid, html, text, rev)
             stored["text"] = (text or "") + "\nAppended line here"
-            if not (res := srv.append_to_note(nid, "Appended line here", rev, True, token)).get("done"):
+            if not (res := srv.append_to_note(nid, "Appended line here", rev, True, server_only=True, preview_token=token)).get("done"):
                 failed["append"].append((nid, res.get("message", "")[:90]))
             stored["text"] = text or ""
             if not (res := srv._replace(nid, text=html, expected_revision=rev, acknowledge_warnings=True)).get("done"):

@@ -42,6 +42,10 @@ def load_server(source, db):
                     if time.monotonic()>deadline:raise srv.ToolError('Synthetic barrier timed out')
                     time.sleep(.02)
             body=q.get('text','');title=q.get('title','');nid=uuid.uuid4().hex;tags=[html.unescape(t).lstrip('#') for t in re.findall(r'data-upnote-tag="([^"]+)"',body)]
+            if mode=='flatten-sections':
+                # Simulates UpNote's 11-09 re-parser failure: wrappers saved without their class.
+                body=re.sub(r'(?i)(<div class=")shine-collapsible-section([" >])',r'\1\2',body)
+                body=body.replace(' data-upnote-placeholder-key',' data-upnote-saved-placeholder-key')
             class Plain(HTMLParser):
                 def __init__(self):super().__init__(convert_charrefs=True);self.parts=[]
                 def handle_data(self,data):self.parts.append(data)

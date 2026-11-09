@@ -146,4 +146,54 @@ class Contract(unittest.TestCase):
         err,d,text=await self.call(s,'append_to_note',note_id=n,text='Corrupt journal append',expected_revision=p['revision'],preview_token=p['preview_token'],acknowledge_warnings=True)
         self.assertTrue(err);self.assertIn('Cannot verify an earlier',text);self.assertEqual(self.event_count('create-request'),before)
 
+    SECTION='<div class="shine-collapsible-section"><div class="shine-section-title-wrapper"><div class="shine-section-title shine-placeholder" data-upnote-placeholder-key="title"><div class="shine-section-title-inner"><h3>Sec</h3></div></div></div><div class="shine-section-content shine-placeholder" data-upnote-placeholder-key="content"><div class="shine-section-content-inner"><div>Body.</div></div></div></div>'
+    async def seeded_note(self,s,tail='<div>After.</div>'):
+        n=await self.create(s)
+        return await self.rebuild(s,'replace_note',note_id=n,text=self.SECTION+tail,markdown=False,server_only=True)
+    @async_test
+    async def test_structural_flatten_refused_and_original_kept(self):
+        s=await self.client();n=await self.seeded_note(s)
+        flat=await self.client('flatten-sections')
+        err,p,text=await self.call(flat,'append_to_note',note_id=n,text='One more line.');self.assertFalse(err,text)
+        self.assertEqual(p['structure']['current']['collapsible_sections'],1,p)
+        self.assertEqual(p['structure']['sent']['collapsible_sections'],1,p)
+        before=self.event_count('create-request')
+        err,d,text=await self.call(flat,'append_to_note',note_id=n,text='One more line.',expected_revision=p['revision'],preview_token=p['preview_token'],acknowledge_warnings=True)
+        self.assertFalse(err,text);self.assertFalse(d['done'],d);self.assertIn('dropped collapsible-section markup',text)
+        self.assertIn('original_note_id',d);self.assertIn('new_note',d)
+        with sqlite3.connect(self.db) as c:
+            live=c.execute('SELECT count(*) FROM notes WHERE id=? AND trashed=0',(n,)).fetchone()[0]
+        self.assertEqual(live,1,'original must stay live when the gate refuses')
+    @async_test
+    async def test_structural_intact_apply_trashes_original(self):
+        s=await self.client();n=await self.seeded_note(s)
+        n2=await self.rebuild(s,'append_to_note',note_id=n,text='Added after the section.')
+        with sqlite3.connect(self.db) as c:
+            html=c.execute('SELECT html FROM notes WHERE id=?',(n2,)).fetchone()[0]
+        self.assertEqual(html.count('shine-collapsible-section'),1,'section must survive a healthy rebuild')
+    @async_test
+    async def test_preview_carries_structure(self):
+        s=await self.client();n=await self.seeded_note(s,'<h3>Other</h3><div>Kept.</div>')
+        err,p,text=await self.call(s,'replace_note',note_id=n,text=self.SECTION+'<h3>Other</h3><div>Kept.</div>',markdown=False,server_only=True)
+        self.assertFalse(err,text)
+        self.assertEqual(p['structure']['current']['collapsible_sections'],1,p)
+        self.assertEqual(p['structure']['sent']['collapsible_sections'],1,p)
+        self.assertEqual(p['structure']['current']['section_placeholders'],2,p)
+        err,p,text=await self.call(s,'make_section',note_id=n,heading='Other')
+        self.assertFalse(err,text)
+        self.assertEqual(p['structure']['sent']['collapsible_sections'],2,p)
+        self.assertEqual(p['structure']['sent']['section_placeholders'],4,p)
+    @async_test
+    async def test_oversized_body_refused_over_mcp(self):
+        s=await self.client();n=await self.seeded_note(s)
+        big='x'*(self.srv.MCP_TEXT_LIMIT+1)
+        before=self.event_count('create-request')
+        for name,args in [('replace_note',dict(note_id=n,text=big)),('append_to_note',dict(note_id=n,text=big))]:
+            err,d,text=await self.call(s,name,**args)
+            self.assertTrue(err,text);self.assertIn('over the 30000-character MCP tool-input limit',text)
+            self.assertIn('server_only',text)
+        self.assertEqual(self.event_count('create-request'),before,'no app effect without a size-limit bypass')
+        err,p,text=await self.call(s,'replace_note',note_id=n,text=big,server_only=True)
+        self.assertFalse(err,text);self.assertEqual(p['stage'],'preview')
+
 if __name__=='__main__':unittest.main(verbosity=2)

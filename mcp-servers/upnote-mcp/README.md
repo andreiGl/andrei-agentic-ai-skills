@@ -226,6 +226,21 @@ warnings accepted, when the note is pinned or bookmarked, sits in more than one
 notebook, has been saved 20 or more times, has collapsible sections or a body over 20,000
 characters, or was edited in the last ten minutes.
 
+A body over 30,000 characters is refused through MCP: some clients pass such inputs cut, and a
+cut body has written a truncated note. Edit large notes through a direct import of `server.py`
+instead, passing `server_only=True` to skip this check - see `reference_upnote_large_note_edits.md`
+in the project memory folder for the recipe.
+
+When the replacement is confirmed, the server compares the collapsible-section counts of the body
+it sent with the copy UpNote saved. UpNote's re-parser has dropped the section wrappers of large
+notes on re-parse (2026-11-09: a 59KB note lost 15 of 16 wrappers, progressively over three
+rebuilds). If any wrapper was lost, the original stays in place and the result is `done=false`
+naming what was dropped. The preview carries the counts in a `structure` object, `current` for the
+note as it is and `sent` for the body submitted, so a flatten shows before applying. A collapsed
+section may legitimately come back expanded, so `collapsed_sections` never gates a write; prefer
+`make_section` or `append_to_note` for notes that hold sections, and hand edits in the UpNote app
+for anything else.
+
 The new version keeps the original's tags. UpNote stores a tag as a hashtag link inside the note,
 so the server adds one at the end for each tag the new text doesn't already carry, and waits until
 UpNote has recorded them. To drop a tag, name it in `remove_tags`: its links are taken out, and
@@ -378,13 +393,15 @@ grant extends to any edit of that file.
 ## Test
 
 The tests run on the server's venv. `test_make_section.py` checks the section-building logic,
-and the HTML clean-up `append_to_note` does, against synthetic note markup, and
-`test_nested_lists.py` checks the nested-list rewrite. Neither touches UpNote or your notes.
+and the HTML clean-up `append_to_note` does, against synthetic note markup,
+`test_nested_lists.py` checks the nested-list rewrite, and `test_structure_gate.py` checks the
+collapsible-section counts and the replace gate's decisions. None touches UpNote or your notes.
 Run each test from this folder:
 
 ```bash
 ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_make_section.py
 ~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_nested_lists.py
+~/.claude/mcp-servers/upnote-mcp-venv/bin/python test_structure_gate.py
 ```
 
 `test_readonly.py` compares every read tool except `open_in_upnote`, which changes what the app
@@ -458,7 +475,9 @@ python -m unittest discover -s tests/upnote -p 'test_*.py' -v
 The suite creates isolated synthetic SQLite data and intercepts every app URL. It
 checks the eight non-read tool paths, previews and invalid applies without side
 effects, cross-process contention, pending state across restart, ambiguous dispatch,
-corrupt journals, literal-backslash warnings, and note navigation/error handling.
+corrupt journals, literal-backslash warnings, the collapsible-section gate (a
+flatten-simulating app mode is refused and the original kept) and the MCP size
+guard, and note navigation/error handling.
 It does not launch UpNote or read/write your notes. Successful fake-app tests do not
 prove compatibility with every UpNote build or editor state.
 
