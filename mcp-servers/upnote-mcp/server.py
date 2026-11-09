@@ -2222,6 +2222,42 @@ def _plan_insert(source: str, heading: str, fragment: str, position: str) -> dic
     }
 
 
+def _fragment_html(text: str) -> str:
+    """The fragment as note HTML. UpNote converts a create link's markdown itself, but a fragment
+    spliced mid-body arrives inside HTML blocks, so the block constructs convert here: lists
+    (nested ones via _nested_lists_to_html, flat ones line-wise), headings, and paragraphs as
+    <div>. Inline markdown (bold, links) is not converted - send HTML for that."""
+    text = _nested_lists_to_html(text)
+    out: list[str] = []
+    paragraph: list[str] = []
+    for line in text.split("\n"):
+        if m := _LIST_ITEM.match(_expand_indent(line)):
+            if paragraph:
+                out.append("<div>" + "<br>".join(paragraph) + "</div>")
+                paragraph = []
+            depth = min(len(m.group(1)) // 2, 5)
+            out.append(f"<ul><li>{html_lib.escape(m.group(4).strip())}</li></ul>" if not depth
+                       else f"{'<ul>' * (depth + 1)}<li>{html_lib.escape(m.group(4).strip())}</li>{'</ul>' * (depth + 1)}")
+        elif m := re.match(r"^ {0,3}(#{1,6})\s+(.*)$", line):
+            if paragraph:
+                out.append("<div>" + "<br>".join(paragraph) + "</div>")
+                paragraph = []
+            out.append(f"<h{len(m.group(1))}>{html_lib.escape(m.group(2).strip())}</h{len(m.group(1))}>")
+        elif line.strip().startswith("<"):
+            if paragraph:
+                out.append("<div>" + "<br>".join(paragraph) + "</div>")
+                paragraph = []
+            out.append(line)  # _nested_lists_to_html wrote it as HTML; pass it through
+        elif line.strip():
+            paragraph.append(html_lib.escape(line.strip()))
+        elif paragraph:
+            out.append("<div>" + "<br>".join(paragraph) + "</div>")
+            paragraph = []
+    if paragraph:
+        out.append("<div>" + "<br>".join(paragraph) + "</div>")
+    return "".join(out)
+
+
 @server.tool(annotations=REPLACE)
 def insert_after_heading(
     note_id: NoteId,
@@ -2253,7 +2289,7 @@ def insert_after_heading(
         _check_token(preview_token, token)
     body, plain = _current_body(note_id)
     if markdown:
-        fragment = _encode_pre_breaks(_sanitize_html(_nested_lists_to_html(text)))
+        fragment = _encode_pre_breaks(_sanitize_html(_fragment_html(text)))
     else:
         fragment = _sanitize_html(text)
     unsafe = [f"Would be removed as unsafe: {', '.join(sorted(set(r)))}."] if (r := _sanitize_report(text)[1]) else []
