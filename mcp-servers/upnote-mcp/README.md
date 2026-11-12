@@ -76,10 +76,10 @@ Alternatively, add this entry to `~/.codex/config.toml`. Merge it with an existi
 command = "/Users/you/.claude/mcp-servers/upnote-mcp-launcher"
 startup_timeout_sec = 20
 tool_timeout_sec = 30
-enabled_tools = ["search_notes", "list_notes", "get_note", "list_notebooks", "list_tags", "run_select", "check_upnote_setup", "create_note", "replace_note", "append_to_note", "move_note", "make_section", "move_note_to_trash", "restore_note", "open_in_upnote"]
+enabled_tools = ["search_notes", "list_notes", "get_note", "list_notebooks", "list_tags", "run_select", "check_upnote_setup", "create_note", "replace_note", "append_to_note", "insert_after_heading", "move_note", "make_section", "move_note_to_trash", "restore_note", "open_in_upnote"]
 ```
 
-These are the server's fifteen tools. Keep the client's normal approval policy; no
+These are the server's sixteen tools. Keep the client's normal approval policy; no
 blanket automatic approval is needed. A project-only test can instead use
 `.codex/config.toml` in a trusted project. See [OpenAI's MCP configuration](https://learn.chatgpt.com/docs/extend/mcp).
 
@@ -111,6 +111,7 @@ separate even when they launch the same implementation.
 | `restore_note` | Moves a note out of Trash |
 | `replace_note` | Edits a note by creating a new version and trashing the original, after a preview; can also move it, remove tags or add them |
 | `append_to_note` | Adds content to the end of a note, copying what's already there, the same way as `replace_note` |
+| `insert_after_heading` | Adds content just under or just above a heading, copying the rest of the note unchanged, the same way as `replace_note` |
 | `move_note` | Moves a note to another notebook by rebuilding it there unchanged, the same way as `replace_note` |
 | `make_section` | Turns a heading and what's under it, up to the next heading or a hand-written end marker, into a collapsible section, nested where it sits |
 | `open_in_upnote` | Shows a note, notebook, tag or search in the app |
