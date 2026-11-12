@@ -88,7 +88,7 @@ version. A repo edit in progress does not change it. `manifest.json` in that dir
 lists each file with its hash. To update the copies, make a new release directory and
 move both sets of links to it. Repo edits to these three skills do nothing until then.
 
-Install UpNote separately using [its instructions](mcp-servers/upnote-mcp/README.md#install).
+Install UpNote separately using [its instructions](https://github.com/andreiGl/upnote-mcp#install).
 For a server shared by Claude and Codex, keep the active code in a versioned copy
 outside the working checkout. Repository edits and pulls then cannot change a running
 server unexpectedly. Test both clients before switching that copy, and reconnect their
@@ -783,16 +783,18 @@ session hooks.
 
 ## UpNote MCP server
 
-[`mcp-servers/upnote-mcp`](mcp-servers/upnote-mcp) connects Claude Code, Claude Desktop and Codex to the
-UpNote desktop app on macOS. Both clients can search and read notes, create formatted and tagged
+[`mcp-servers/upnote-mcp`](https://github.com/andreiGl/upnote-mcp) connects Claude Code, Claude Desktop and Codex to the
+UpNote desktop app on macOS. The folder is a git submodule pointing at [its own
+repo](https://github.com/andreiGl/upnote-mcp), where the server now lives; clone this repo with
+`--recurse-submodules` to get it. Both clients can search and read notes, create formatted and tagged
 notes, edit a note, add to its end, move it to another notebook, turn a heading into a
 collapsible section, change its tags, move notes to Trash and back, and open notes in the app.
 UpNote can't change a note in place, so an edit creates a checked new version and only then
 moves the original to Trash. Text sent to UpNote is cleaned of anything that could run code,
 load remote content or change other notes. Setup, tools and limits are in
-[its README](mcp-servers/upnote-mcp/README.md).
+[its README](https://github.com/andreiGl/upnote-mcp).
 
-The same server exposes fifteen tools to both clients, using separate client registrations
+The same server exposes sixteen tools to both clients, using separate client registrations
 and their normal approval rules. Rebuild/trash operations use shared per-note locks and
 pending markers across server processes, so a second client or restarted server can detect
 an uncertain rebuild before dispatching another copy. A create is still not idempotent;
@@ -801,8 +803,8 @@ read the result before retrying an uncertain operation.
 Local validation covered both clients' CLI and desktop sessions, disposable real notes,
 and synthetic failure cases. The open-in-app fix was visually verified for a restored
 note in a notebook; `sent=true` alone confirms link dispatch. Unfiled and Trash navigation
-branches have synthetic coverage. See [tests](mcp-servers/upnote-mcp/README.md#test) and
-[shared operation state](mcp-servers/upnote-mcp/README.md#shared-operation-state).
+branches have synthetic coverage. See [tests](https://github.com/andreiGl/upnote-mcp/blob/main/docs/TESTING.md) and
+[shared operation state](https://github.com/andreiGl/upnote-mcp/blob/main/docs/DESIGN.md).
 
 ## License
 

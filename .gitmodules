@@ -1,0 +1,3 @@
+[submodule "mcp-servers/upnote-mcp"]
+	path = mcp-servers/upnote-mcp
+	url = https://github.com/andreiGl/upnote-mcp
